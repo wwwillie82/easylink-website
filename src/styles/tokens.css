@@ -1,0 +1,17 @@
+:root {
+  --color-navy: #0f1159;
+  --color-neon: #aeff00;
+  --color-soft: #f7f7f7;
+  --color-white: #ffffff;
+  --color-ink: #17182f;
+  --color-muted: #6f7390;
+  --color-line: rgba(15, 17, 89, 0.14);
+  --color-glass: rgba(255, 255, 255, 0.08);
+  --shadow-soft: 0 24px 70px rgba(15, 17, 89, 0.16);
+  --shadow-neon: 0 0 32px rgba(174, 255, 0, 0.35);
+  --radius-sm: 14px;
+  --radius-md: 22px;
+  --radius-lg: 34px;
+  --container: 1180px;
+  --font-sans: 'Sora', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
