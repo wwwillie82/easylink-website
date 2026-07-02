@@ -1,0 +1,16 @@
+---
+import '../styles/global.css';
+const { title = 'Easylink — Cégvezetés, könnyedén.', description = 'Modern ügyviteli rendszer számlázáshoz, adminisztrációhoz, CRM-hez és AI támogatott döntésekhez.' } = Astro.props;
+---
+<!doctype html>
+<html lang="hu">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content={description} />
+    <meta name="robots" content="noindex,nofollow" />
+    <link rel="icon" href="/favicon.svg" />
+    <title>{title}</title>
+  </head>
+  <body><slot /></body>
+</html>
