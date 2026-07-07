@@ -1,6 +1,6 @@
 # Easylink brand assets TODO
 
-Ide kerül majd a deploy felületről kinyert, bizonyíthatóan eredeti Easylink logó **Deploy felirat nélküli** változata.
+Ide kerül majd a deploy felületről vagy hivatalos brand forrásból kinyert, bizonyíthatóan eredeti Easylink logó **Deploy felirat nélküli** változata.
 
 Jelenleg a repóban nincs igazolható logó asset, ezért a public site header szöveges `easylink` brandet használ. A későbbi csere javasolt útvonala:
 

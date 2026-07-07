@@ -1,18 +1,143 @@
 ---
-const { attempt = 'premium' } = Astro.props;
 const deployUrl = import.meta.env.PUBLIC_DEPLOY_URL ?? 'https://deploy.easylink.hu';
 ---
-<section id="top" class:list={["hero", attempt]}>
+
+<section id="top" class="hero">
   <div class="container hero-grid">
     <div class="hero-copy">
       <span class="eyebrow">Easylink ügyvitel + AI</span>
       <h1>Cégvezetés, könnyedén.</h1>
-      <p>Felejtsd el a táblázatokat! Olyan ügyviteli rendszert adunk a kezedbe, amivel egyetlen, átlátható felületen irányíthatod a számlázást, az adminisztrációt és az ügyfélnyilvántartást.</p>
-      <div class="actions"><a class="button button-primary" href={deployUrl}>Demót kérek</a><a class="button button-secondary" href={deployUrl}>Próbáld ki ingyen</a></div>
+      <p>
+        Felejtsd el a táblázatokat! Olyan ügyviteli rendszert adunk a kezedbe, amivel egyetlen,
+        átlátható felületen irányíthatod a számlázást, az adminisztrációt és az ügyfélnyilvántartást.
+      </p>
+      <div class="actions">
+        <a class="button button-primary" href={deployUrl}>Demót kérek</a>
+        <a class="button button-secondary" href={deployUrl}>Próbáld ki ingyen</a>
+      </div>
     </div>
-    <div class="visual" aria-hidden="true"><div class="orb"></div><div class="panel"><b>Mai üzleti pulzus</b><span>+28% gyorsabb admin</span><span>12 nyitott számla</span><span>AI javaslat: 3 prioritás</span></div></div>
+
+    <div class="visual" aria-hidden="true">
+      <span class="node node-a"></span>
+      <span class="node node-b"></span>
+      <span class="node node-c"></span>
+      <span class="node node-d"></span>
+      <span class="line line-a"></span>
+      <span class="line line-b"></span>
+      <span class="line line-c"></span>
+      <div class="orb"></div>
+      <div class="panel">
+        <b>Mai üzleti pulzus</b>
+        <span>12 nyitott számla</span>
+        <span>4 admin teendő</span>
+        <span>AI javaslat: 3 prioritás</span>
+      </div>
+    </div>
   </div>
 </section>
+
 <style>
-.hero{overflow:hidden;background:radial-gradient(circle at 75% 20%,rgba(174,255,0,.22),transparent 28%),linear-gradient(135deg,var(--color-navy),#080a34);color:var(--color-white);padding:clamp(86px,11vw,150px) 0}.hero-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:48px;align-items:center}.hero p{max-width:760px;color:rgba(255,255,255,.78);font-size:1.1rem}.actions{display:flex;gap:14px;flex-wrap:wrap}.visual{min-height:430px;position:relative;border-radius:var(--radius-lg);background:linear-gradient(145deg,rgba(255,255,255,.14),rgba(255,255,255,.04));border:1px solid rgba(255,255,255,.18);box-shadow:var(--shadow-soft);overflow:hidden}.orb{position:absolute;inset:54px;border-radius:50%;background:radial-gradient(circle,var(--color-neon),transparent 60%);filter:blur(8px);opacity:.75}.panel{position:absolute;left:36px;right:36px;bottom:36px;display:grid;gap:12px;padding:24px;border-radius:24px;background:rgba(15,17,89,.78);border:1px solid rgba(174,255,0,.28);backdrop-filter:blur(12px)}.panel span{padding:12px 14px;border-radius:14px;background:rgba(255,255,255,.08)}.futuristic .visual:before{content:"";position:absolute;inset:0;background-image:linear-gradient(rgba(174,255,0,.18) 1px,transparent 1px),linear-gradient(90deg,rgba(174,255,0,.16) 1px,transparent 1px);background-size:54px 54px;mask-image:radial-gradient(circle,black,transparent 72%)}@media(max-width:860px){.hero-grid{grid-template-columns:1fr}.visual{min-height:320px}.actions{display:grid}}
+  .hero {
+    overflow: hidden;
+    background:
+      radial-gradient(circle at 75% 20%, rgba(174, 255, 0, 0.22), transparent 28%),
+      linear-gradient(135deg, var(--color-navy), #080a34 68%, #05061d);
+    color: var(--color-white);
+    padding: clamp(86px, 11vw, 150px) 0;
+  }
+
+  .hero-grid {
+    display: grid;
+    grid-template-columns: 1.05fr 0.95fr;
+    gap: 48px;
+    align-items: center;
+  }
+
+  .hero p {
+    max-width: 760px;
+    color: rgba(255, 255, 255, 0.78);
+    font-size: 1.1rem;
+  }
+
+  .actions {
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+
+  .visual {
+    min-height: 430px;
+    position: relative;
+    border-radius: var(--radius-lg);
+    background:
+      linear-gradient(rgba(174, 255, 0, 0.13) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(174, 255, 0, 0.11) 1px, transparent 1px),
+      linear-gradient(145deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.04));
+    background-size: 52px 52px, 52px 52px, auto;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    box-shadow: var(--shadow-soft);
+    overflow: hidden;
+  }
+
+  .orb {
+    position: absolute;
+    inset: 76px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(174, 255, 0, 0.72), transparent 62%);
+    filter: blur(10px);
+    opacity: 0.72;
+  }
+
+  .node {
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--color-neon);
+    box-shadow: var(--shadow-neon);
+    z-index: 2;
+  }
+
+  .node-a { left: 18%; top: 22%; }
+  .node-b { right: 22%; top: 30%; }
+  .node-c { left: 28%; bottom: 30%; }
+  .node-d { right: 16%; bottom: 20%; background: #fff; }
+
+  .line {
+    position: absolute;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(174, 255, 0, 0.72), transparent);
+    transform-origin: left center;
+  }
+
+  .line-a { left: 20%; top: 25%; width: 58%; transform: rotate(8deg); }
+  .line-b { left: 30%; top: 67%; width: 50%; transform: rotate(-18deg); }
+  .line-c { left: 20%; top: 25%; width: 46%; transform: rotate(64deg); }
+
+  .panel {
+    position: absolute;
+    left: 36px;
+    right: 36px;
+    bottom: 36px;
+    display: grid;
+    gap: 12px;
+    padding: 24px;
+    border-radius: 24px;
+    background: rgba(15, 17, 89, 0.78);
+    border: 1px solid rgba(174, 255, 0, 0.28);
+    backdrop-filter: blur(12px);
+    z-index: 3;
+  }
+
+  .panel span {
+    padding: 12px 14px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  @media (max-width: 860px) {
+    .hero-grid { grid-template-columns: 1fr; }
+    .visual { min-height: 320px; }
+    .actions { display: grid; }
+  }
 </style>
