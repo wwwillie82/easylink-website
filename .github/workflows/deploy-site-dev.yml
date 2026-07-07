@@ -74,8 +74,14 @@ jobs:
         run: |
           set -euo pipefail
           curl -I --max-time 20 "https://${SITE_DEV_DOMAIN}/"
-          HTML="$(curl -s --max-time 20 "https://${SITE_DEV_DOMAIN}/")"
-          printf '%s' "$HTML" | grep -F "Cégvezetés, könnyedén"
-          printf '%s' "$HTML" | grep -F "noindex,nofollow"
-          printf '%s' "$HTML" | grep -F "https://deploy.easylink.hu"
+          HOME_HTML="$(curl -s --max-time 20 "https://${SITE_DEV_DOMAIN}/")"
+          SOLUTIONS_HTML="$(curl -s --max-time 20 "https://${SITE_DEV_DOMAIN}/megoldasaink/")"
+          AUDIENCES_HTML="$(curl -s --max-time 20 "https://${SITE_DEV_DOMAIN}/kinek-szol/")"
+          INTEGRATIONS_HTML="$(curl -s --max-time 20 "https://${SITE_DEV_DOMAIN}/integraciok/")"
+          printf '%s' "$HOME_HTML" | grep -F "Cégvezetés, könnyedén"
+          printf '%s' "$HOME_HTML" | grep -F "noindex,nofollow"
+          printf '%s' "$HOME_HTML" | grep -F "https://deploy.easylink.hu"
+          printf '%s' "$SOLUTIONS_HTML" | grep -F "Pénzügy és számlázás"
+          printf '%s' "$AUDIENCES_HTML" | grep -F "Kinek szól?"
+          printf '%s' "$INTEGRATIONS_HTML" | grep -F "NAV Online Számla"
           curl -s --max-time 20 "https://${SITE_DEV_DOMAIN}/robots.txt" | grep -F "Disallow: /"

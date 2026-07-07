@@ -1,5 +1,6 @@
 ---
-const deployUrl = import.meta.env.PUBLIC_DEPLOY_URL ?? 'https://deploy.easylink.hu';
+import { deployUrl } from '@/content/siteNavigation';
+const { title = 'Készen állsz könnyedebben vezetni a céged?', description = 'Kérj demót vagy próbáld ki ingyen a konfigurált Deploy felületen.', primaryLabel = 'Demót kérek', secondaryLabel = 'Próbáld ki ingyen' } = Astro.props;
 ---
-<section id="áraink" class="section cta"><div class="container box"><span class="eyebrow">Következő lépés</span><h2>Indítsuk el a demót egy letisztult statikus oldallal.</h2><p>Az árak és csomagok később bővíthetők, a jelenlegi CTA a konfigurált Deploy URL-re mutat.</p><a class="button button-primary" href={deployUrl}>Próbáld ki ingyen</a></div></section>
-<style>.cta{background:#080a34}.box{text-align:center;border-radius:var(--radius-lg);padding:clamp(42px,7vw,82px);background:radial-gradient(circle at top,rgba(174,255,0,.24),transparent 35%),var(--color-navy);color:white}.box p{color:rgba(255,255,255,.72);max-width:680px;margin:0 auto 26px}</style>
+<section class="section cta"><div class="container box"><span class="eyebrow">Következő lépés</span><h2>{title}</h2><p>{description}</p><div class="actions"><a class="button button-primary" href={deployUrl}>{primaryLabel}</a><a class="button button-secondary" href={deployUrl}>{secondaryLabel}</a></div></div></section>
+<style>.cta{background:#080a34}.box{text-align:center;border-radius:var(--radius-lg);padding:clamp(42px,7vw,82px);background:radial-gradient(circle at top,rgba(174,255,0,.24),transparent 35%),var(--color-navy);color:white}.box p{color:rgba(255,255,255,.72);max-width:680px;margin:0 auto 26px}.actions{display:flex;justify-content:center;gap:14px;flex-wrap:wrap}</style>
