@@ -1,0 +1,81 @@
+name: Deploy site-dev
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: site-dev-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Build and deploy site-dev
+    runs-on: ubuntu-latest
+
+    env:
+      PUBLIC_DEPLOY_URL: https://deploy.easylink.hu
+      SITE_DEV_DOMAIN: site-dev.easylink.hu
+      SITE_DEV_WEBROOT: /var/www/clients/client1/web172/web
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.12.0
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Check
+        run: npm run check
+
+      - name: Build
+        run: npm run build
+
+      - name: Setup SSH
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "${{ secrets.SITE_DEV_SSH_KEY }}" > ~/.ssh/site_dev_deploy_key
+          chmod 600 ~/.ssh/site_dev_deploy_key
+          ssh-keyscan -p "${{ secrets.SITE_DEV_SSH_PORT }}" "${{ secrets.SITE_DEV_SSH_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Deploy dist to site-dev
+        shell: bash
+        run: |
+          set -euo pipefail
+          rsync -az --delete \
+            --exclude='error/' \
+            --exclude='stats/' \
+            -e "ssh -i ~/.ssh/site_dev_deploy_key -p ${{ secrets.SITE_DEV_SSH_PORT }} -o IdentitiesOnly=yes" \
+            dist/ \
+            "${{ secrets.SITE_DEV_SSH_USER }}@${{ secrets.SITE_DEV_SSH_HOST }}:${SITE_DEV_WEBROOT}/"
+
+      - name: Fix webroot ownership
+        shell: bash
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/site_dev_deploy_key \
+            -p "${{ secrets.SITE_DEV_SSH_PORT }}" \
+            -o IdentitiesOnly=yes \
+            "${{ secrets.SITE_DEV_SSH_USER }}@${{ secrets.SITE_DEV_SSH_HOST }}" \
+            "chown -R web172:client1 '${SITE_DEV_WEBROOT}'"
+
+      - name: Smoke test
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -I --max-time 20 "https://${SITE_DEV_DOMAIN}/"
+          HTML="$(curl -s --max-time 20 "https://${SITE_DEV_DOMAIN}/")"
+          printf '%s' "$HTML" | grep -F "Cégvezetés, könnyedén"
+          printf '%s' "$HTML" | grep -F "noindex,nofollow"
+          printf '%s' "$HTML" | grep -F "https://deploy.easylink.hu"
+          curl -s --max-time 20 "https://${SITE_DEV_DOMAIN}/robots.txt" | grep -F "Disallow: /"
