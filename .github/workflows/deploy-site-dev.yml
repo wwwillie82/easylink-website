@@ -73,15 +73,47 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          curl -I --max-time 20 "https://${SITE_DEV_DOMAIN}/"
-          HOME_HTML="$(curl -s --max-time 20 "https://${SITE_DEV_DOMAIN}/")"
-          SOLUTIONS_HTML="$(curl -s --max-time 20 "https://${SITE_DEV_DOMAIN}/megoldasaink/")"
-          AUDIENCES_HTML="$(curl -s --max-time 20 "https://${SITE_DEV_DOMAIN}/kinek-szol/")"
-          INTEGRATIONS_HTML="$(curl -s --max-time 20 "https://${SITE_DEV_DOMAIN}/integraciok/")"
+
+          routes=(
+            "/"
+            "/megoldasaink/"
+            "/megoldasaink/penzugy-szamlazas/"
+            "/megoldasaink/hr-munkaugy/"
+            "/megoldasaink/crm-ugyfelkezeles/"
+            "/megoldasaink/dokumentumkezeles-adminisztracio/"
+            "/megoldasaink/kontrolling/"
+            "/megoldasaink/ai-asszisztens/"
+            "/kinek-szol/"
+            "/kinek-szol/hotelek-szallashelyek/"
+            "/kinek-szol/vendeglatohelyek/"
+            "/kinek-szol/szolgaltato-vallalkozasok/"
+            "/integraciok/"
+            "/arak/"
+            "/kapcsolat/"
+          )
+
+          for route in "${routes[@]}"; do
+            status="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "https://${SITE_DEV_DOMAIN}${route}")"
+            test "$status" = "200"
+          done
+
+          HOME_HTML="$(curl -sS --max-time 20 "https://${SITE_DEV_DOMAIN}/")"
+          SOLUTION_DETAIL_HTML="$(curl -sS --max-time 20 "https://${SITE_DEV_DOMAIN}/megoldasaink/penzugy-szamlazas/")"
+          AUDIENCE_DETAIL_HTML="$(curl -sS --max-time 20 "https://${SITE_DEV_DOMAIN}/kinek-szol/hotelek-szallashelyek/")"
+          INTEGRATIONS_HTML="$(curl -sS --max-time 20 "https://${SITE_DEV_DOMAIN}/integraciok/")"
+          PRICING_HTML="$(curl -sS --max-time 20 "https://${SITE_DEV_DOMAIN}/arak/")"
+          CONTACT_HTML="$(curl -sS --max-time 20 "https://${SITE_DEV_DOMAIN}/kapcsolat/")"
+          ROBOTS_TXT="$(curl -sS --max-time 20 "https://${SITE_DEV_DOMAIN}/robots.txt")"
+
           printf '%s' "$HOME_HTML" | grep -F "Cégvezetés, könnyedén"
-          printf '%s' "$HOME_HTML" | grep -F "noindex,nofollow"
+          printf '%s' "$HOME_HTML" | grep -F "Kérdezz, és a rendszered válaszol"
           printf '%s' "$HOME_HTML" | grep -F "https://deploy.easylink.hu"
-          printf '%s' "$SOLUTIONS_HTML" | grep -F "Pénzügy és számlázás"
-          printf '%s' "$AUDIENCES_HTML" | grep -F "Kinek szól?"
+          printf '%s' "$HOME_HTML" | grep -F "noindex,nofollow"
+          printf '%s' "$SOLUTION_DETAIL_HTML" | grep -F "Mire jó?"
+          printf '%s' "$SOLUTION_DETAIL_HTML" | grep -F "Vezetői haszon"
+          printf '%s' "$AUDIENCE_DETAIL_HTML" | grep -F "Hostware integrációs irány / előkészítés"
           printf '%s' "$INTEGRATIONS_HTML" | grep -F "NAV Online Számla"
-          curl -s --max-time 20 "https://${SITE_DEV_DOMAIN}/robots.txt" | grep -F "Disallow: /"
+          printf '%s' "$INTEGRATIONS_HTML" | grep -F "kész runtime NAV kapcsolatot"
+          printf '%s' "$PRICING_HTML" | grep -F "Csomagárak és árkalkulátor"
+          printf '%s' "$CONTACT_HTML" | grep -F "hello@easylink.hu"
+          printf '%s' "$ROBOTS_TXT" | grep -F "Disallow: /"

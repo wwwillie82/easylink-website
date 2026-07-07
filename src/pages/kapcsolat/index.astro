@@ -1,5 +1,44 @@
 ---
-import BaseLayout from '@/layouts/BaseLayout.astro';import Header from '@/components/Header.astro';import PageHero from '@/components/PageHero.astro';import CTASection from '@/components/CTASection.astro';import Footer from '@/components/Footer.astro';
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import Header from '@/components/Header.astro';
+import PageHero from '@/components/PageHero.astro';
+import CTASection from '@/components/CTASection.astro';
+import Footer from '@/components/Footer.astro';
+const deployUrl = import.meta.env.PUBLIC_DEPLOY_URL ?? 'https://deploy.easylink.hu';
 ---
-<BaseLayout title="Kapcsolat | Easylink" description="Kapcsolat az Easylink csapattal."><Header/><main><PageHero eyebrow="Kapcsolat" title="Kapcsolódjunk össze." description="Írj nekünk, vagy kérj demót a Deploy felületen keresztül."/><section class="section light"><div class="container card contact"><h2>Kapcsolat</h2><p><a href="mailto:hello@easylink.hu">hello@easylink.hu</a></p></div></section><CTASection/></main><Footer/></BaseLayout>
-<style>.light{background:var(--color-soft)}.contact{padding:32px}.contact h2{color:var(--color-navy)}</style>
+
+<BaseLayout title="Kapcsolat | Easylink" description="Kapcsolat az Easylink csapattal.">
+  <Header />
+  <main>
+    <PageHero eyebrow="Kapcsolat" title="Kapcsolódjunk össze." description="Írj nekünk, vagy kérj demót a Deploy felületen keresztül." />
+    <section class="section light">
+      <div class="container contact-grid">
+        <article class="card contact">
+          <h2>Kapcsolat</h2>
+          <p>Email: <a href="mailto:hello@easylink.hu">hello@easylink.hu</a></p>
+          <a class="button button-primary" href={deployUrl}>Demót kérek</a>
+        </article>
+        <article class="card contact">
+          <h2>Miben tudunk segíteni?</h2>
+          <ul>
+            <li>Megnézzük, mely modulok illenek a jelenlegi működésedhez.</li>
+            <li>Átbeszéljük a hotel/szálláshely, vendéglátó vagy szolgáltatói fókuszt.</li>
+            <li>Összegyűjtjük, milyen integrációs irányokat érdemes előkészíteni.</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+    <CTASection />
+  </main>
+  <Footer />
+</BaseLayout>
+
+<style>
+  .light { background: var(--color-soft); }
+  .contact-grid { display: grid; grid-template-columns: 0.85fr 1.15fr; gap: 22px; }
+  .contact { padding: 32px; }
+  .contact h2 { color: var(--color-navy); font-size: clamp(1.8rem, 4vw, 3rem); }
+  .contact a:not(.button) { color: var(--color-navy); font-weight: 800; }
+  li { margin: 12px 0; color: var(--color-navy); line-height: 1.55; font-weight: 600; }
+  @media (max-width: 860px) { .contact-grid { grid-template-columns: 1fr; } }
+</style>
