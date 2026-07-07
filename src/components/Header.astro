@@ -1,15 +1,11 @@
 ---
-const deployUrl = import.meta.env.PUBLIC_DEPLOY_URL ?? 'https://deploy.easylink.hu';
-const nav = ['Megoldásaink', 'Kinek szól?', 'Integrációk', 'Áraink', 'Kapcsolat'];
+import { siteNavigation, deployUrl } from '@/content/siteNavigation';
 ---
 <header class="site-header">
   <div class="container nav-wrap">
-    <a class="brand" href="#top"><span>easy</span>link</a>
-    <nav aria-label="Fő navigáció">{nav.map((item) => <a href={`#${item.toLowerCase().replaceAll(' ', '-').replace('?', '')}`}>{item}</a>)}</nav>
+    <a class="brand" href="/" aria-label="Easylink főoldal"><span>easy</span>link</a>
+    <nav aria-label="Fő navigáció">{siteNavigation.map((item) => <a href={item.href}>{item.title}</a>)}</nav>
     <a class="button button-primary" href={deployUrl}>Demót kérek</a>
   </div>
 </header>
-<style>
-.site-header{position:sticky;top:0;z-index:20;background:rgba(247,247,247,.88);backdrop-filter:blur(18px);border-bottom:1px solid var(--color-line)}
-.nav-wrap{height:78px;display:flex;align-items:center;justify-content:space-between;gap:24px}.brand{font-weight:800;font-size:1.35rem;color:var(--color-navy)}.brand span{color:var(--color-neon);text-shadow:0 0 14px rgba(174,255,0,.7)}nav{display:flex;gap:24px;font-size:.92rem;color:var(--color-navy)}nav a{opacity:.78}nav a:hover{opacity:1}@media(max-width:900px){nav{display:none}.nav-wrap{height:68px}}
-</style>
+<style>.site-header{position:sticky;top:0;z-index:20;background:rgba(247,247,247,.88);backdrop-filter:blur(18px);border-bottom:1px solid var(--color-line)}.nav-wrap{height:78px;display:flex;align-items:center;justify-content:space-between;gap:24px}.brand{font-weight:800;font-size:1.35rem;color:var(--color-navy)}.brand span{color:var(--color-neon);text-shadow:0 0 14px rgba(174,255,0,.7)}nav{display:flex;gap:24px;font-size:.92rem;color:var(--color-navy)}nav a{opacity:.78}nav a:hover{opacity:1}@media(max-width:900px){nav{display:none}.nav-wrap{height:68px}}</style>

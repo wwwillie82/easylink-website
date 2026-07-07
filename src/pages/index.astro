@@ -1,34 +1,6 @@
 ---
-import BaseLayout from '@/layouts/BaseLayout.astro';
-import Header from '@/components/Header.astro';
-import Hero from '@/components/Hero.astro';
-import AiAssistantPreview from '@/components/AiAssistantPreview.astro';
-import FeatureCards from '@/components/FeatureCards.astro';
-import IntegrationsStrip from '@/components/IntegrationsStrip.astro';
-import AudienceSection from '@/components/AudienceSection.astro';
-import CTASection from '@/components/CTASection.astro';
-import Footer from '@/components/Footer.astro';
+import BaseLayout from '@/layouts/BaseLayout.astro';import Header from '@/components/Header.astro';import Hero from '@/components/Hero.astro';import ListingCards from '@/components/ListingCards.astro';import AiAssistantPreview from '@/components/AiAssistantPreview.astro';import IntegrationsStrip from '@/components/IntegrationsStrip.astro';import CTASection from '@/components/CTASection.astro';import Footer from '@/components/Footer.astro';
+import { publishedSolutions } from '@/content/solutions';import { publishedAudiences } from '@/content/audiences';
 ---
-<BaseLayout>
-  <Header />
-  <main>
-    <Hero attempt="premium" />
-    <FeatureCards />
-    <AiAssistantPreview />
-    <IntegrationsStrip />
-    <AudienceSection />
-    <section class="section attempt-two">
-      <div class="container alt-grid">
-        <div>
-          <span class="eyebrow">Attempt 2 vizuális irány</span>
-          <h2>Minden mindennel kapcsolódik.</h2>
-          <p>Futurisztikusabb AI/adatáramlás koncepció finom hálózati réteggel, neon zöld kapcsolódási pontokkal és mobilon is tiszta felépítéssel.</p>
-        </div>
-        <div class="network" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
-      </div>
-    </section>
-    <CTASection />
-  </main>
-  <Footer />
-</BaseLayout>
-<style>.attempt-two{background:radial-gradient(circle at 25% 20%,rgba(174,255,0,.2),transparent 26%),linear-gradient(135deg,#070926,var(--color-navy));color:white}.attempt-two p{color:rgba(255,255,255,.72)}.alt-grid{display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:center}.network{min-height:360px;position:relative;border:1px solid rgba(174,255,0,.24);border-radius:var(--radius-lg);background-image:linear-gradient(rgba(174,255,0,.1) 1px,transparent 1px),linear-gradient(90deg,rgba(174,255,0,.1) 1px,transparent 1px);background-size:42px 42px;overflow:hidden}.network:before,.network:after{content:"";position:absolute;inset:20% 10%;border:1px solid rgba(174,255,0,.36);border-radius:50%;filter:drop-shadow(0 0 18px rgba(174,255,0,.5))}.network:after{inset:36% 24%;border-color:rgba(255,255,255,.28)}i{position:absolute;width:16px;height:16px;border-radius:50%;background:var(--color-neon);box-shadow:var(--shadow-neon)}i:nth-child(1){left:18%;top:28%}i:nth-child(2){left:58%;top:22%}i:nth-child(3){left:76%;top:62%}i:nth-child(4){left:34%;top:72%}i:nth-child(5){left:48%;top:48%;background:white}@media(max-width:800px){.alt-grid{grid-template-columns:1fr}.network{min-height:260px}}</style>
+<BaseLayout><Header/><main><Hero/><section class="section light"><div class="container"><span class="eyebrow">Megoldásaink</span><h2>Egy rendszer a napi működés kulcspontjaira.</h2><ListingCards items={publishedSolutions.slice(0,3)} basePath="/megoldasaink/"/><p class="more"><a class="button button-secondary" href="/megoldasaink/">Összes megoldás</a></p></div></section><AiAssistantPreview/><IntegrationsStrip/><section class="section"><div class="container"><span class="eyebrow">Kinek szól?</span><h2>Hoteleknek, vendéglátóhelyeknek és szolgáltató vállalkozásoknak.</h2><ListingCards items={publishedAudiences} basePath="/kinek-szol/"/></div></section><CTASection/></main><Footer/></BaseLayout>
+<style>.more{margin-top:28px}.light{background:var(--color-soft)}h2{max-width:900px}</style>

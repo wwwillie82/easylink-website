@@ -1,0 +1,8 @@
+---
+const { blocks = [], media } = Astro.props;
+---
+<section class="section light"><div class="container block-grid">
+  <div class="blocks">{blocks.map((block) => <article class="card content-card"><span class="eyebrow">{block.type}</span><h2>{block.title}</h2>{block.body && <p>{block.body}</p>}{block.items && <ul>{block.items.map((item)=><li>{item}</li>)}</ul>}</article>)}</div>
+  {media && <aside class="media-note card"><b>Media placeholder</b><code>{media.path}</code><p>{media.todo}</p></aside>}
+</div></section>
+<style>.block-grid{display:grid;grid-template-columns:1fr 320px;gap:24px}.blocks{display:grid;gap:22px}.content-card,.media-note{padding:28px}.content-card h2{font-size:clamp(2rem,4vw,3.2rem);color:var(--color-navy)}li{margin:12px 0;color:var(--color-navy);font-weight:600}.media-note{align-self:start;background:linear-gradient(180deg,#fff,var(--color-soft))}code{display:block;white-space:normal;margin:16px 0;color:var(--color-navy)}@media(max-width:900px){.block-grid{grid-template-columns:1fr}}</style>

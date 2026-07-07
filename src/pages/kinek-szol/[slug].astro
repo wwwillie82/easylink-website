@@ -1,0 +1,6 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';import Header from '@/components/Header.astro';import PageHero from '@/components/PageHero.astro';import ContentBlocks from '@/components/ContentBlocks.astro';import RelatedLinks from '@/components/RelatedLinks.astro';import CTASection from '@/components/CTASection.astro';import Footer from '@/components/Footer.astro';import { publishedAudiences } from '@/content/audiences';
+export function getStaticPaths(){return publishedAudiences.map((item)=>({params:{slug:item.slug},props:{item}}));}
+const { item } = Astro.props;const related = publishedAudiences.filter((entry)=>entry.slug!==item.slug).map((entry)=>({title:entry.title,href:`/kinek-szol/${entry.slug}/`}));
+---
+<BaseLayout title={item.seoTitle} description={item.seoDescription}><Header/><main><PageHero eyebrow="Kinek szól?" title={item.heroTitle} description={item.heroDescription}/><ContentBlocks blocks={item.blocks} media={item.media}/><RelatedLinks links={related}/><CTASection/></main><Footer/></BaseLayout>

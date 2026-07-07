@@ -1,0 +1,10 @@
+---
+const { eyebrow = 'easylink', title, description, dark = true } = Astro.props;
+---
+<section class:list={['page-hero', { light: !dark }]}>
+  <div class="container page-hero-grid">
+    <div><span class="eyebrow">{eyebrow}</span><h1>{title}</h1><p>{description}</p></div>
+    <div class="data-visual" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+  </div>
+</section>
+<style>.page-hero{background:radial-gradient(circle at 75% 20%,rgba(174,255,0,.22),transparent 28%),linear-gradient(135deg,var(--color-navy),#080a34);color:white;padding:clamp(70px,9vw,120px) 0}.page-hero.light{background:var(--color-soft);color:var(--color-navy)}.page-hero p{max-width:760px;color:rgba(255,255,255,.78);font-size:1.08rem}.light p{color:var(--color-muted)}.page-hero-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:44px;align-items:center}.data-visual{min-height:300px;border:1px solid rgba(174,255,0,.25);border-radius:var(--radius-lg);background-image:linear-gradient(rgba(174,255,0,.10) 1px,transparent 1px),linear-gradient(90deg,rgba(174,255,0,.10) 1px,transparent 1px);background-size:44px 44px;position:relative;overflow:hidden}.data-visual:before{content:"";position:absolute;inset:20%;border:1px solid rgba(174,255,0,.36);border-radius:50%;filter:drop-shadow(0 0 18px rgba(174,255,0,.5))}.data-visual i{position:absolute;width:15px;height:15px;border-radius:50%;background:var(--color-neon);box-shadow:var(--shadow-neon)}.data-visual i:nth-child(1){left:18%;top:24%}.data-visual i:nth-child(2){left:68%;top:30%}.data-visual i:nth-child(3){left:38%;top:72%}.data-visual i:nth-child(4){left:78%;top:70%;background:white}@media(max-width:860px){.page-hero-grid{grid-template-columns:1fr}.data-visual{min-height:220px}}</style>
