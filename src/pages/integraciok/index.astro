@@ -38,11 +38,11 @@ import { publishedIntegrations } from '@/content/integrations';
   .light { background: var(--color-soft); }
   .network-section { background: linear-gradient(180deg, #f6f8f5, #fff); }
   .intro { margin-bottom: 28px; }
-  .intro h2 { max-width: 920px; color: var(--color-navy); font-size: clamp(2rem, 4vw, 3.3rem); }
-  .integration-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; }
-  .integration-card { position: relative; overflow: hidden; padding: 28px; border-radius: 28px; box-shadow: 0 22px 70px rgba(15,17,89,.1); }
+  .intro h2 { max-width: 920px; color: var(--color-navy); font-size: clamp(1.85rem, 3vw, 2.75rem); }
+  .integration-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--card-gap); }
+  .integration-card { position: relative; overflow: hidden; padding: var(--card-padding); border-radius: 24px; box-shadow: 0 22px 70px rgba(15,17,89,.1); }
   .integration-card:before { content: ""; position: absolute; inset: 0 0 auto; height: 5px; background: linear-gradient(90deg, var(--color-neon), #16d7ff); }
-  .integration-card span { color: var(--color-neon); background: var(--color-navy); width: 46px; height: 46px; border-radius: 16px; display: grid; place-items: center; font-weight: 800; }
+  .integration-card span { color: var(--color-neon); background: var(--color-navy); width: 40px; height: 40px; border-radius: 14px; display: grid; place-items: center; font-weight: 800; }
   .integration-card h3 { color: var(--color-navy); }
   .detail { color: var(--color-ink); font-weight: 400; }
   code { color: var(--color-muted); white-space: normal; }

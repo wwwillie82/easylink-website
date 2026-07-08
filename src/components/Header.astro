@@ -30,7 +30,7 @@ import { siteNavigation, deployUrl } from '@/content/siteNavigation';
     display: grid;
     grid-template-columns: minmax(168px, auto) minmax(0, 1fr) auto;
     align-items: center;
-    gap: clamp(14px, 2vw, 24px);
+    gap: clamp(10px, 1.5vw, 18px);
   }
 
   .brand,
@@ -64,13 +64,13 @@ import { siteNavigation, deployUrl } from '@/content/siteNavigation';
     justify-content: center;
     flex-wrap: wrap;
     min-width: 0;
-    font-size: 0.9rem;
+    font-size: 0.86rem;
     color: var(--color-navy);
     font-weight: 700;
   }
 
   nav a {
-    padding: 10px 12px;
+    padding: 8px 10px;
     border-radius: var(--radius-pill);
     opacity: 0.78;
     white-space: nowrap;
@@ -84,15 +84,15 @@ import { siteNavigation, deployUrl } from '@/content/siteNavigation';
   }
 
   .nav-cta {
-    padding: 13px 19px;
+    padding: 11px 17px;
     white-space: nowrap;
   }
 
   @media (max-width: 980px) {
     .nav-wrap {
       min-height: var(--header-height-mobile);
-      padding-top: 12px;
-      padding-bottom: 12px;
+      padding-top: 9px;
+      padding-bottom: 9px;
       grid-template-columns: minmax(0, 1fr) auto;
     }
 

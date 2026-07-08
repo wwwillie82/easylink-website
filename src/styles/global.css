@@ -26,10 +26,10 @@ h1 { font-size: var(--text-page-hero-title); }
 h2 { font-size: var(--text-section-title); }
 h3 { font-size: var(--text-card-title); }
 h3, .button { font-weight: 600; }
-p { color: var(--color-muted); font-size: var(--text-body); line-height: 1.72; font-weight: 300; }
+p { color: var(--color-muted); font-size: var(--text-body); line-height: 1.65; font-weight: 300; }
 .section { padding: var(--section-padding) 0; }
 .section-tight { padding: var(--section-padding-tight) 0; }
-.button { display: inline-flex; align-items: center; justify-content: center; gap: 10px; border-radius: var(--radius-pill); padding: 15px 22px; border: 1px solid transparent; transition: transform .2s ease, box-shadow .2s ease, background .2s ease; }
+.button { display: inline-flex; align-items: center; justify-content: center; gap: 10px; border-radius: var(--radius-pill); padding: 13px 20px; border: 1px solid transparent; transition: transform .2s ease, box-shadow .2s ease, background .2s ease; }
 .button:hover { transform: translateY(-2px); }
 .button-primary { background: var(--color-neon); color: var(--color-navy); box-shadow: var(--shadow-neon); }
 .button-secondary { border-color: rgba(255,255,255,.28); color: var(--color-white); background: rgba(255,255,255,.08); }
@@ -37,6 +37,6 @@ p { color: var(--color-muted); font-size: var(--text-body); line-height: 1.72; f
 .card { border: 1px solid var(--color-line); border-radius: var(--radius-md); background: var(--color-white); box-shadow: var(--shadow-soft); }
 @media (max-width: 760px) {
   .container, .container-narrow { width: min(100% - 28px, var(--container)); }
-  .section { padding: 60px 0; }
+  .section { padding: 48px 0; }
   .button { width: 100%; }
 }
