@@ -15,9 +15,7 @@ const {
       <h1>{title}</h1>
       <p>{description}</p>
     </div>
-    <div class="page-hero-visual" aria-hidden="true">
-      <span>{variant === 'detail' ? 'Fókuszált üzleti nézet' : 'Adatkapcsolati keret'}</span>
-    </div>
+    <div class="page-hero-visual" aria-hidden="true"></div>
   </div>
 </section>
 <style>
@@ -34,10 +32,10 @@ const {
     position: absolute;
     inset: 0;
     background-image:
-      linear-gradient(90deg, rgba(8, 10, 52, 0.96), rgba(8, 10, 52, 0.83) 44%, rgba(8, 10, 52, 0.34) 74%, rgba(8, 10, 52, 0.18)),
+      linear-gradient(90deg, rgba(8, 10, 52, 0.98) 0%, rgba(8, 10, 52, 0.88) 43%, rgba(8, 10, 52, 0.26) 72%, rgba(8, 10, 52, 0.08) 100%),
       var(--page-hero-asset);
     background-size: cover;
-    background-position: 62% center;
+    background-position: 66% center;
     opacity: 0.98;
   }
 
@@ -48,7 +46,7 @@ const {
     position: relative;
     z-index: 1;
     display: grid;
-    grid-template-columns: minmax(0, 0.98fr) minmax(220px, 0.52fr);
+    grid-template-columns: minmax(0, 1fr) minmax(200px, 0.45fr);
     gap: clamp(18px, 3vw, 34px);
     align-items: center;
   }
@@ -59,26 +57,13 @@ const {
   .page-hero p { max-width: 720px; color: rgba(255, 255, 255, 0.8); font-size: var(--text-body-lg); }
 
   .page-hero-visual {
-    min-height: clamp(130px, 15vw, 190px);
-    border-radius: 24px;
-    border: 1px solid rgba(174, 255, 0, 0.18);
-    background: linear-gradient(135deg, rgba(174, 255, 0, 0.12), rgba(255, 255, 255, 0.035));
-    backdrop-filter: blur(5px);
+    min-height: clamp(120px, 14vw, 180px);
     position: relative;
+    pointer-events: none;
+    background: radial-gradient(circle at 58% 42%, rgba(174, 255, 0, 0.14), transparent 34%);
   }
 
-  .page-hero-detail .page-hero-visual { min-height: 112px; opacity: 0.72; }
-
-  .page-hero-visual span {
-    position: absolute;
-    left: 18px;
-    bottom: 16px;
-    color: rgba(255, 255, 255, 0.74);
-    font-size: 0.76rem;
-    font-weight: 800;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
+  .page-hero-detail .page-hero-visual { min-height: 104px; opacity: 0.68; }
 
   @media (max-width: 860px) {
     .page-hero { padding: 36px 0 40px; }
