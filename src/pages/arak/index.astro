@@ -16,7 +16,7 @@ import Footer from '@/components/Footer.astro';
     />
     <section class="section light">
       <div class="container price-grid">
-        <article class="card">
+        <article class="card polished">
           <h2>Mitől függhet az ár?</h2>
           <ul>
             <li>Választott moduloktól: pénzügy, CRM, dokumentumkezelés, kontrolling vagy AI irány.</li>
@@ -25,7 +25,7 @@ import Footer from '@/components/Footer.astro';
             <li>Bevezetési, adat-előkészítési és támogatási igényektől.</li>
           </ul>
         </article>
-        <article class="card placeholder">
+        <article class="card polished placeholder">
           <span class="eyebrow">Későbbi hely</span>
           <h2>Csomagárak és árkalkulátor</h2>
           <p>
@@ -43,7 +43,7 @@ import Footer from '@/components/Footer.astro';
 <style>
   .light { background: var(--color-soft); }
   .price-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
-  .card { padding: 28px; }
+  .polished { padding: 32px; border-radius: 28px; box-shadow: 0 22px 70px rgba(15,17,89,.1); }
   h2 { color: var(--color-navy); font-size: clamp(1.8rem, 4vw, 3rem); }
   li { margin: 12px 0; color: var(--color-navy); line-height: 1.55; font-weight: 600; }
   .placeholder { background: linear-gradient(180deg, #fff, #f0f5eb); }

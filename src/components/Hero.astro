@@ -3,6 +3,7 @@ const deployUrl = import.meta.env.PUBLIC_DEPLOY_URL ?? 'https://deploy.easylink.
 ---
 
 <section id="top" class="hero">
+  <div class="hero-bg" aria-hidden="true"></div>
   <div class="container hero-grid">
     <div class="hero-copy">
       <span class="eyebrow">Easylink ügyvitel + AI</span>
@@ -15,129 +16,95 @@ const deployUrl = import.meta.env.PUBLIC_DEPLOY_URL ?? 'https://deploy.easylink.
         <a class="button button-primary" href={deployUrl}>Demót kérek</a>
         <a class="button button-secondary" href={deployUrl}>Próbáld ki ingyen</a>
       </div>
-    </div>
-
-    <div class="visual" aria-hidden="true">
-      <span class="node node-a"></span>
-      <span class="node node-b"></span>
-      <span class="node node-c"></span>
-      <span class="node node-d"></span>
-      <span class="line line-a"></span>
-      <span class="line line-b"></span>
-      <span class="line line-c"></span>
-      <div class="orb"></div>
-      <div class="panel">
-        <b>Mai üzleti pulzus</b>
-        <span>12 nyitott számla</span>
-        <span>4 admin teendő</span>
-        <span>AI javaslat: 3 prioritás</span>
+      <div class="trust-row">
+        <span>Számlázás</span>
+        <span>Admin</span>
+        <span>CRM</span>
+        <span>AI válaszok</span>
       </div>
+    </div>
+    <div class="hero-panel" aria-hidden="true">
+      <b>Vezetői pulzus</b>
+      <span>12 nyitott számla</span>
+      <span>4 admin teendő</span>
+      <span>AI javaslat: 3 prioritás</span>
     </div>
   </div>
 </section>
 
 <style>
   .hero {
-    overflow: hidden;
-    background:
-      radial-gradient(circle at 75% 20%, rgba(174, 255, 0, 0.22), transparent 28%),
-      linear-gradient(135deg, var(--color-navy), #080a34 68%, #05061d);
-    color: var(--color-white);
-    padding: clamp(86px, 11vw, 150px) 0;
-  }
-
-  .hero-grid {
-    display: grid;
-    grid-template-columns: 1.05fr 0.95fr;
-    gap: 48px;
-    align-items: center;
-  }
-
-  .hero p {
-    max-width: 760px;
-    color: rgba(255, 255, 255, 0.78);
-    font-size: 1.1rem;
-  }
-
-  .actions {
-    display: flex;
-    gap: 14px;
-    flex-wrap: wrap;
-  }
-
-  .visual {
-    min-height: 430px;
     position: relative;
-    border-radius: var(--radius-lg);
-    background:
-      linear-gradient(rgba(174, 255, 0, 0.13) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(174, 255, 0, 0.11) 1px, transparent 1px),
-      linear-gradient(145deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.04));
-    background-size: 52px 52px, 52px 52px, auto;
-    border: 1px solid rgba(255, 255, 255, 0.18);
-    box-shadow: var(--shadow-soft);
     overflow: hidden;
+    min-height: clamp(680px, 82vh, 880px);
+    display: grid;
+    align-items: center;
+    color: white;
+    background: #07082d;
+    padding: clamp(86px, 10vw, 150px) 0;
   }
-
-  .orb {
+  .hero-bg {
     position: absolute;
-    inset: 76px;
-    border-radius: 50%;
-    background: radial-gradient(circle, rgba(174, 255, 0, 0.72), transparent 62%);
-    filter: blur(10px);
-    opacity: 0.72;
+    inset: 0;
+    background-image:
+      linear-gradient(90deg, rgba(7, 8, 45, 0.95) 0%, rgba(15, 17, 89, 0.84) 36%, rgba(15, 17, 89, 0.28) 70%, rgba(7, 8, 45, 0.58) 100%),
+      linear-gradient(0deg, rgba(7, 8, 45, 0.84), rgba(7, 8, 45, 0.08) 46%, rgba(7, 8, 45, 0.9)),
+      url('/assets/nati/hero-bg-flow-03.webp');
+    background-size: cover;
+    background-position: center right;
+    transform: scale(1.02);
   }
-
-  .node {
+  .hero::after {
+    content: "";
     position: absolute;
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    background: var(--color-neon);
-    box-shadow: var(--shadow-neon);
-    z-index: 2;
+    inset: auto -12% -20% -12%;
+    height: 260px;
+    background: radial-gradient(ellipse at center, rgba(174, 255, 0, 0.18), transparent 60%);
+    filter: blur(18px);
   }
-
-  .node-a { left: 18%; top: 22%; }
-  .node-b { right: 22%; top: 30%; }
-  .node-c { left: 28%; bottom: 30%; }
-  .node-d { right: 16%; bottom: 20%; background: #fff; }
-
-  .line {
-    position: absolute;
-    height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(174, 255, 0, 0.72), transparent);
-    transform-origin: left center;
+  .hero-grid {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(280px, 0.55fr);
+    gap: 42px;
+    align-items: end;
   }
-
-  .line-a { left: 20%; top: 25%; width: 58%; transform: rotate(8deg); }
-  .line-b { left: 30%; top: 67%; width: 50%; transform: rotate(-18deg); }
-  .line-c { left: 20%; top: 25%; width: 46%; transform: rotate(64deg); }
-
-  .panel {
-    position: absolute;
-    left: 36px;
-    right: 36px;
-    bottom: 36px;
+  .hero-copy { max-width: 820px; }
+  .hero p { max-width: 760px; color: rgba(255, 255, 255, 0.82); font-size: clamp(1.05rem, 1.4vw, 1.22rem); }
+  .actions, .trust-row { display: flex; gap: 14px; flex-wrap: wrap; }
+  .actions { margin-top: 30px; }
+  .trust-row { margin-top: 30px; }
+  .trust-row span {
+    border: 1px solid rgba(174, 255, 0, 0.28);
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 999px;
+    padding: 9px 13px;
+    color: rgba(255, 255, 255, 0.78);
+    font-size: 0.88rem;
+  }
+  .hero-panel {
+    padding: 24px;
+    border-radius: 28px;
+    background: rgba(6, 8, 39, 0.62);
+    border: 1px solid rgba(174, 255, 0, 0.28);
+    backdrop-filter: blur(14px);
+    box-shadow: 0 28px 80px rgba(0, 0, 0, 0.28);
     display: grid;
     gap: 12px;
-    padding: 24px;
-    border-radius: 24px;
-    background: rgba(15, 17, 89, 0.78);
-    border: 1px solid rgba(174, 255, 0, 0.28);
-    backdrop-filter: blur(12px);
-    z-index: 3;
   }
-
-  .panel span {
-    padding: 12px 14px;
-    border-radius: 14px;
-    background: rgba(255, 255, 255, 0.08);
-  }
-
+  .hero-panel b { color: var(--color-neon); }
+  .hero-panel span { padding: 13px 14px; border-radius: 16px; background: rgba(255, 255, 255, 0.08); }
   @media (max-width: 860px) {
+    .hero { min-height: auto; }
+    .hero-bg {
+      background-image:
+        linear-gradient(90deg, rgba(7, 8, 45, 0.94), rgba(7, 8, 45, 0.78)),
+        url('/assets/nati/hero-bg-flow-03.webp');
+      background-position: 62% center;
+    }
     .hero-grid { grid-template-columns: 1fr; }
-    .visual { min-height: 320px; }
+    .hero-panel { max-width: 520px; }
     .actions { display: grid; }
   }
 </style>

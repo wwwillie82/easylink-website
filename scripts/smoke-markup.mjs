@@ -50,13 +50,28 @@ async function scanLocal(dir) {
 
   const files = await collectFiles(dir);
   const failures = [];
+  const combined = [];
 
   for (const file of files) {
     const content = await readFile(file, 'utf8');
+    combined.push(content);
     for (const pattern of badPatterns) {
       if (content.includes(pattern)) {
         failures.push(`${file}: contains ${pattern}`);
       }
+    }
+  }
+
+  const allContent = combined.join('\n');
+  const requiredAssets = [
+    '/assets/brand/easylink-logo-horizontal.png',
+    '/assets/nati/hero-bg-flow-03.webp',
+    '/assets/nati/hero-bg-flow-01.webp',
+    '/assets/nati/hero-bg-flow-02.webp',
+  ];
+  for (const asset of requiredAssets) {
+    if (!allContent.includes(asset)) {
+      failures.push(`${dir}: missing asset reference ${asset}`);
     }
   }
 
