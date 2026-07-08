@@ -1,7 +1,7 @@
 import { readdir, readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 
-const badPatterns = [
+const badStrings = [
   'nodenode',
   '<spandata',
   '<aclass',
@@ -11,9 +11,20 @@ const badPatterns = [
   '<bdata',
   '<ahref',
   '1pxsolid',
+  '<h3data',
+  '<idata',
+  'alt="Easylink"data',
+  'felületenirányíthatod',
+  'rendezettebbdokumentumok',
 ];
 
-const args = new Set(process.argv.slice(2));
+const badRegexes = [
+  { name: '<tagdata-astro', regex: /<[a-z][a-z0-9-]*data-astro/gi },
+  { name: 'quoted-attribute-data-astro-without-space', regex: /"[a-zA-Z0-9_-]+data-astro/g },
+  { name: 'href-attribute-data-without-space', regex: /href="[^"]+"data/gi },
+  { name: 'alt-attribute-data-without-space', regex: /alt="[^"]+"data/gi },
+];
+
 const targetArg = process.argv.slice(2).find((arg) => !arg.startsWith('--'));
 const target = targetArg ?? 'dist';
 
@@ -36,6 +47,26 @@ async function collectFiles(dir) {
   return files;
 }
 
+function scanContent(content, label) {
+  const failures = [];
+
+  for (const pattern of badStrings) {
+    if (content.includes(pattern)) {
+      failures.push(`${label}: contains ${pattern}`);
+    }
+  }
+
+  for (const { name, regex } of badRegexes) {
+    regex.lastIndex = 0;
+    const match = regex.exec(content);
+    if (match) {
+      failures.push(`${label}: matches ${name} (${match[0]})`);
+    }
+  }
+
+  return failures;
+}
+
 async function scanLocal(dir) {
   try {
     const dirStat = await stat(dir);
@@ -55,11 +86,7 @@ async function scanLocal(dir) {
   for (const file of files) {
     const content = await readFile(file, 'utf8');
     combined.push(content);
-    for (const pattern of badPatterns) {
-      if (content.includes(pattern)) {
-        failures.push(`${file}: contains ${pattern}`);
-      }
-    }
+    failures.push(...scanContent(content, file));
   }
 
   const allContent = combined.join('\n');
@@ -107,11 +134,7 @@ async function scanLive(baseUrl) {
     }
 
     const content = await response.text();
-    for (const pattern of badPatterns) {
-      if (content.includes(pattern)) {
-        failures.push(`${url}: contains ${pattern}`);
-      }
-    }
+    failures.push(...scanContent(content, url));
   }
 
   return failures;
