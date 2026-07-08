@@ -46,6 +46,6 @@ export function createContentRepository(pool: Pool) {
 
 export async function createMariaDbContentRepository() {
   const mod = await import('./client.mjs');
-  const pool = await mod.createPool() as Pool;
+  const pool = (await mod.createPool()) as unknown as Pool;
   return createContentRepository(pool);
 }
