@@ -22,7 +22,7 @@ const related = publishedSolutions
 <BaseLayout title={item.seoTitle} description={item.seoDescription}>
   <Header />
   <main>
-    <PageHero eyebrow="Megoldásaink" title={item.heroTitle} description={item.heroDescription} />
+    <PageHero eyebrow="Megoldásaink" title={item.heroTitle} description={item.heroDescription} variant="detail" />
     <ContentBlocks blocks={item.blocks} media={item.media} />
     <RelatedLinks links={related} />
     <CTASection />
