@@ -1,6 +1,7 @@
-export function shouldTryDbContentForEnv(env = {}, isBuild = false) {
+export function shouldTryDbContentForEnv(env = {}) {
   const source = env.SITE_CONTENT_SOURCE || 'auto';
-  return source === 'db' || (source === 'auto' && !isBuild && Boolean(env.DATABASE_URL || env.DB_HOST));
+  const hasDbConfig = Boolean(env.DATABASE_URL || (env.DB_HOST && env.DB_NAME && env.DB_USER));
+  return source === 'db' || (source === 'auto' && hasDbConfig);
 }
 export async function pageWithFallback(route, dbReader, fallbackPages) {
   try {

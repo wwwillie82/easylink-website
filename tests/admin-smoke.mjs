@@ -148,7 +148,7 @@ assert.equal(verifyPassword('x', 'bad'), false);
 assert.equal(readCookie('easylink_site_admin=%E0%A4%A'), undefined);
 assert.equal(verifySessionToken('bad.cookie'), null);
 assert.equal(shouldTryDbContentForEnv({ SITE_CONTENT_SOURCE: 'static', DB_HOST: 'localhost' }), false);
-assert.equal(shouldTryDbContentForEnv({ SITE_CONTENT_SOURCE: 'auto', DB_HOST: 'localhost' }, true), false);
+assert.equal(shouldTryDbContentForEnv({ SITE_CONTENT_SOURCE: 'auto', DB_HOST: 'localhost', DB_NAME: 'site', DB_USER: 'site' }), true);
 assert.equal((await pageWithFallback('/arak/', { getPageByRoute: async () => { throw new Error('db down'); } }, staticPagesData)).route, '/arak/');
 const requiredRoutes = ['/', '/megoldasaink/', '/megoldasaink/penzugy-szamlazas/', '/megoldasaink/hr-munkaugy/', '/megoldasaink/crm-ugyfelkezeles/', '/megoldasaink/dokumentumkezeles-adminisztracio/', '/megoldasaink/kontrolling/', '/megoldasaink/ai-asszisztens/', '/kinek-szol/', '/kinek-szol/hotelek-szallashelyek/', '/kinek-szol/vendeglatohelyek/', '/kinek-szol/szolgaltato-vallalkozasok/', '/integraciok/', '/arak/', '/kapcsolat/'];
 for (const route of requiredRoutes) assert.ok(staticPagesData.find((page) => page.route === route), `missing fallback route ${route}`);

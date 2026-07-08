@@ -3,9 +3,9 @@ import { staticNavigationItems, staticPages, getStaticPageByRoute, getStaticPage
 type DbReader = { getPageByRoute(route: string): Promise<SitePage | null>; listNavigation(): Promise<Array<{ title: string; href: string; sortOrder: number; status: string }>> };
 
 const env = (import.meta as unknown as { env?: Record<string, string | undefined> }).env ?? {};
-const isBuild = () => env.ASTRO_PHASE === 'build' || env.MODE === 'production';
 export const contentSource = () => env.SITE_CONTENT_SOURCE ?? 'auto';
-export const shouldTryDbContent = () => contentSource() === 'db' || (contentSource() === 'auto' && !isBuild() && Boolean(env.DATABASE_URL || env.DB_HOST));
+export const hasDbConfig = () => Boolean(env.DATABASE_URL || (env.DB_HOST && env.DB_NAME && env.DB_USER));
+export const shouldTryDbContent = () => contentSource() === 'db' || (contentSource() === 'auto' && hasDbConfig());
 
 async function getDbReader(): Promise<DbReader | null> {
   if (!shouldTryDbContent()) return null;

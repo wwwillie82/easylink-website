@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import { mkdir, mkdtemp, readdir, stat } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, readdir, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
@@ -14,6 +14,22 @@ export function stableJson(value) {
 export function contentHash(content) { return crypto.createHash('sha256').update(stableJson(content)).digest('hex'); }
 
 async function exists(filePath) { try { await stat(filePath); return true; } catch { return false; } }
+
+export async function ensureWebrootPermissions(webroot) {
+  const rootStat = await stat(webroot);
+  if (!rootStat.isDirectory()) return;
+  async function walk(currentPath) {
+    const currentStat = await stat(currentPath);
+    if (currentStat.isDirectory()) {
+      if ((currentStat.mode & 0o777) < 0o755) await chmod(currentPath, currentStat.mode | 0o755);
+      const entries = await readdir(currentPath, { withFileTypes: true });
+      for (const entry of entries) await walk(path.join(currentPath, entry.name));
+      return;
+    }
+    if (currentStat.isFile() && (currentStat.mode & 0o777) < 0o644) await chmod(currentPath, currentStat.mode | 0o644);
+  }
+  await walk(webroot);
+}
 function routeOutputPath(releasePath, route) {
   const clean = String(route || '').replace(/^\/+|\/+$/g, '');
   return clean ? path.join(releasePath, clean, 'index.html') : path.join(releasePath, 'index.html');
@@ -51,7 +67,9 @@ export function createPublishService({ repo, env = process.env, build, deploy } 
     await mkdir(webroot, { recursive: true });
     // Best-effort safe deploy for shared hosting: build already happened in a temp release dir;
     // rsync uses delayed updates so the current webroot is only touched after a complete successful build.
-    return runCommand('rsync', ['-a', '--delete', '--delay-updates', `${releasePath}/`, `${webroot}/`]);
+    const result = await runCommand('rsync', ['-a', '--delete', '--delay-updates', `${releasePath}/`, `${webroot}/`]);
+    if (result.ok) await ensureWebrootPermissions(webroot);
+    return result;
   });
 
   async function publish({ adminId = null, label = null } = {}) {
