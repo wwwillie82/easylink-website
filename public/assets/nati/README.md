@@ -1,18 +1,9 @@
-# Nati visual direction assets TODO
+# Easylink visual assets
 
-A public site jelenleg CSS-alapú, mobilbarát futurisztikus AI/adatáramlás vizuált használ, mert nincs tényleges Nati-féle image asset a repóban.
+These files were extracted from the provided Easylink hero mockups.
 
-Ha megérkeznek a végleges képek, ide kerüljenek:
+- `hero-bg-flow-01.webp`
+- `hero-bg-flow-02.webp`
+- `hero-bg-flow-03.webp`
 
-- `public/assets/nati/solutions/penzugy-szamlazas.webp`
-- `public/assets/nati/solutions/hr-munkaugy.webp`
-- `public/assets/nati/solutions/crm-ugyfelkezeles.webp`
-- `public/assets/nati/solutions/dokumentumkezeles.webp`
-- `public/assets/nati/solutions/kontrolling.webp`
-- `public/assets/nati/solutions/ai-asszisztens.webp`
-- `public/assets/nati/audiences/hotelek.webp`
-- `public/assets/nati/audiences/vendeglatohelyek.webp`
-- `public/assets/nati/audiences/szolgaltatok.webp`
-- `public/assets/nati/integrations/1.webp` ... `public/assets/nati/integrations/6.webp`
-
-Képet csak akkor importáljunk vagy rendereljünk tényleges `<img>` elemként, ha az asset már bizonyítottan létezik a repóban.
+The original mockups contained navigation, CTA and repeated copy. These derived files keep only the dark navy / neon data-flow background direction for implementation use.
