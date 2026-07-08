@@ -4,15 +4,17 @@ import Header from '@/components/Header.astro';
 import PageHero from '@/components/PageHero.astro';
 import CTASection from '@/components/CTASection.astro';
 import Footer from '@/components/Footer.astro';
+import { getPageByRoute } from '@/lib/content/provider';
+const page = await getPageByRoute('/arak/');
 ---
 
-<BaseLayout title="Áraink | Easylink" description="Easylink árak és csomagok előkészített public oldal.">
+<BaseLayout title={page?.seoTitle ?? "Áraink | Easylink"} description={page?.seoDescription ?? "Easylink árak és csomagok előkészített public oldal."}>
   <Header />
   <main>
     <PageHero
-      eyebrow="Áraink"
-      title="Árazás, ami a működésedhez igazodik."
-      description="Konkrét csomagárakat még nem publikálunk, és ezen az oldalon nem készül kalkulátor. A cél egy érthető public előkészítő oldal demó CTA-val."
+      eyebrow={page?.heroEyebrow ?? "arak"}
+      title={page?.heroTitle ?? "Áraink"}
+      description={page?.heroDescription ?? "Konkrét csomagárakat még nem publikálunk, és ezen az oldalon nem készül kalkulátor. A cél egy érthető public előkészítő oldal demó CTA-val."}
     />
     <section class="section light">
       <div class="container price-grid">
