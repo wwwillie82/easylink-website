@@ -12,6 +12,18 @@ async function body(req) { const raw = await rawBody(req); if (!raw) return {}; 
 function wantsHtml(req) { return String(req.headers.accept || '').includes('text/html'); }
 function authed(req, env) { return requireAuthFromRequest({ headers: { get: (name) => req.headers[name.toLowerCase()] || '' } }, env); }
 
+function validateNavPayload(payload) {
+  if (!Array.isArray(payload?.items) || payload.items.length === 0) return { ok: false, error: { code: 'INVALID_NAVIGATION_ITEMS', message: 'Legalább egy menüpont szükséges.' } };
+  const required = ['id', 'title', 'href', 'sort_order', 'status'];
+  for (const [index, item] of payload.items.entries()) {
+    if (!item || typeof item !== 'object') return { ok: false, error: { code: 'INVALID_NAVIGATION_ITEM', message: `Hibás menüpont: ${index + 1}.` } };
+    for (const field of required) {
+      if (item[field] === undefined || item[field] === null || String(item[field]).trim() === '') return { ok: false, error: { code: 'INVALID_NAVIGATION_ITEM', message: `Hiányzó menüpont mező: ${field}.` } };
+    }
+  }
+  return { ok: true, data: payload.items };
+}
+
 export function createAdminServer({ repo, env = process.env } = {}) {
   if (!repo) throw new Error('createAdminServer requires repo');
   return http.createServer(async (req, res) => {
@@ -47,7 +59,7 @@ export function createAdminServer({ repo, env = process.env } = {}) {
         return json(res, 200, { ok: true, data: await repo.upsertBlock(payload) });
       }
       if (url.pathname.startsWith('/api/admin/blocks/') && req.method === 'DELETE') { await repo.deleteBlock(url.pathname.split('/').pop()); return json(res, 200, { ok: true }); }
-      if (url.pathname === '/api/admin/navigation') { if (req.method === 'GET') return json(res, 200, { ok: true, data: await repo.nav() }); await repo.updateNav((await body(req)).items || []); return json(res, 200, { ok: true }); }
+      if (url.pathname === '/api/admin/navigation') { if (req.method === 'GET') return json(res, 200, { ok: true, data: await repo.nav() }); const valid = validateNavPayload(await body(req)); if (!valid.ok) return json(res, 400, valid); await repo.updateNav(valid.data); return json(res, 200, { ok: true }); }
       if (url.pathname === '/admin/dashboard') return html(res, '<div class="card"><h2>Dashboard MVP</h2><p>Oldalak, blokkok és menüpontok szerkesztése.</p></div>');
       if (url.pathname === '/admin/pages') return html(res, pagesTable(await repo.pages()));
       if (url.pathname.startsWith('/admin/pages/')) { const page = await repo.page(url.pathname.split('/').pop()); return page ? html(res, pageForm(page)) : html(res, '<p class="msg err">Az oldal nem található.</p>', 404); }
