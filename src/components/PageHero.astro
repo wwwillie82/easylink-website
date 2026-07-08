@@ -47,8 +47,8 @@ const {
   .page-hero::after {
     content: "";
     position: absolute;
-    inset: auto -12% -42% 44%;
-    height: 260px;
+    inset: auto -12% -46% 48%;
+    height: 210px;
     background: radial-gradient(ellipse at center, rgba(174, 255, 0, 0.18), transparent 64%);
     filter: blur(20px);
   }
@@ -66,8 +66,8 @@ const {
     position: relative;
     z-index: 1;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(220px, 0.38fr);
-    gap: clamp(24px, 5vw, 54px);
+    grid-template-columns: minmax(0, 1fr) minmax(190px, 0.32fr);
+    gap: clamp(20px, 3.5vw, 40px);
     align-items: center;
   }
 
@@ -77,7 +77,7 @@ const {
 
   .page-hero h1 {
     max-width: 12.5ch;
-    margin-bottom: var(--space-md);
+    margin-bottom: var(--space-sm);
     font-size: var(--text-page-hero-title);
     line-height: 1.04;
     text-wrap: balance;
@@ -97,7 +97,7 @@ const {
   .page-hero.light p { color: var(--color-muted); }
 
   .page-hero-visual {
-    min-height: clamp(190px, 22vw, 260px);
+    min-height: clamp(150px, 17vw, 210px);
     border: 1px solid rgba(174, 255, 0, 0.2);
     border-radius: var(--radius-lg);
     background:
@@ -111,8 +111,8 @@ const {
 
   .visual-label {
     position: absolute;
-    left: 22px;
-    top: 20px;
+    left: 18px;
+    top: 16px;
     color: var(--color-neon);
     font-size: 0.78rem;
     font-weight: 800;
@@ -143,7 +143,7 @@ const {
 
   @media (max-width: 860px) {
     .page-hero {
-      padding: 48px 0 52px;
+      padding: 40px 0 44px;
     }
 
     .page-hero::before {
@@ -155,6 +155,6 @@ const {
 
     .page-hero-grid { grid-template-columns: 1fr; }
     .page-hero h1 { max-width: 13.5ch; }
-    .page-hero-visual { min-height: 160px; }
+    .page-hero-visual { min-height: 140px; }
   }
 </style>
