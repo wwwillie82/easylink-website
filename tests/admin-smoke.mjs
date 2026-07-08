@@ -48,12 +48,35 @@ const base = `http://127.0.0.1:${server.address().port}`;
 try {
   let response = await fetch(`${base}/admin/login`);
   assert.equal(response.status, 200);
-  assert.match(await response.text(), /Belépés/);
+  const loginPageHtml = await response.text();
+  assert.match(loginPageHtml, /Belépés/);
+  assert.doesNotMatch(loginPageHtml, /Dashboard/);
+  assert.doesNotMatch(loginPageHtml, /Oldalak/);
+  assert.doesNotMatch(loginPageHtml, /Kilépés/);
 
   response = await fetch(`${base}/api/admin/login`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded', accept: 'text/html' }, body: new URLSearchParams({ email: 'admin@example.com', password: 'correct-password' }), redirect: 'manual' });
   assert.equal(response.status, 303);
   const cookie = response.headers.get('set-cookie');
   assert.match(cookie, /HttpOnly/);
+  assert.equal(response.headers.get('location'), '/admin/pages');
+
+
+  response = await fetch(`${base}/admin/pages`, { headers: { cookie } });
+  assert.equal(response.status, 200);
+  const pagesHtml = await response.text();
+  assert.match(pagesHtml, /admin-nav/);
+  assert.match(pagesHtml, /Oldalak/);
+  assert.match(pagesHtml, /Kilépés/);
+  assert.doesNotMatch(pagesHtml, />Dashboard</);
+  assert.match(pagesHtml, /button,\.btn\{[^}]*cursor:pointer/);
+  assert.match(pagesHtml, /button:hover,\.btn:hover/);
+  assert.match(pagesHtml, /button:active,\.btn:active/);
+  assert.match(pagesHtml, /button:focus-visible,\.btn:focus-visible/);
+  assert.match(pagesHtml, /button:disabled/);
+
+  response = await fetch(`${base}/admin/dashboard`, { headers: { cookie }, redirect: 'manual' });
+  assert.equal(response.status, 303);
+  assert.equal(response.headers.get('location'), '/admin/pages');
 
   response = await fetch(`${base}/api/admin/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: 'bad', password: 'short' }) });
   assert.equal(response.status, 400);
@@ -124,8 +147,11 @@ try {
   response = await fetch(`${base}/admin/publish`, { headers: { cookie } });
   assert.equal(response.status, 200);
   const publishHtml = await response.text();
-  assert.match(publishHtml, /Korábbi élesítések/);
-  assert.match(publishHtml, /Újraélesítés/);
+  assert.match(publishHtml, /Korábbi élesítések \/ Visszaállítás/);
+  assert.match(publishHtml, /Visszaállítás erre az állapotra/);
+  assert.doesNotMatch(publishHtml, /Utolsó hiba/);
+  assert.doesNotMatch(publishHtml, /Újraélesítés/);
+  assert.doesNotMatch(publishHtml, /Aktuális publish státusz/);
   response = await fetch(`${base}/api/admin/publish/rollback/7`, { method: 'POST', headers: { cookie } });
   assert.equal(response.status, 200);
   assert.equal(state.pages[0].title, 'Rollback');
@@ -135,10 +161,16 @@ try {
   assert.equal(response.status, 200);
   assert.match(await response.text(), /Oldal szerkesztése/);
   const pageEditorHtml = await (await fetch(`${base}/admin/pages/1`, { headers: { cookie } })).text();
-  assert.match(pageEditorHtml, /j.ok&&j.publish\?\.ok/);
+  assert.match(pageEditorHtml, /setupDirtyForm/);
+  assert.match(pageEditorHtml, /baseline/);
+  assert.match(pageEditorHtml, /addEventListener\('input',sync\)/);
+  assert.match(pageEditorHtml, /document.getElementById\('msg'\).innerHTML=''/);
+  assert.match(pageEditorHtml, /if\(j.ok&&j.publish\?\.ok\)pageState.markSaved\(\)/);
   const menuEditorHtml = await (await fetch(`${base}/admin/menu`, { headers: { cookie } })).text();
   assert.match(menuEditorHtml, /Mentés és élesítés/);
-  assert.match(menuEditorHtml, /j.ok&&j.publish\?\.ok/);
+  assert.match(menuEditorHtml, /setupDirtyForm/);
+  assert.match(menuEditorHtml, /baseline/);
+  assert.match(menuEditorHtml, /formState.markSaved\(\)/);
 } finally {
   server.close();
 }
