@@ -1,7 +1,28 @@
 <section class="section ai">
   <div class="container ai-grid">
-    <div class="ai-copy"><span class="eyebrow">AI asszisztens</span><h2>Kérdezz, és a rendszered válaszol!</h2><p>Public bemutatóként mutatjuk meg az irányt: az Easylink célja, hogy a számlázási, CRM és adminisztrációs adatokból gyors, vezetői szintű válaszokat adjon — érthetően, egy felületen.</p></div>
-    <div class="chat"><div class="source-row"><span>NAV</span><span>CRM</span><span>Banki státusz</span><span>Admin</span></div><div class="msg user">Melyik ügyfeleknél várható késedelmes fizetés ezen a héten?</div><div class="msg bot"><b>Javaslat</b><p>3 ügyfélnél magas a kockázat. Érdemes automatikus emlékeztetőt előkészíteni, majd pénteki utánkövetést tervezni.</p></div></div>
+    <div class="ai-copy">
+      <span class="eyebrow">AI asszisztens</span>
+      <h2>Kérdezz, és a rendszered válaszol.</h2>
+      <p>Az AI blokk a háttérben látható adatáramlásra épít: pénzügy, CRM és adminisztráció adatai vezetői szintű válaszokká rendeződhetnek.</p>
+    </div>
+    <div class="chat">
+      <div class="source-row"><span>NAV</span><span>CRM</span><span>Banki státusz</span><span>Admin</span></div>
+      <div class="msg user">Mely ügyek igényelnek vezetői figyelmet ezen a héten?</div>
+      <div class="msg bot"><b>Javaslat</b><p>3 pénzügyi és 2 adminisztratív pontnál érdemes utánkövetést előkészíteni.</p></div>
+    </div>
   </div>
 </section>
-<style>.ai{position:relative;overflow:hidden;background:#07082d;color:white}.ai:before{content:"";position:absolute;inset:0;background-image:linear-gradient(90deg,rgba(7,8,45,.9),rgba(7,8,45,.62)),url('/assets/nati/hero-bg-flow-01.webp');background-size:cover;background-position:center;opacity:.82}.ai-grid{position:relative;display:grid;grid-template-columns:.9fr 1.1fr;gap:42px;align-items:center}.ai-copy p{color:rgba(255,255,255,.75)}.chat{padding:28px;border-radius:32px;border:1px solid rgba(174,255,0,.25);background:rgba(255,255,255,.08);backdrop-filter:blur(14px);display:grid;gap:16px;box-shadow:0 30px 90px rgba(0,0,0,.25)}.source-row{display:flex;gap:10px;flex-wrap:wrap}.source-row span{background:rgba(174,255,0,.14);border:1px solid rgba(174,255,0,.3);color:var(--color-neon);font-weight:800;border-radius:999px;padding:8px 12px}.msg{padding:18px 20px;border-radius:22px;line-height:1.6}.user{background:rgba(15,17,89,.86);color:white;margin-left:8%;border:1px solid rgba(255,255,255,.14)}.bot{background:white;color:var(--color-navy);margin-right:8%}.bot p{color:var(--color-ink);margin:8px 0 0}@media(max-width:800px){.ai-grid{grid-template-columns:1fr}.user,.bot{margin-left:0;margin-right:0}}</style>
+<style>
+  .ai { position: relative; overflow: hidden; background: #07082d; color: white; }
+  .ai::before { content: ""; position: absolute; inset: 0; background-image: linear-gradient(90deg, rgba(7, 8, 45, 0.92), rgba(7, 8, 45, 0.52) 55%, rgba(7, 8, 45, 0.24)), url('/assets/nati/hero-bg-flow-01.webp'); background-size: cover; background-position: center; opacity: 0.95; }
+  .ai-grid { position: relative; display: grid; grid-template-columns: 0.9fr 1.1fr; gap: 38px; align-items: center; }
+  .ai-copy p { color: rgba(255, 255, 255, 0.76); }
+  .chat { padding: clamp(20px, 3vw, 28px); border-radius: 28px; border: 1px solid rgba(174, 255, 0, 0.24); background: rgba(255, 255, 255, 0.07); backdrop-filter: blur(12px); display: grid; gap: 14px; box-shadow: 0 28px 85px rgba(0, 0, 0, 0.22); }
+  .source-row { display: flex; gap: 9px; flex-wrap: wrap; }
+  .source-row span { background: rgba(174, 255, 0, 0.13); border: 1px solid rgba(174, 255, 0, 0.28); color: var(--color-neon); font-weight: 800; border-radius: 999px; padding: 7px 11px; font-size: 0.86rem; }
+  .msg { padding: 16px 18px; border-radius: 20px; line-height: 1.55; }
+  .user { background: rgba(15, 17, 89, 0.82); color: white; margin-left: 8%; border: 1px solid rgba(255, 255, 255, 0.12); }
+  .bot { background: white; color: var(--color-navy); margin-right: 8%; }
+  .bot p { color: var(--color-ink); margin: 8px 0 0; }
+  @media (max-width: 800px) { .ai-grid { grid-template-columns: 1fr; } .user, .bot { margin-left: 0; margin-right: 0; } }
+</style>

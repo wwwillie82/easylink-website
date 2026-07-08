@@ -1,5 +1,11 @@
 ---
 const deployUrl = import.meta.env.PUBLIC_DEPLOY_URL ?? 'https://deploy.easylink.hu';
+
+const benefits = [
+  { title: 'Átlátható működés', text: 'Valós idejű adatok, tiszta kép.' },
+  { title: 'Időmegtakarítás', text: 'Automatizált folyamatok, kevesebb manuális munka.' },
+  { title: 'Biztonság & megbízhatóság', text: 'Magyarországi háttér, stabil rendszer.' },
+];
 ---
 
 <section id="top" class="hero">
@@ -7,8 +13,9 @@ const deployUrl = import.meta.env.PUBLIC_DEPLOY_URL ?? 'https://deploy.easylink.
   <div class="container hero-grid">
     <div class="hero-copy">
       <span class="eyebrow">Easylink ügyvitel + AI</span>
-      <h1>Cégvezetés, könnyedén.</h1>
-      <p>
+      <h1>easyLink ERP</h1>
+      <p class="hero-subtitle">Cégvezetés, könnyedén.</p>
+      <p class="hero-description">
         Felejtsd el a táblázatokat! Olyan ügyviteli rendszert adunk a kezedbe, amivel egyetlen,
         átlátható felületen irányíthatod a számlázást, az adminisztrációt és az ügyfélnyilvántartást.
       </p>
@@ -16,19 +23,18 @@ const deployUrl = import.meta.env.PUBLIC_DEPLOY_URL ?? 'https://deploy.easylink.
         <a class="button button-primary" href={deployUrl}>Demót kérek</a>
         <a class="button button-secondary" href={deployUrl}>Próbáld ki ingyen</a>
       </div>
-      <div class="trust-row">
-        <span>Számlázás</span>
-        <span>Admin</span>
-        <span>CRM</span>
-        <span>AI válaszok</span>
-      </div>
     </div>
-    <div class="hero-panel" aria-hidden="true">
-      <b>Vezetői pulzus</b>
-      <span>12 nyitott számla</span>
-      <span>4 admin teendő</span>
-      <span>AI javaslat: 3 prioritás</span>
+    <div class="hero-visual" aria-hidden="true">
+      <div class="visual-note">Adatáramlás · AI · ERP</div>
     </div>
+  </div>
+  <div class="container benefit-row" aria-label="Easylink előnyök">
+    {benefits.map((benefit) => (
+      <article>
+        <h2>{benefit.title}</h2>
+        <p>{benefit.text}</p>
+      </article>
+    ))}
   </div>
 </section>
 
@@ -37,75 +43,120 @@ const deployUrl = import.meta.env.PUBLIC_DEPLOY_URL ?? 'https://deploy.easylink.
     position: relative;
     overflow: hidden;
     min-height: var(--home-hero-min-height);
-    display: grid;
-    align-items: center;
     color: white;
     background: var(--color-navy-deep);
-    padding: clamp(56px, 6.5vw, 94px) 0;
+    padding: clamp(46px, 5.5vw, 76px) 0 clamp(24px, 3vw, 36px);
   }
+
   .hero-bg {
     position: absolute;
     inset: 0;
     background-image:
-      linear-gradient(90deg, rgba(7, 8, 45, 0.95) 0%, rgba(15, 17, 89, 0.84) 36%, rgba(15, 17, 89, 0.28) 70%, rgba(7, 8, 45, 0.58) 100%),
-      linear-gradient(0deg, rgba(7, 8, 45, 0.84), rgba(7, 8, 45, 0.08) 46%, rgba(7, 8, 45, 0.9)),
+      linear-gradient(90deg, rgba(7, 8, 45, 0.98) 0%, rgba(8, 10, 52, 0.92) 37%, rgba(8, 10, 52, 0.38) 62%, rgba(8, 10, 52, 0.14) 100%),
+      linear-gradient(0deg, rgba(7, 8, 45, 0.88), rgba(7, 8, 45, 0.03) 42%, rgba(7, 8, 45, 0.58)),
       url('/assets/nati/hero-bg-flow-03.webp');
     background-size: cover;
-    background-position: center right;
-    transform: scale(1.02);
+    background-position: 60% center;
+    transform: scale(1.01);
   }
+
   .hero::after {
     content: "";
     position: absolute;
-    inset: auto -12% -20% -12%;
-    height: 260px;
-    background: radial-gradient(ellipse at center, rgba(174, 255, 0, 0.18), transparent 60%);
+    inset: auto -14% -24% 28%;
+    height: 250px;
+    background: radial-gradient(ellipse at center, rgba(174, 255, 0, 0.2), transparent 62%);
     filter: blur(18px);
   }
+
   .hero-grid {
     position: relative;
     z-index: 1;
     display: grid;
-    grid-template-columns: minmax(0, 1.08fr) minmax(240px, 0.48fr);
-    gap: clamp(24px, 3.5vw, 36px);
-    align-items: end;
+    grid-template-columns: minmax(0, 0.9fr) minmax(360px, 1.1fr);
+    gap: clamp(24px, 5vw, 68px);
+    align-items: center;
   }
-  .hero-copy { max-width: 760px; }
-  .hero h1 { max-width: 11ch; font-size: var(--text-home-hero-title); }
-  .hero p { max-width: var(--container-reading); color: rgba(255, 255, 255, 0.82); font-size: var(--text-body-lg); }
-  .actions, .trust-row { display: flex; gap: 14px; flex-wrap: wrap; }
-  .actions { margin-top: 22px; }
-  .trust-row { margin-top: 20px; }
-  .trust-row span {
-    border: 1px solid rgba(174, 255, 0, 0.28);
-    background: rgba(255, 255, 255, 0.08);
-    border-radius: 999px;
+
+  .hero-copy { max-width: 620px; }
+  .hero h1 { max-width: 10ch; margin-bottom: 8px; font-size: var(--text-home-hero-title); }
+
+  .hero-subtitle {
+    margin: 0 0 16px;
+    color: var(--color-neon);
+    font-size: var(--text-home-hero-subtitle);
+    font-weight: 800;
+    line-height: 1.08;
+    letter-spacing: -0.045em;
+    text-wrap: balance;
+  }
+
+  .hero-description {
+    max-width: 650px;
+    color: rgba(255, 255, 255, 0.82);
+    font-size: var(--text-body-lg);
+  }
+
+  .actions { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 22px; }
+
+  .hero-visual {
+    min-height: clamp(330px, 39vw, 500px);
+    border-radius: 34px;
+    position: relative;
+    background:
+      radial-gradient(circle at 68% 34%, rgba(174, 255, 0, 0.18), transparent 28%),
+      linear-gradient(135deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0));
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: inset 0 0 0 1px rgba(174, 255, 0, 0.08), 0 34px 100px rgba(0, 0, 0, 0.18);
+  }
+
+  .visual-note {
+    position: absolute;
+    right: 22px;
+    bottom: 20px;
     padding: 9px 13px;
-    color: rgba(255, 255, 255, 0.78);
-    font-size: 0.88rem;
+    border-radius: var(--radius-pill);
+    color: rgba(255, 255, 255, 0.82);
+    background: rgba(7, 8, 45, 0.42);
+    border: 1px solid rgba(174, 255, 0, 0.24);
+    backdrop-filter: blur(10px);
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
   }
-  .hero-panel {
-    padding: 20px;
-    border-radius: 24px;
-    background: rgba(6, 8, 39, 0.62);
-    border: 1px solid rgba(174, 255, 0, 0.28);
-    backdrop-filter: blur(14px);
-    box-shadow: 0 28px 80px rgba(0, 0, 0, 0.28);
+
+  .benefit-row {
+    position: relative;
+    z-index: 1;
     display: grid;
-    gap: 10px;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-top: clamp(22px, 3vw, 34px);
   }
-  .hero-panel b { color: var(--color-neon); }
-  .hero-panel span { padding: 10px 12px; border-radius: 14px; background: rgba(255, 255, 255, 0.08); }
-  @media (max-width: 860px) {
-    .hero { min-height: auto; }
+
+  .benefit-row article {
+    padding: 16px 18px;
+    border-radius: 20px;
+    border: 1px solid rgba(174, 255, 0, 0.24);
+    background: rgba(255, 255, 255, 0.075);
+    backdrop-filter: blur(10px);
+  }
+
+  .benefit-row h2 { margin-bottom: 5px; color: white; font-size: 1rem; letter-spacing: -0.02em; }
+  .benefit-row p { margin: 0; color: rgba(255, 255, 255, 0.72); font-size: 0.9rem; line-height: 1.45; }
+
+  @media (max-width: 920px) {
     .hero-bg {
       background-image:
-        linear-gradient(90deg, rgba(7, 8, 45, 0.94), rgba(7, 8, 45, 0.78)),
+        linear-gradient(90deg, rgba(7, 8, 45, 0.96), rgba(7, 8, 45, 0.76)),
         url('/assets/nati/hero-bg-flow-03.webp');
       background-position: 62% center;
     }
+
     .hero-grid { grid-template-columns: 1fr; }
-    .hero-panel { max-width: 520px; }
+    .hero-visual { min-height: 260px; }
+    .benefit-row { grid-template-columns: 1fr; }
     .actions { display: grid; }
   }
 </style>
