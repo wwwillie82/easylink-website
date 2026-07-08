@@ -3,15 +3,35 @@ import { siteNavigation, deployUrl } from '@/content/siteNavigation';
 ---
 <header class="site-header">
   <div class="container nav-wrap">
-    <a class="brand" href="/" aria-label="Easylink főoldal">
+    <a
+      class="brand"
+      href="/"
+      aria-label="Easylink főoldal"
+    >
       <span class="brand-logo-frame">
-        <img src="/assets/brand/easylink-logo-horizontal.png" alt="Easylink" />
+        <img
+          src="/assets/brand/easylink-logo-horizontal.png"
+          alt="Easylink"
+        />
       </span>
     </a>
+
     <nav aria-label="Fő navigáció">
-      {siteNavigation.map((item) => <a href={item.href}>{item.title}</a>)}
+      {
+        siteNavigation.map((item) => (
+          <a href={item.href}>
+            {item.title}
+          </a>
+        ))
+      }
     </nav>
-    <a class="button button-primary nav-cta" href={deployUrl}>Demót kérek</a>
+
+    <a
+      class="button button-primary nav-cta"
+      href={deployUrl}
+    >
+      Demót kérek
+    </a>
   </div>
 </header>
 <style>

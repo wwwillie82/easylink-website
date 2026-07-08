@@ -2,7 +2,7 @@
 import { deployUrl } from '@/content/siteNavigation';
 
 const {
-  title = 'Készen állsz könnyedebben vezetni a céged?',
+  title,
   description = 'Kérj demót vagy próbáld ki ingyen a konfigurált Deploy felületen.',
   primaryLabel = 'Demót kérek',
   secondaryLabel = 'Próbáld ki ingyen',
@@ -12,7 +12,13 @@ const {
 <section class="section cta">
   <div class="container box">
     <span class="eyebrow">Következő lépés</span>
-    <h2>{title}</h2>
+    <h2>
+      {
+        title ?? (
+          <>Készen állsz könnyedebben vezetni a{' '}céged?</>
+        )
+      }
+    </h2>
     <p>{description}</p>
     <div class="actions">
       <a class="button button-primary" href={deployUrl}>{primaryLabel}</a>

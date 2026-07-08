@@ -2,14 +2,27 @@
 const { items, basePath = '' } = Astro.props;
 ---
 <div class="listing-grid">
-  {items.map((item) => (
-    <a class="listing-card" href={`${basePath}${item.slug}/`}>
-      <span class="number">{String(item.order).padStart(2, '0')}</span>
-      <h3>{item.title}</h3>
-      <p>{item.shortDescription}</p>
-      <i>Részletek →</i>
-    </a>
-  ))}
+  {
+    items.map((item) => (
+      <a
+        class="listing-card"
+        href={`${basePath}${item.slug}/`}
+      >
+        <span class="number">
+          {String(item.order).padStart(2, '0')}
+        </span>
+        <h3>
+          {item.title}
+        </h3>
+        <p>
+          {item.shortDescription}
+        </p>
+        <i>
+          Részletek →
+        </i>
+      </a>
+    ))
+  }
 </div>
 <style>
   .listing-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--card-gap); }
