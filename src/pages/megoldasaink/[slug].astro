@@ -1,6 +1,31 @@
 ---
-import BaseLayout from '@/layouts/BaseLayout.astro';import Header from '@/components/Header.astro';import PageHero from '@/components/PageHero.astro';import ContentBlocks from '@/components/ContentBlocks.astro';import RelatedLinks from '@/components/RelatedLinks.astro';import CTASection from '@/components/CTASection.astro';import Footer from '@/components/Footer.astro';import { publishedSolutions } from '@/content/solutions';
-export function getStaticPaths(){return publishedSolutions.map((item)=>({params:{slug:item.slug},props:{item}}));}
-const { item } = Astro.props;const related = publishedSolutions.filter((entry)=>entry.slug!==item.slug).slice(0,3).map((entry)=>({title:entry.title,href:`/megoldasaink/${entry.slug}/`}));
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import Header from '@/components/Header.astro';
+import PageHero from '@/components/PageHero.astro';
+import ContentBlocks from '@/components/ContentBlocks.astro';
+import RelatedLinks from '@/components/RelatedLinks.astro';
+import CTASection from '@/components/CTASection.astro';
+import Footer from '@/components/Footer.astro';
+import { publishedSolutions } from '@/content/solutions';
+
+export function getStaticPaths() {
+  return publishedSolutions.map((item) => ({ params: { slug: item.slug }, props: { item } }));
+}
+
+const { item } = Astro.props;
+const related = publishedSolutions
+  .filter((entry) => entry.slug !== item.slug)
+  .slice(0, 3)
+  .map((entry) => ({ title: entry.title, href: `/megoldasaink/${entry.slug}/` }));
 ---
-<BaseLayout title={item.seoTitle} description={item.seoDescription}><Header/><main><PageHero eyebrow="Megoldásaink" title={item.heroTitle} description={item.heroDescription}/><ContentBlocks blocks={item.blocks} media={item.media}/><RelatedLinks links={related}/><CTASection/></main><Footer/></BaseLayout>
+
+<BaseLayout title={item.seoTitle} description={item.seoDescription}>
+  <Header />
+  <main>
+    <PageHero eyebrow="Megoldásaink" title={item.heroTitle} description={item.heroDescription} />
+    <ContentBlocks blocks={item.blocks} media={item.media} />
+    <RelatedLinks links={related} />
+    <CTASection />
+  </main>
+  <Footer />
+</BaseLayout>

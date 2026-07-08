@@ -1,2 +1,46 @@
-<footer id="kapcsolat" class="footer"><div class="container foot"><div><a class="brand" href="/"><span>easy</span>link</a><p>Statikus Astro marketing alap staging környezethez.</p></div><div><b>Kapcsolat</b><a href="mailto:hello@easylink.hu">hello@easylink.hu</a><a href={import.meta.env.PUBLIC_DEPLOY_URL ?? 'https://deploy.easylink.hu'}>Belépés / demo</a></div></div></footer>
-<style>.footer{padding:44px 0;background:var(--color-soft);border-top:1px solid var(--color-line)}.foot{display:flex;justify-content:space-between;gap:24px}.brand{font-weight:800;color:var(--color-navy);font-size:1.25rem}.brand span{color:#74ad00}.foot div:last-child{display:grid;gap:10px}@media(max-width:700px){.foot{display:grid}}</style>
+<footer id="kapcsolat" class="footer">
+  <div class="container foot">
+    <div>
+      <a class="brand" href="/"><span>easy</span>link</a>
+      <p>Statikus Astro marketing alap staging környezethez.</p>
+    </div>
+    <div>
+      <b>Kapcsolat</b>
+      <a href="mailto:hello@easylink.hu">hello@easylink.hu</a>
+      <a href={import.meta.env.PUBLIC_DEPLOY_URL ?? 'https://deploy.easylink.hu'}>Belépés / demo</a>
+    </div>
+  </div>
+</footer>
+
+<style>
+  .footer {
+    padding: 44px 0;
+    background: var(--color-soft);
+    border-top: 1px solid var(--color-line);
+  }
+
+  .foot {
+    display: flex;
+    justify-content: space-between;
+    gap: 24px;
+  }
+
+  .brand {
+    font-weight: 800;
+    color: var(--color-navy);
+    font-size: 1.25rem;
+  }
+
+  .brand span {
+    color: #74ad00;
+  }
+
+  .foot div:last-child {
+    display: grid;
+    gap: 10px;
+  }
+
+  @media (max-width: 700px) {
+    .foot { display: grid; }
+  }
+</style>
