@@ -22,7 +22,10 @@ export const audiences: PublicContentItem[] = [
   {
     title: 'Vendéglátóhelyeknek',
     slug: 'vendeglatohelyek',
-    shortDescription: 'Gyors napi adminisztráció és tisztább működési áttekintés vendéglátásban.',
+    shortDescription: [
+      'Gyors napi',
+      'adminisztráció és tisztább működési áttekintés vendéglátásban.',
+    ].join(' '),
     order: 2,
     seoTitle: 'Vendéglátóhelyeknek | Easylink',
     seoDescription: 'Easylink vendéglátóhelyeknek.',

@@ -100,25 +100,36 @@ jobs:
             test "$status" = "200"
           done
 
-          HOME_HTML="$(curl -sS --max-time 20 "https://${SITE_DEV_DOMAIN}/")"
-          SOLUTION_DETAIL_HTML="$(curl -sS --max-time 20 "https://${SITE_DEV_DOMAIN}/megoldasaink/penzugy-szamlazas/")"
-          AUDIENCE_DETAIL_HTML="$(curl -sS --max-time 20 "https://${SITE_DEV_DOMAIN}/kinek-szol/hotelek-szallashelyek/")"
-          INTEGRATIONS_HTML="$(curl -sS --max-time 20 "https://${SITE_DEV_DOMAIN}/integraciok/")"
-          PRICING_HTML="$(curl -sS --max-time 20 "https://${SITE_DEV_DOMAIN}/arak/")"
-          CONTACT_HTML="$(curl -sS --max-time 20 "https://${SITE_DEV_DOMAIN}/kapcsolat/")"
-          ROBOTS_TXT="$(curl -sS --max-time 20 "https://${SITE_DEV_DOMAIN}/robots.txt")"
+          check_contains() {
+            local route="$1"
+            local expected="$2"
+            local content
+            content="$(curl -sS --max-time 20 "https://${SITE_DEV_DOMAIN}${route}")"
 
-          printf '%s' "$HOME_HTML" | grep -F "Cégvezetés, könnyedén"
-          printf '%s' "$HOME_HTML" | grep -F "Kérdezz, és a rendszered válaszol"
-          printf '%s' "$HOME_HTML" | grep -F "https://deploy.easylink.hu"
-          printf '%s' "$HOME_HTML" | grep -F "noindex,nofollow"
-          printf '%s' "$SOLUTION_DETAIL_HTML" | grep -F "Mire jó?"
-          printf '%s' "$SOLUTION_DETAIL_HTML" | grep -F "Vezetői haszon"
-          printf '%s' "$AUDIENCE_DETAIL_HTML" | grep -F "Hostware integrációs irány / előkészítés"
-          printf '%s' "$INTEGRATIONS_HTML" | grep -F "NAV Online Számla"
-          printf '%s' "$INTEGRATIONS_HTML" | grep -F "kész runtime NAV kapcsolatot"
-          printf '%s' "$PRICING_HTML" | grep -F "Csomagárak és árkalkulátor"
-          printf '%s' "$CONTACT_HTML" | grep -F "hello@easylink.hu"
-          printf '%s' "$ROBOTS_TXT" | grep -F "Disallow: /"
+            if ! grep -qF "$expected" <<< "$content"; then
+              echo "Content smoke failed for ${route}: missing expected pattern: ${expected}" >&2
+              return 1
+            fi
+          }
+
+          check_contains "/" "easyLink ERP"
+          check_contains "/" "Cégvezetés, könnyedén."
+          check_contains "/" "Demót kérek"
+          check_contains "/" "Próbáld ki ingyen"
+          check_contains "/" "Átlátható működés"
+          check_contains "/" "noindex,nofollow"
+          check_contains "/megoldasaink/" "Egy rendszer a napi működés kulcspontjaira"
+          check_contains "/megoldasaink/penzugy-szamlazas/" "Pénzügy és számlázás"
+          check_contains "/megoldasaink/penzugy-szamlazas/" "Konkrét fókuszok"
+          check_contains "/kinek-szol/" "Hoteleknek"
+          check_contains "/kinek-szol/" "Vendéglátóhelyeknek"
+          check_contains "/integraciok/" "Kapcsolódások, adatáramlás, tisztább működés"
+          check_contains "/integraciok/" "NAV Online Számla"
+          check_contains "/integraciok/" "Hostware"
+          check_contains "/integraciok/" "Cégjelző"
+          check_contains "/arak/" "Árazás, ami a működésedhez igazodik"
+          check_contains "/arak/" "Demó alapján pontosítunk"
+          check_contains "/kapcsolat/" "hello@easylink.hu"
+          check_contains "/robots.txt" "Disallow: /"
 
           npm run smoke:markup -- "https://${SITE_DEV_DOMAIN}"

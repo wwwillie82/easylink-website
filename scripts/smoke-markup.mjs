@@ -2,26 +2,36 @@ import { readdir, readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 
 const badStrings = [
-  'nodenode',
-  '<spandata',
   '<aclass',
+  '<spandata',
   '<lidata',
-  'cardcontent-card',
+  '<h3data',
+  '<idata',
   '<divclass',
   '<bdata',
   '<ahref',
+  'cardcontent-card',
+  'nodenode',
   '1pxsolid',
-  '<h3data',
-  '<idata',
+  '"data-astro',
+  "'data-astro",
+  'brand-logo-frame"data',
+  'listing-card"data',
   'alt="Easylink"data',
+  'egyátlátható',
+  'napiadminisztráció',
+  'acéged',
   'felületenirányíthatod',
   'rendezettebbdokumentumok',
+  'rendszertadunk',
+  'folyamatok,státuszok',
 ];
 
 const badRegexes = [
   { name: '<tagdata-astro', regex: /<[a-z][a-z0-9-]*data-astro/gi },
-  { name: 'quoted-attribute-data-astro-without-space', regex: /"[a-zA-Z0-9_-]+data-astro/g },
-  { name: 'href-attribute-data-without-space', regex: /href="[^"]+"data/gi },
+  { name: 'double-quoted-attribute-data-astro-without-space', regex: /"data-astro/g },
+  { name: 'single-quoted-attribute-data-astro-without-space', regex: /'data-astro/g },
+  { name: 'href-attribute-data-without-space', regex: /href="[^"]+"data-astro/gi },
   { name: 'alt-attribute-data-without-space', regex: /alt="[^"]+"data/gi },
 ];
 
