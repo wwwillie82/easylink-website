@@ -9,18 +9,36 @@ const blockLabels = {
 ---
 <section class="section light">
   <div class="container blocks">
-    {blocks.map((block) => (
-      <article class:list={['content-card', `type-${block.type}`]}>
-        <span class="eyebrow">{blockLabels[block.type] ?? block.type}</span>
-        <h2>{block.title}</h2>
-        {block.body && <p>{block.body}</p>}
-        {block.items && (
-          <ul>
-            {block.items.map((item) => <li>{item}</li>)}
-          </ul>
-        )}
-      </article>
-    ))}
+    {
+      blocks.map((block) => {
+        const eyebrow = blockLabels[block.type] ?? block.type;
+
+        return (
+          <article class:list={['content-card', `type-${block.type}`]}>
+            <span class="eyebrow">
+              {eyebrow}
+            </span>
+            <h2>
+              {block.title}
+            </h2>
+            {block.body && (
+              <p>
+                {block.body}
+              </p>
+            )}
+            {block.items && (
+              <ul>
+                {block.items.map((item) => (
+                  <li>
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </article>
+        );
+      })
+    }
   </div>
 </section>
 <style>

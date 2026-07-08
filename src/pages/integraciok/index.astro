@@ -17,14 +17,25 @@ import { publishedIntegrations } from '@/content/integrations';
       asset="/assets/nati/hero-bg-flow-02.webp"
     />
     <section class="section light network-section">
-      <div class="container intro"><span class="eyebrow">Csomópontok</span><h2>Nem késznek állított ígéretek, hanem tisztán tagolt integrációs irányok.</h2></div>
+      <div class="container intro">
+        <span class="eyebrow">Csomópontok</span>
+        <h2>Nem késznek állított ígéretek, hanem tisztán tagolt integrációs irányok.</h2>
+      </div>
       <div class="container integration-grid">
         {publishedIntegrations.map((item) => (
           <article class="card integration-card">
-            <span>{String(item.order).padStart(2, '0')}</span>
-            <h3>{item.title}</h3>
-            <p>{item.shortDescription}</p>
-            <p class="detail">{item.detail}</p>
+            <span>
+              {String(item.order).padStart(2, '0')}
+            </span>
+            <h3>
+              {item.title}
+            </h3>
+            <p>
+              {item.shortDescription}
+            </p>
+            <p class="detail">
+              {item.detail}
+            </p>
           </article>
         ))}
       </div>
