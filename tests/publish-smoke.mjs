@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { createPublishService, contentHash, stableJson } from '../src/lib/admin/publish.mjs';
+import { tmpdir } from 'node:os';
+import { createPublishService, contentHash, ensureWebrootPermissions, stableJson } from '../src/lib/admin/publish.mjs';
 import { publishPanel } from '../src/lib/admin/render.mjs';
 
 const content = { navigation: [{ id: 1, title: 'A' }], pages: [{ id: 1, route: '/', title: 'Home' }, { id: 2, route: '/arak/', title: 'Árak' }], blocks: [], settings: [], media: [] };
@@ -27,6 +28,17 @@ const service = createPublishService({ repo, build: async ({ releasePath }) => {
 let result = await service.publish({ adminId: 1 });
 assert.equal(result.ok, true);
 assert.equal(deployed, 1);
+
+const webroot = await mkdtemp(join(tmpdir(), 'easylink-webroot-'));
+await mkdir(join(webroot, 'nested'), { recursive: true, mode: 0o700 });
+await writeFile(join(webroot, 'nested', 'index.html'), '<!doctype html>');
+await chmod(webroot, 0o700);
+await chmod(join(webroot, 'nested'), 0o700);
+await chmod(join(webroot, 'nested', 'index.html'), 0o600);
+await ensureWebrootPermissions(webroot);
+assert.equal((await stat(webroot)).mode & 0o777, 0o755);
+assert.equal((await stat(join(webroot, 'nested'))).mode & 0o777, 0o755);
+assert.equal((await stat(join(webroot, 'nested', 'index.html'))).mode & 0o777, 0o644);
 
 const emptyRelease = createPublishService({ repo, build: async () => ({ ok: true, log: 'claimed built but wrote nothing' }), deploy: async () => { deployed += 1; return { ok: true }; } });
 result = await emptyRelease.publish();
@@ -58,4 +70,4 @@ await first;
 for (let i = 0; i < 25; i += 1) await service.publish();
 assert.ok(snapshots.filter((s) => s.status === 'success').length <= 20);
 assert.match(publishPanel({ status: { lastSuccess: snapshots.at(-1), lastError: { build_log_excerpt: 'hiba' } }, snapshots: snapshots.filter((s) => s.status === 'success'), running: true }), /Korábbi élesítések/);
-console.log('Publish smoke passed: deterministic snapshots, release validation, no deploy on invalid release/build, lock, retention and render panel.');
+console.log('Publish smoke passed: deterministic snapshots, release validation, webroot permissions, no deploy on invalid release/build, lock, retention and render panel.');

@@ -1,5 +1,8 @@
 ---
-import { siteNavigation, deployUrl } from '@/content/siteNavigation';
+import { deployUrl } from '@/content/siteNavigation';
+import { listNavigation } from '@/lib/content/provider';
+
+const siteNavigation = await listNavigation();
 ---
 <header class="site-header">
   <div class="container nav-wrap">
