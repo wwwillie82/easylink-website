@@ -28,10 +28,11 @@ const blockLabels = {
   .blocks { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--card-gap); }
   .content-card { position: relative; overflow: hidden; border: 1px solid rgba(15, 17, 89, 0.1); border-radius: var(--radius-md); background: white; box-shadow: var(--shadow-card); padding: var(--card-padding); }
   .content-card::before { content: ""; position: absolute; inset: 0 0 auto; height: 4px; background: linear-gradient(90deg, var(--color-neon), var(--color-cyan)); }
-  .content-card h2 { color: var(--color-navy); font-size: clamp(1.3rem, 1.7vw, 1.75rem); line-height: 1.16; }
+  .content-card h2 { color: var(--color-navy); font-size: clamp(1.22rem, 1.45vw, 1.62rem); font-weight: 700; line-height: 1.22; letter-spacing: -0.025em; }
+  .content-card p { color: var(--color-ink); line-height: 1.68; }
   .type-ai-preview, .type-network-visual { background: linear-gradient(135deg, var(--color-navy), #080a34); color: white; }
   .type-ai-preview p, .type-network-visual p { color: rgba(255, 255, 255, 0.75); }
-  li { margin: 10px 0; color: var(--color-navy); font-weight: 700; line-height: 1.5; }
-  .type-ai-preview li, .type-network-visual li { color: white; }
+  li { margin: 10px 0; color: var(--color-navy); font-weight: 600; line-height: 1.58; }
+  .type-ai-preview li, .type-network-visual li { color: rgba(255, 255, 255, 0.92); }
   @media (max-width: 900px) { .blocks { grid-template-columns: 1fr; } }
 </style>
