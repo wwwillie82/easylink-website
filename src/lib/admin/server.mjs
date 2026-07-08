@@ -1,7 +1,8 @@
 import http from 'node:http';
 import { authenticate, signSession, sessionCookie, clearSessionCookie, requireAuthFromRequest } from './auth.mjs';
 import { parseJsonItems, validateLoginPayload } from './validation.mjs';
-import { layout, loginHtml, navHtml, pageForm, pagesTable } from './render.mjs';
+import { layout, loginHtml, navHtml, pageForm, pagesTable, publishPanel } from './render.mjs';
+import { createPublishService, PublishInProgressError } from './publish.mjs';
 
 const apiError = (res, status, code, message) => json(res, status, { ok: false, error: { code, message } });
 const json = (res, status, body, headers = {}) => { res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', ...headers }); res.end(JSON.stringify(body)); };
@@ -24,8 +25,13 @@ function validateNavPayload(payload) {
   return { ok: true, data: payload.items };
 }
 
-export function createAdminServer({ repo, env = process.env } = {}) {
+export function createAdminServer({ repo, env = process.env, publishService } = {}) {
   if (!repo) throw new Error('createAdminServer requires repo');
+  const publisher = publishService || createPublishService({ repo, env });
+  async function publishAfterSave(user, label) {
+    try { return await publisher.publish({ adminId: user.id, label }); }
+    catch (error) { if (error instanceof PublishInProgressError || error.code === 'PUBLISH_IN_PROGRESS') return { ok: false, status: 'publish_in_progress', contentSaved: true, liveUnchanged: true, error: error.message }; throw error; }
+  }
   return http.createServer(async (req, res) => {
     try {
       const url = new URL(req.url, 'http://localhost');
@@ -50,17 +56,21 @@ export function createAdminServer({ repo, env = process.env } = {}) {
         if (!page) return apiError(res, 404, 'PAGE_NOT_FOUND', 'Az oldal nem található.');
         if (req.method === 'GET') return json(res, 200, { ok: true, data: page });
         await repo.updatePage(id, await body(req));
-        return json(res, 200, { ok: true });
+        return json(res, 200, { ok: true, publish: await publishAfterSave(user, `Oldal mentés: ${id}`) });
       }
       if (url.pathname === '/api/admin/blocks' && req.method === 'POST') {
         let payload;
         try { payload = await body(req); parseJsonItems(payload.items); }
         catch (error) { return apiError(res, 400, error.code || 'INVALID_BLOCK_JSON', error.message || 'Hibás JSON.'); }
-        return json(res, 200, { ok: true, data: await repo.upsertBlock(payload) });
+        const data = await repo.upsertBlock(payload);
+        return json(res, 200, { ok: true, data, publish: await publishAfterSave(user, `Blokk mentés: ${payload.page_id}`) });
       }
-      if (url.pathname.startsWith('/api/admin/blocks/') && req.method === 'DELETE') { await repo.deleteBlock(url.pathname.split('/').pop()); return json(res, 200, { ok: true }); }
-      if (url.pathname === '/api/admin/navigation') { if (req.method === 'GET') return json(res, 200, { ok: true, data: await repo.nav() }); const valid = validateNavPayload(await body(req)); if (!valid.ok) return json(res, 400, valid); await repo.updateNav(valid.data); return json(res, 200, { ok: true }); }
-      if (url.pathname === '/admin/dashboard') return html(res, '<div class="card"><h2>Dashboard MVP</h2><p>Oldalak, blokkok és menüpontok szerkesztése.</p></div>');
+      if (url.pathname.startsWith('/api/admin/blocks/') && req.method === 'DELETE') { await repo.deleteBlock(url.pathname.split('/').pop()); return json(res, 200, { ok: true, publish: await publishAfterSave(user, `Blokk inaktiválás`) }); }
+      if (url.pathname === '/api/admin/navigation') { if (req.method === 'GET') return json(res, 200, { ok: true, data: await repo.nav() }); const valid = validateNavPayload(await body(req)); if (!valid.ok) return json(res, 400, valid); await repo.updateNav(valid.data); return json(res, 200, { ok: true, publish: await publishAfterSave(user, 'Menü mentés') }); }
+      if (url.pathname === '/api/admin/publish' && req.method === 'POST') return json(res, 200, { ok: true, publish: await publishAfterSave(user, 'Kézi újraélesítés') });
+      if (url.pathname.startsWith('/api/admin/publish/rollback/') && req.method === 'POST') { const snap = await repo.publishSnapshot(url.pathname.split('/').pop()); if (!snap) return apiError(res, 404, 'SNAPSHOT_NOT_FOUND', 'Snapshot nem található.'); await repo.importContentSnapshot(snap.content_json); return json(res, 200, { ok: true, publish: await publishAfterSave(user, `Rollback: ${snap.id}`) }); }
+      if (url.pathname === '/admin/dashboard') return html(res, publishPanel({ status: await repo.publishStatus(), snapshots: await repo.publishSnapshots(20), running: publisher.isRunning() }));
+      if (url.pathname === '/admin/publish') return html(res, publishPanel({ status: await repo.publishStatus(), snapshots: await repo.publishSnapshots(20), running: publisher.isRunning() }));
       if (url.pathname === '/admin/pages') return html(res, pagesTable(await repo.pages()));
       if (url.pathname.startsWith('/admin/pages/')) { const page = await repo.page(url.pathname.split('/').pop()); return page ? html(res, pageForm(page)) : html(res, '<p class="msg err">Az oldal nem található.</p>', 404); }
       if (url.pathname === '/admin/menu') return html(res, `<h2>Menü</h2>${navHtml(await repo.nav())}`);

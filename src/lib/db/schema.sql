@@ -61,3 +61,20 @@ CREATE TABLE IF NOT EXISTS site_admin_users (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS site_media_assets (id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY, path VARCHAR(512) NOT NULL, alt VARCHAR(255) NULL, type VARCHAR(80) NULL, status VARCHAR(32) NOT NULL DEFAULT 'active', created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS site_publish_snapshots (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  created_by_admin_id BIGINT UNSIGNED NULL,
+  label VARCHAR(255) NULL,
+  content_json LONGTEXT NOT NULL CHECK (JSON_VALID(content_json)),
+  content_hash CHAR(64) NOT NULL,
+  status VARCHAR(32) NOT NULL DEFAULT 'success',
+  build_started_at TIMESTAMP NULL,
+  build_finished_at TIMESTAMP NULL,
+  build_log_excerpt TEXT NULL,
+  release_path VARCHAR(1024) NULL,
+  is_current TINYINT(1) NOT NULL DEFAULT 0,
+  INDEX idx_site_publish_snapshots_status_created (status, created_at),
+  INDEX idx_site_publish_snapshots_current (is_current)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

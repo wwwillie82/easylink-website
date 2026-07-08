@@ -12,6 +12,10 @@ const state = {
   user: { id: 1, email: 'admin@example.com', password_hash: hashPassword('correct-password'), display_name: 'Admin', role: 'admin', status: 'active' },
   pages: [{ id: 1, route: '/arak/', slug: 'arak', type: 'pricing', title: 'Árak', status: 'published', sort_order: 1, seo_title: 'Árak', seo_description: 'Desc', hero_eyebrow: 'Árak', hero_title: 'Hero', hero_description: 'Hero desc', hero_asset: '/asset.webp' }],
   blocks: [{ id: 1, page_id: 1, block_key: 'seed:/arak/:text:0', type: 'text', title: 'Block', body: 'Body', items: '[]', status: 'published', sort_order: 1 }],
+
+  snapshots: [],
+  imported: null,
+  publishCalls: 0,
   nav: [
     { id: 1, title: 'Árak', href: '/arak/', sort_order: 1, status: 'published' },
     { id: 2, title: 'Kapcsolat', href: '/kapcsolat/', sort_order: 2, status: 'published' },
@@ -28,9 +32,16 @@ const repo = {
   async deleteBlock(id) { state.blocks.find((b) => String(b.id) === String(id)).status = 'archived'; },
   async nav() { return state.nav; },
   async updateNav(items) { for (const item of items) { const nav = state.nav.find((n) => String(n.id) === String(item.id)); if (!nav) throw new Error(`Navigation item not found: ${item.id}`); Object.assign(nav, { title: item.title, href: item.href, sort_order: Number(item.sort_order), status: item.status }); } },
+
+  async exportContentSnapshot() { return { pages: structuredClone(state.pages), blocks: structuredClone(state.blocks), navigation: structuredClone(state.nav), settings: [], media: [] }; },
+  async importContentSnapshot(content) { state.imported = content; state.pages = structuredClone(content.pages || []); state.blocks = structuredClone(content.blocks || []); state.nav = structuredClone(content.navigation || []); },
+  async publishSnapshots(limit = 20) { return state.snapshots.filter((s) => s.status === 'success').slice(0, limit); },
+  async publishStatus() { return { lastSuccess: state.snapshots.find((s) => s.status === 'success') || null, lastError: state.snapshots.find((s) => s.status === 'failed') || null }; },
+  async publishSnapshot(id) { return state.snapshots.find((s) => String(s.id) === String(id) && s.status === 'success') || null; },
 };
 
-const server = createAdminServer({ repo, env: { SITE_ADMIN_SESSION_SECRET: sessionSecret, NODE_ENV: 'test' } });
+const publishService = { isRunning: () => false, async publish() { state.publishCalls += 1; return { ok: true, status: 'success', contentSaved: true, published: true }; } };
+const server = createAdminServer({ repo, publishService, env: { SITE_ADMIN_SESSION_SECRET: sessionSecret, NODE_ENV: 'test' } });
 server.listen(0);
 await once(server, 'listening');
 const base = `http://127.0.0.1:${server.address().port}`;
@@ -59,6 +70,8 @@ try {
 
   response = await fetch(`${base}/api/admin/pages/1`, { method: 'PUT', headers: { cookie, 'content-type': 'application/json' }, body: JSON.stringify({ ...state.pages[0], title: 'Árak módosítva' }) });
   assert.equal(response.status, 200);
+  let saved = await response.json();
+  assert.equal(saved.publish.ok, true);
   assert.equal(state.pages[0].title, 'Árak módosítva');
 
   const beforeBlocks = state.blocks.length;
@@ -93,6 +106,8 @@ try {
     { id: 3, title: 'Archív', href: '/archiv/', sort_order: 3, status: 'draft' },
   ] }) });
   assert.equal(response.status, 200);
+  saved = await response.json();
+  assert.equal(saved.publish.ok, true);
   assert.equal(state.nav[0].title, 'Díjszabás');
   assert.equal(state.nav[0].href, '/arak/');
   assert.equal(state.nav[0].sort_order, 1);
@@ -105,9 +120,25 @@ try {
   assert.equal(response.status, 500);
   assert.equal(state.nav.find((n) => n.id === 999), undefined);
 
+  state.snapshots = [{ id: 7, created_at: '2026-07-08', created_by_admin_id: 1, content_hash: 'abcdef123456', status: 'success', is_current: 1, content_json: { pages: [{ ...state.pages[0], title: 'Rollback' }], blocks: state.blocks, navigation: state.nav, settings: [], media: [] } }];
+  response = await fetch(`${base}/admin/publish`, { headers: { cookie } });
+  assert.equal(response.status, 200);
+  const publishHtml = await response.text();
+  assert.match(publishHtml, /Korábbi élesítések/);
+  assert.match(publishHtml, /Újraélesítés/);
+  response = await fetch(`${base}/api/admin/publish/rollback/7`, { method: 'POST', headers: { cookie } });
+  assert.equal(response.status, 200);
+  assert.equal(state.pages[0].title, 'Rollback');
+  assert.ok(state.publishCalls >= 3);
+
   response = await fetch(`${base}/admin/pages/1`, { headers: { cookie } });
   assert.equal(response.status, 200);
   assert.match(await response.text(), /Oldal szerkesztése/);
+  const pageEditorHtml = await (await fetch(`${base}/admin/pages/1`, { headers: { cookie } })).text();
+  assert.match(pageEditorHtml, /j.ok&&j.publish\?\.ok/);
+  const menuEditorHtml = await (await fetch(`${base}/admin/menu`, { headers: { cookie } })).text();
+  assert.match(menuEditorHtml, /Mentés és élesítés/);
+  assert.match(menuEditorHtml, /j.ok&&j.publish\?\.ok/);
 } finally {
   server.close();
 }
