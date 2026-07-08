@@ -6,15 +6,17 @@ import ListingCards from '@/components/ListingCards.astro';
 import CTASection from '@/components/CTASection.astro';
 import Footer from '@/components/Footer.astro';
 import { publishedAudiences } from '@/content/audiences';
+import { getPageByRoute } from '@/lib/content/provider';
+const page = await getPageByRoute('/kinek-szol/');
 ---
 
-<BaseLayout title="Kinek szól? | Easylink" description="Easylink hoteleknek, vendéglátóhelyeknek és szolgáltató vállalkozásoknak.">
+<BaseLayout title={page?.seoTitle ?? "Kinek szól? | Easylink"} description={page?.seoDescription ?? "Easylink hoteleknek, vendéglátóhelyeknek és szolgáltató vállalkozásoknak."}>
   <Header />
   <main>
     <PageHero
-      eyebrow="Kinek szól?"
-      title="Iparági fókusz, admin-kompatibilis tartalommal."
-      description="A public site külön route-okon mutatja be, mely vállalkozásoknak ad könnyebb cégvezetést az Easylink."
+      eyebrow={page?.heroEyebrow ?? "kinek-szol"}
+      title={page?.heroTitle ?? "Kinek szól?"}
+      description={page?.heroDescription ?? "A public site külön route-okon mutatja be, mely vállalkozásoknak ad könnyebb cégvezetést az Easylink."}
     />
     <section class="section light">
       <div class="container">

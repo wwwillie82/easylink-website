@@ -5,12 +5,14 @@ import PageHero from '@/components/PageHero.astro';
 import CTASection from '@/components/CTASection.astro';
 import Footer from '@/components/Footer.astro';
 const deployUrl = import.meta.env.PUBLIC_DEPLOY_URL ?? 'https://deploy.easylink.hu';
+import { getPageByRoute } from '@/lib/content/provider';
+const page = await getPageByRoute('/kapcsolat/');
 ---
 
-<BaseLayout title="Kapcsolat | Easylink" description="Kapcsolat az Easylink csapattal.">
+<BaseLayout title={page?.seoTitle ?? "Kapcsolat | Easylink"} description={page?.seoDescription ?? "Kapcsolat az Easylink csapattal."}>
   <Header />
   <main>
-    <PageHero eyebrow="Kapcsolat" title="Kapcsolódjunk össze." description="Írj nekünk, vagy kérj demót a Deploy felületen keresztül." />
+    <PageHero eyebrow={page?.heroEyebrow ?? "Kapcsolat"} title={page?.heroTitle ?? "Kapcsolódjunk össze."} description={page?.heroDescription ?? "Írj nekünk, vagy kérj demót a Deploy felületen keresztül."} />
     <section class="section light">
       <div class="container contact-grid">
         <article class="card polished contact">

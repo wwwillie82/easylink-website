@@ -5,15 +5,17 @@ import PageHero from '@/components/PageHero.astro';
 import CTASection from '@/components/CTASection.astro';
 import Footer from '@/components/Footer.astro';
 import { publishedIntegrations } from '@/content/integrations';
+import { getPageByRoute } from '@/lib/content/provider';
+const page = await getPageByRoute('/integraciok/');
 ---
 
-<BaseLayout title="Integrációk | Easylink" description="NAV Online Számla, magyar bankok, Hostware, Számlázz.hu, Billingo és Cégjelző integrációs irányok.">
+<BaseLayout title={page?.seoTitle ?? "Integrációk | Easylink"} description={page?.seoDescription ?? "NAV Online Számla, magyar bankok, Hostware, Számlázz.hu, Billingo és Cégjelző integrációs irányok."}>
   <Header />
   <main>
     <PageHero
-      eyebrow="Integrációk"
-      title="Kapcsolódások, adatáramlás, tisztább működés."
-      description="Az integrációs registry előkészíti a későbbi partner- és adatkapcsolati tartalmakat. Ahol nincs bizonyított éles kapcsolat, ott integrációs irányként kommunikálunk."
+      eyebrow={page?.heroEyebrow ?? "integraciok"}
+      title={page?.heroTitle ?? "Integrációk"}
+      description={page?.heroDescription ?? "Az integrációs registry előkészíti a későbbi partner- és adatkapcsolati tartalmakat. Ahol nincs bizonyított éles kapcsolat, ott integrációs irányként kommunikálunk."}
       asset="/assets/nati/hero-bg-flow-02.webp"
     />
     <section class="section light network-section">
