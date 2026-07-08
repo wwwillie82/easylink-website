@@ -1,5 +1,29 @@
 ---
 const { title = 'Kapcsolódó oldalak', links = [] } = Astro.props;
 ---
-<section class="section related"><div class="container"><h2>{title}</h2><div class="links">{links.map((link)=><a class="button button-secondary" href={link.href}>{link.title}</a>)}</div></div></section>
-<style>.related{background:var(--color-navy);color:white}.related h2{font-size:clamp(2rem,4vw,3.4rem)}.links{display:flex;gap:12px;flex-wrap:wrap}</style>
+
+<section class="section related">
+  <div class="container">
+    <h2>{title}</h2>
+    <div class="links">
+      {links.map((link) => <a class="button button-secondary" href={link.href}>{link.title}</a>)}
+    </div>
+  </div>
+</section>
+
+<style>
+  .related {
+    background: var(--color-navy);
+    color: white;
+  }
+
+  .related h2 {
+    font-size: clamp(2rem, 4vw, 3.4rem);
+  }
+
+  .links {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+</style>

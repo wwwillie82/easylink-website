@@ -38,6 +38,9 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Markup smoke on built HTML
+        run: npm run smoke:markup
+
       - name: Setup SSH
         shell: bash
         run: |
@@ -117,3 +120,5 @@ jobs:
           printf '%s' "$PRICING_HTML" | grep -F "Csomagárak és árkalkulátor"
           printf '%s' "$CONTACT_HTML" | grep -F "hello@easylink.hu"
           printf '%s' "$ROBOTS_TXT" | grep -F "Disallow: /"
+
+          npm run smoke:markup -- "https://${SITE_DEV_DOMAIN}"

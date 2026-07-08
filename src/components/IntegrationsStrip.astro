@@ -1,2 +1,46 @@
-<section id="integrációk" class="integrations"><div class="container"><p>Integrációs irányok</p><div class="logos">{['NAV Online Számla','Magyar bankok / PSD2 / Aggreg8','Hostware','Számlázz.hu','Billingo','Cégjelző'].map((item) => <span>{item}</span>)}</div></div></section>
-<style>.integrations{padding:34px 0;background:var(--color-navy);color:white}.integrations p{color:rgba(255,255,255,.62);font-weight:600;margin-bottom:16px}.logos{display:flex;gap:12px;flex-wrap:wrap}.logos span{border:1px solid rgba(174,255,0,.34);border-radius:999px;padding:11px 15px;background:rgba(255,255,255,.07)}</style>
+---
+const integrations = [
+  'NAV Online Számla',
+  'Magyar bankok / PSD2 / Aggreg8',
+  'Hostware',
+  'Számlázz.hu',
+  'Billingo',
+  'Cégjelző',
+];
+---
+
+<section id="integrációk" class="integrations">
+  <div class="container">
+    <p>Integrációs irányok</p>
+    <div class="logos">
+      {integrations.map((item) => <span>{item}</span>)}
+    </div>
+  </div>
+</section>
+
+<style>
+  .integrations {
+    padding: 34px 0;
+    background: var(--color-navy);
+    color: white;
+  }
+
+  .integrations p {
+    color: rgba(255, 255, 255, 0.62);
+    font-weight: 600;
+    margin-bottom: 16px;
+  }
+
+  .logos {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .logos span {
+    border: 1px solid rgba(174, 255, 0, 0.34);
+    border-radius: 999px;
+    padding: 11px 15px;
+    background: rgba(255, 255, 255, 0.07);
+  }
+</style>
