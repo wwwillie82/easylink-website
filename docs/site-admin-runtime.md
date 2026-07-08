@@ -80,3 +80,20 @@ npm run smoke:admin
 - Draft/published version history.
 - Production-grade CSRF tokens, rate limiting and audit log.
 - Server config changes for nginx/systemd.
+
+## Publish / élesítés MVP
+
+Az admin tartalmi mentések után a Node admin runtime automatikusan publish folyamatot indít. A folyamat először DB snapshotot készít, majd temp release könyvtárba buildel, és csak sikeres build, release-validáció és deploy után frissíti a webrootot. Sikertelen build/deploy vagy invalid release esetén az aktuális élő webroot változatlan marad.
+
+Konfigurálható környezeti változók:
+
+- `SITE_PUBLISH_REPO_DIR`: a checkout, ahol a build parancs fusson (stagingen várhatóan `/var/www/clients/client1/web172/private/easylink-website-src`). Alapértelmezés: aktuális process cwd.
+- `SITE_PUBLISH_BUILD_COMMAND`: build parancs. Alapértelmezés: `npm`.
+- `SITE_PUBLISH_BUILD_ARGS`: build argumentumok szóközzel elválasztva. Alapértelmezés: `run build`.
+- `SITE_PUBLISH_RELEASES_DIR`: temp/release könyvtár gyökere. Alapértelmezés: OS temp.
+- `SITE_PUBLISH_OUT_DIR`: a publish service automatikusan a temp `releasePath` értékre állítja; az `astro.config.mjs` ezt olvassa és erre állítja az Astro `outDir`-t. Kompatibilitásként az `OUT_DIR` is ugyanazt az értéket kapja.
+- `SITE_PUBLISH_WEBROOT`: sikeres build után frissítendő public webroot. Ha nincs beállítva, a deploy lépés kihagyásra kerül, ami fejlesztői környezetben hasznos.
+
+A shared hosting környezet miatt a repo-oldali deploy helper best-effort `rsync -a --delete --delay-updates` frissítést használ a sikeres temp build után. Ez nem módosít nginx/systemd/Supervisor konfigurációt, és nem commitol build outputot vagy webroot tartalmat.
+
+Deploy előtt a publish service kötelező guardokat futtat: a release könyvtárnak léteznie kell, nem lehet üres, tartalmaznia kell a gyökér `index.html`-t, és a snapshot első néhány page route-jának megfelelő `index.html` outputját is ellenőrzi. Invalid vagy üres release soha nem kerül `rsync --delete` bemenetként a webrootra; ilyenkor a snapshot `failed`, a válasz `liveUnchanged: true`, és az élő webroot változatlan marad.
