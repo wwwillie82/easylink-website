@@ -1,8 +1,10 @@
 <footer id="kapcsolat" class="footer">
   <div class="container foot">
     <div>
-      <a class="brand" href="/"><span>easy</span>link</a>
-      <p>Statikus Astro marketing alap staging környezethez.</p>
+      <a class="brand" href="/">
+        <img src="/assets/brand/easylink-logo-horizontal.png" alt="Easylink" />
+      </a>
+      <p>Statikus Astro marketing site staging környezethez.</p>
     </div>
     <div>
       <b>Kapcsolat</b>
@@ -13,34 +15,10 @@
 </footer>
 
 <style>
-  .footer {
-    padding: 44px 0;
-    background: var(--color-soft);
-    border-top: 1px solid var(--color-line);
-  }
-
-  .foot {
-    display: flex;
-    justify-content: space-between;
-    gap: 24px;
-  }
-
-  .brand {
-    font-weight: 800;
-    color: var(--color-navy);
-    font-size: 1.25rem;
-  }
-
-  .brand span {
-    color: #74ad00;
-  }
-
-  .foot div:last-child {
-    display: grid;
-    gap: 10px;
-  }
-
-  @media (max-width: 700px) {
-    .foot { display: grid; }
-  }
+  .footer { padding: 52px 0; background: #f5f7f4; border-top: 1px solid var(--color-line); }
+  .foot { display: flex; justify-content: space-between; gap: 24px; }
+  .brand img { width: 180px; }
+  .foot div:last-child { display: grid; gap: 10px; }
+  .foot a:not(.brand) { color: var(--color-navy); font-weight: 700; }
+  @media (max-width: 700px) { .foot { display: grid; } }
 </style>

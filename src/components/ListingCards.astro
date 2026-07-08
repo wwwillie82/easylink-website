@@ -1,5 +1,16 @@
 ---
 const { items, basePath = '' } = Astro.props;
 ---
-<div class="listing-grid">{items.map((item) => <a class="card listing-card" href={`${basePath}${item.slug}/`}><span>{String(item.order).padStart(2,'0')}</span><h3>{item.title}</h3><p>{item.shortDescription}</p></a>)}</div>
-<style>.listing-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:22px}.listing-card{padding:28px;display:block}.listing-card span{width:48px;height:48px;border-radius:16px;background:var(--color-navy);color:var(--color-neon);display:grid;place-items:center;font-weight:800;margin-bottom:24px}.listing-card h3{color:var(--color-navy);font-size:1.25rem}@media(max-width:860px){.listing-grid{grid-template-columns:1fr}}</style>
+<div class="listing-grid">
+  {items.map((item) => (
+    <a class="listing-card" href={`${basePath}${item.slug}/`}>
+      <span class="number">{String(item.order).padStart(2, '0')}</span>
+      <h3>{item.title}</h3>
+      <p>{item.shortDescription}</p>
+      <i>Részletek →</i>
+    </a>
+  ))}
+</div>
+<style>
+  .listing-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:22px}.listing-card{position:relative;isolation:isolate;overflow:hidden;min-height:260px;padding:30px;display:flex;flex-direction:column;border:1px solid rgba(15,17,89,.1);border-radius:28px;background:linear-gradient(#fff,#fff) padding-box,linear-gradient(135deg,rgba(174,255,0,.75),rgba(0,220,255,.22),rgba(15,17,89,.18)) border-box;box-shadow:0 22px 70px rgba(15,17,89,.1);transition:transform .2s ease,box-shadow .2s ease,border-color .2s ease}.listing-card:before{content:"";position:absolute;inset:0 0 auto;height:5px;background:linear-gradient(90deg,var(--color-neon),#18d6ff,transparent)}.listing-card:after{content:"";position:absolute;right:-48px;top:-60px;width:180px;height:180px;border-radius:50%;background:rgba(174,255,0,.14);z-index:-1}.listing-card:hover,.listing-card:focus-visible{transform:translateY(-6px);box-shadow:0 34px 90px rgba(15,17,89,.18);outline:none}.number{width:50px;height:50px;border-radius:18px;background:var(--color-navy);color:var(--color-neon);display:grid;place-items:center;font-weight:800;margin-bottom:24px;box-shadow:var(--shadow-neon)}.listing-card h3{color:var(--color-navy);font-size:1.25rem}.listing-card p{margin-bottom:24px}.listing-card i{margin-top:auto;color:var(--color-navy);font-style:normal;font-weight:800}@media(max-width:1040px){.listing-grid{grid-template-columns:repeat(2,1fr)}}@media(max-width:680px){.listing-grid{grid-template-columns:1fr}.listing-card{min-height:auto}}
+</style>
