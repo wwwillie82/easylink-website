@@ -20,6 +20,6 @@ export function createAdminRepository(pool) {
     },
     async deleteBlock(id) { await pool.execute('UPDATE site_content_blocks SET status=? WHERE id=?', ['archived', id]); },
     async nav() { const [r] = await pool.query('SELECT * FROM site_navigation_items ORDER BY sort_order,id'); return r; },
-    async updateNav(items) { for (const item of items) await pool.execute('UPDATE site_navigation_items SET title=?, href=?, sort_order=?, status=? WHERE id=?', [item.title, item.href, Number(item.sort_order || 0), item.status, item.id]); },
+    async updateNav(items) { for (const item of items) { const [existing] = await pool.query('SELECT id FROM site_navigation_items WHERE id=? LIMIT 1', [item.id]); if (!existing[0]) throw new Error(`Navigation item not found: ${item.id}`); await pool.execute('UPDATE site_navigation_items SET title=?, href=?, sort_order=?, status=? WHERE id=?', [item.title, item.href, Number(item.sort_order || 0), item.status, item.id]); } },
   };
 }

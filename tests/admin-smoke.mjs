@@ -12,7 +12,11 @@ const state = {
   user: { id: 1, email: 'admin@example.com', password_hash: hashPassword('correct-password'), display_name: 'Admin', role: 'admin', status: 'active' },
   pages: [{ id: 1, route: '/arak/', slug: 'arak', type: 'pricing', title: 'Árak', status: 'published', sort_order: 1, seo_title: 'Árak', seo_description: 'Desc', hero_eyebrow: 'Árak', hero_title: 'Hero', hero_description: 'Hero desc', hero_asset: '/asset.webp' }],
   blocks: [{ id: 1, page_id: 1, block_key: 'seed:/arak/:text:0', type: 'text', title: 'Block', body: 'Body', items: '[]', status: 'published', sort_order: 1 }],
-  nav: [{ id: 1, title: 'Árak', href: '/arak/', sort_order: 1, status: 'published' }],
+  nav: [
+    { id: 1, title: 'Árak', href: '/arak/', sort_order: 1, status: 'published' },
+    { id: 2, title: 'Kapcsolat', href: '/kapcsolat/', sort_order: 2, status: 'published' },
+    { id: 3, title: 'Archív', href: '/archiv/', sort_order: 3, status: 'draft' },
+  ],
 };
 const repo = {
   async findAdminUserByEmail(email) { return email === state.user.email ? state.user : null; },
@@ -23,7 +27,7 @@ const repo = {
   async upsertBlock(payload) { JSON.parse(payload.items || 'null'); if (payload.id) { Object.assign(state.blocks.find((b) => String(b.id) === String(payload.id)), payload); return { id: payload.id }; } const block = { ...payload, id: state.blocks.length + 1, block_key: `manual:test-${state.blocks.length + 1}` }; state.blocks.push(block); return { id: block.id, block_key: block.block_key }; },
   async deleteBlock(id) { state.blocks.find((b) => String(b.id) === String(id)).status = 'archived'; },
   async nav() { return state.nav; },
-  async updateNav(items) { state.nav = items; },
+  async updateNav(items) { for (const item of items) { const nav = state.nav.find((n) => String(n.id) === String(item.id)); if (!nav) throw new Error(`Navigation item not found: ${item.id}`); Object.assign(nav, { title: item.title, href: item.href, sort_order: Number(item.sort_order), status: item.status }); } },
 };
 
 const server = createAdminServer({ repo, env: { SITE_ADMIN_SESSION_SECRET: sessionSecret, NODE_ENV: 'test' } });
@@ -71,9 +75,35 @@ try {
   assert.equal(response.status, 200);
   assert.equal(state.blocks[0].status, 'archived');
 
-  response = await fetch(`${base}/api/admin/navigation`, { method: 'PUT', headers: { cookie, 'content-type': 'application/json' }, body: JSON.stringify({ items: [{ id: 1, title: 'Kapcsolat', href: '/kapcsolat/', sort_order: 2, status: 'published' }] }) });
+  response = await fetch(`${base}/admin/menu`, { headers: { cookie } });
   assert.equal(response.status, 200);
-  assert.equal(state.nav[0].href, '/kapcsolat/');
+  const menuHtml = await response.text();
+  assert.match(menuHtml, /data-nav-item/);
+  assert.match(menuHtml, /data-field=\"title\"/);
+  assert.doesNotMatch(menuHtml, /k\.match\(\/items/);
+
+  response = await fetch(`${base}/api/admin/navigation`, { method: 'PUT', headers: { cookie, 'content-type': 'application/json' }, body: JSON.stringify({ items: [] }) });
+  assert.equal(response.status, 400);
+  assert.equal((await response.json()).ok, false);
+  assert.equal(state.nav[0].title, 'Árak');
+
+  response = await fetch(`${base}/api/admin/navigation`, { method: 'PUT', headers: { cookie, 'content-type': 'application/json' }, body: JSON.stringify({ items: [
+    { id: 1, title: 'Díjszabás', href: '/arak/', sort_order: 1, status: 'published' },
+    { id: 2, title: 'Kapcsolat', href: '/kapcsolat/', sort_order: 2, status: 'published' },
+    { id: 3, title: 'Archív', href: '/archiv/', sort_order: 3, status: 'draft' },
+  ] }) });
+  assert.equal(response.status, 200);
+  assert.equal(state.nav[0].title, 'Díjszabás');
+  assert.equal(state.nav[0].href, '/arak/');
+  assert.equal(state.nav[0].sort_order, 1);
+  assert.equal(state.nav[1].title, 'Kapcsolat');
+  assert.equal(state.nav[2].status, 'draft');
+
+  response = await fetch(`${base}/api/admin/navigation`, { method: 'PUT', headers: { cookie, 'content-type': 'application/json' }, body: JSON.stringify({ items: [
+    { id: 999, title: 'Hiányzó', href: '/hianyzo/', sort_order: 9, status: 'draft' },
+  ] }) });
+  assert.equal(response.status, 500);
+  assert.equal(state.nav.find((n) => n.id === 999), undefined);
 
   response = await fetch(`${base}/admin/pages/1`, { headers: { cookie } });
   assert.equal(response.status, 200);
