@@ -40,7 +40,7 @@
   --container-reading: 760px;
   --section-padding: clamp(54px, 6.5vw, 86px);
   --section-padding-tight: clamp(38px, 5vw, 62px);
-  --home-hero-min-height: clamp(520px, 64vh, 650px);
+  --home-hero-min-height: clamp(480px, 58vh, 590px);
   --page-hero-padding: clamp(36px, 4.4vw, 58px);
   --detail-hero-padding: clamp(28px, 3.6vw, 46px);
   --header-height: 66px;
