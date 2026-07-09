@@ -15,7 +15,8 @@
     "admin:init": "node scripts/admin-init.mjs",
     "smoke:admin": "node tests/admin-smoke.mjs",
     "smoke:publish": "node tests/publish-smoke.mjs",
-    "smoke:header": "node tests/header-navigation-smoke.mjs"
+    "smoke:header": "node tests/header-navigation-smoke.mjs",
+    "smoke:live": "node scripts/smoke-live-site.mjs"
   },
   "dependencies": {
     "astro": "7.0.5",
