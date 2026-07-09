@@ -2,52 +2,18 @@
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import Header from '@/components/Header.astro';
 import PageHero from '@/components/PageHero.astro';
-import CTASection from '@/components/CTASection.astro';
+import ContentBlocks from '@/components/ContentBlocks.astro';
 import Footer from '@/components/Footer.astro';
-import { getPageByRoute } from '@/lib/content/provider';
-const page = await getPageByRoute('/arak/');
+import { getPublicPageState } from '@/lib/content/provider';
+const pageState = await getPublicPageState('/arak/');
+const page = pageState.page;
+if (pageState.hiddenByDb) Astro.response.status = 404;
 ---
-
-<BaseLayout title={page?.seoTitle ?? "Áraink | Easylink"} description={page?.seoDescription ?? "Easylink árak és csomagok előkészített public oldal."}>
+<BaseLayout title={page?.seoTitle} description={page?.seoDescription}>
   <Header />
-  <main>
-    <PageHero
-      eyebrow={page?.heroEyebrow ?? "arak"}
-      title={page?.heroTitle ?? "Áraink"}
-      description={page?.heroDescription ?? "Konkrét csomagárakat még nem publikálunk, és ezen az oldalon nem készül kalkulátor. A cél egy érthető public előkészítő oldal demó CTA-val."}
-    />
-    <section class="section light">
-      <div class="container price-grid">
-        <article class="card polished">
-          <h2>Mitől függhet az ár?</h2>
-          <ul>
-            <li>Választott moduloktól: pénzügy, CRM, dokumentumkezelés, kontrolling vagy AI irány.</li>
-            <li>Cégmérettől, felhasználói köröktől és adminisztrációs összetettségtől.</li>
-            <li>Előkészített vagy később bizonyított integrációktól.</li>
-            <li>Bevezetési, adat-előkészítési és támogatási igényektől.</li>
-          </ul>
-        </article>
-        <article class="card polished placeholder">
-          <span class="eyebrow">Ajánlatkérés</span>
-          <h2>Demó alapján pontosítunk</h2>
-          <p>
-            A public oldalon nem közlünk csomagárat. Demó során a modulokat, a cégméretet
-            és az integrációs előkészítést együtt mérjük fel.
-          </p>
-        </article>
-      </div>
-    </section>
-    <CTASection title="Kérj demót, és beszéljük át a modulokat." description="A pontos ajánlat a választott funkcióktól, cégmérettől és integrációs igényektől függ." />
-  </main>
+  {pageState.hiddenByDb ? <main><section class="section"><div class="container"><h1>Az oldal nem található.</h1></div></section></main> : <main>
+    <PageHero eyebrow={page?.heroEyebrow} title={page?.heroTitle} description={page?.heroDescription} asset={page?.heroAsset || undefined} />
+    <ContentBlocks blocks={page?.blocks || []} />
+  </main>}
   <Footer />
 </BaseLayout>
-
-<style>
-  .light { background: var(--color-soft); }
-  .price-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
-  .polished { padding: 32px; border-radius: 28px; box-shadow: 0 22px 70px rgba(15,17,89,.1); }
-  h2 { color: var(--color-navy); font-size: clamp(1.45rem, 2.2vw, 2.2rem); }
-  li { margin: 12px 0; color: var(--color-navy); line-height: 1.55; font-weight: 600; }
-  .placeholder { background: linear-gradient(180deg, #fff, #f0f5eb); }
-  @media (max-width: 860px) { .price-grid { grid-template-columns: 1fr; } }
-</style>

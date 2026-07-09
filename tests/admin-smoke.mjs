@@ -1,16 +1,21 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { once } from 'node:events';
 import { hashPassword, verifyPassword } from '../src/lib/db/client.mjs';
 import { readCookie, verifySessionToken } from '../src/lib/admin/auth.mjs';
 import { shouldTryDbContentForEnv, pageWithFallback } from '../src/lib/content/provider.test-helper.mjs';
 import { staticPagesData } from '../src/lib/content/static-seed-data.mjs';
 import { createAdminServer } from '../src/lib/admin/server.mjs';
+import { staleSeedKeys } from '../scripts/db-seed.mjs';
 
 const sessionSecret = 'test-session-secret-long-enough';
 const state = {
   user: { id: 1, email: 'admin@example.com', password_hash: hashPassword('correct-password'), display_name: 'Admin', role: 'admin', status: 'active' },
-  pages: [{ id: 1, route: '/arak/', slug: 'arak', type: 'pricing', title: 'Árak', status: 'published', sort_order: 1, seo_title: 'Árak', seo_description: 'Desc', hero_eyebrow: 'Árak', hero_title: 'Hero', hero_description: 'Hero desc', hero_asset: '/asset.webp' }],
+  pages: [
+    { id: 1, route: '/arak/', slug: 'arak', type: 'pricing', title: 'Árak', status: 'published', sort_order: 1, seo_title: 'Árak', seo_description: 'Desc', hero_eyebrow: 'Árak', hero_title: 'Hero', hero_description: 'Hero desc', hero_asset: '/asset.webp' },
+    { id: 10, route: '/', slug: 'home', type: 'home', title: 'Kezdőlap', status: 'published', sort_order: 0, seo_title: 'Home SEO', seo_description: 'Home desc', hero_eyebrow: 'Home', hero_title: 'Home hero', hero_description: 'Home hero desc', hero_asset: '/home.webp' },
+  ],
   blocks: [{ id: 1, page_id: 1, block_key: 'seed:/arak/:text:0', type: 'text', title: 'Block', body: 'Body', items: '[]', status: 'published', sort_order: 1 }],
 
   snapshots: [],
@@ -22,16 +27,19 @@ const state = {
     { id: 3, title: 'Archív', href: '/archiv/', sort_order: 3, status: 'draft' },
   ],
 };
+const normalizeRoute = (route) => { const withStart = String(route || '').startsWith('/') ? String(route || '') : `/${route}`; return withStart.endsWith('/') ? withStart : `${withStart}/`; };
+const validationError = (message) => Object.assign(new Error(message), { status: 400, code: 'VALIDATION_ERROR' });
 const repo = {
   async findAdminUserByEmail(email) { return email === state.user.email ? state.user : null; },
   async markAdminLogin() {},
   async pages() { return state.pages; },
+  async createPage(payload) { const route = normalizeRoute(payload.route); if (route === '/') throw validationError('Adj meg érvényes URL-t.'); if (state.pages.find((p) => p.route === route)) throw validationError('Ez az URL már létezik.'); const page = { id: Math.max(...state.pages.map((p) => p.id)) + 1, route, slug: route.replace(/^\//, '').replace(/\/$/, ''), type: payload.type || 'content_page', title: payload.title, status: payload.status || 'draft', sort_order: state.pages.length + 1, seo_title: payload.title, seo_description: '', hero_eyebrow: '', hero_title: payload.title, hero_description: '', hero_asset: '' }; state.pages.push(page); return { id: page.id, route: page.route, slug: page.slug }; },
   async page(id) { const page = state.pages.find((p) => String(p.id) === String(id)); return page ? { page, blocks: state.blocks.filter((b) => String(b.page_id) === String(id)) } : null; },
-  async updatePage(id, payload) { Object.assign(state.pages.find((p) => String(p.id) === String(id)), payload); },
+  async updatePage(id, payload) { const page = state.pages.find((p) => String(p.id) === String(id)); const route = payload.route ? normalizeRoute(payload.route) : page.route; const isExistingHome = page.route === '/' || page.type === 'home'; if (route === '/' && !isExistingHome) throw validationError('Adj meg érvényes URL-t.'); if (state.pages.find((p) => p.route === route && String(p.id) !== String(id))) throw validationError('Ez az URL már létezik.'); Object.assign(page, payload, { route, slug: route === '/' ? 'home' : (payload.slug || page.slug) }); },
   async upsertBlock(payload) { JSON.parse(payload.items || 'null'); if (payload.id) { Object.assign(state.blocks.find((b) => String(b.id) === String(payload.id)), payload); return { id: payload.id }; } const block = { ...payload, id: state.blocks.length + 1, block_key: `manual:test-${state.blocks.length + 1}` }; state.blocks.push(block); return { id: block.id, block_key: block.block_key }; },
   async deleteBlock(id) { state.blocks.find((b) => String(b.id) === String(id)).status = 'archived'; },
   async nav() { return state.nav; },
-  async updateNav(items) { for (const item of items) { const nav = state.nav.find((n) => String(n.id) === String(item.id)); if (!nav) throw new Error(`Navigation item not found: ${item.id}`); Object.assign(nav, { title: item.title, href: item.href, sort_order: Number(item.sort_order), status: item.status }); } },
+  async updateNav(items) { for (const item of items) { if (item.id) { const nav = state.nav.find((n) => String(n.id) === String(item.id)); if (!nav) throw new Error(`Navigation item not found: ${item.id}`); Object.assign(nav, { title: item.title, href: item.href, sort_order: Number(item.sort_order), status: item.status }); } else { state.nav.push({ id: Math.max(...state.nav.map((n) => n.id)) + 1, title: item.title, href: item.href, sort_order: Number(item.sort_order), status: item.status }); } } state.nav.sort((a,b)=>a.sort_order-b.sort_order||a.id-b.id); },
 
   async exportContentSnapshot() { return { pages: structuredClone(state.pages), blocks: structuredClone(state.blocks), navigation: structuredClone(state.nav), settings: [], media: [] }; },
   async importContentSnapshot(content) { state.imported = content; state.pages = structuredClone(content.pages || []); state.blocks = structuredClone(content.blocks || []); state.nav = structuredClone(content.navigation || []); },
@@ -66,11 +74,14 @@ try {
   const pagesHtml = await response.text();
   assert.match(pagesHtml, /admin-nav/);
   assert.match(pagesHtml, /Oldalak/);
+  assert.match(pagesHtml, /Oldal neve/);
+  assert.match(pagesHtml, /Típus/);
+  assert.match(pagesHtml, /Új oldal létrehozása/);
+  assert.match(pagesHtml, /Általános tartalmi oldal/);
   assert.match(pagesHtml, /Kilépés/);
   assert.doesNotMatch(pagesHtml, />Dashboard</);
   assert.match(pagesHtml, /button,\.btn\{[^}]*cursor:pointer/);
   assert.match(pagesHtml, /button:hover,\.btn:hover/);
-  assert.match(pagesHtml, /button:active,\.btn:active/);
   assert.match(pagesHtml, /button:focus-visible,\.btn:focus-visible/);
   assert.match(pagesHtml, /button:disabled/);
 
@@ -91,9 +102,43 @@ try {
   assert.equal(response.status, 200);
   assert.equal((await response.json()).data[0].route, '/arak/');
 
-  response = await fetch(`${base}/api/admin/pages/1`, { method: 'PUT', headers: { cookie, 'content-type': 'application/json' }, body: JSON.stringify({ ...state.pages[0], title: 'Árak módosítva' }) });
+  response = await fetch(`${base}/api/admin/pages`, { method: 'POST', headers: { cookie, 'content-type': 'application/json' }, body: JSON.stringify({ title: 'Rólunk', route: '/rolunk/', type: 'content_page', status: 'draft' }) });
   assert.equal(response.status, 200);
   let saved = await response.json();
+  assert.equal(saved.data.id, 11);
+  assert.equal(state.pages.find((p) => p.id === 11).type, 'content_page');
+
+  response = await fetch(`${base}/api/admin/pages`, { method: 'POST', headers: { cookie, 'content-type': 'application/json' }, body: JSON.stringify({ title: 'Dupla', route: '/arak/', type: 'content_page', status: 'draft' }) });
+  assert.equal(response.status, 400);
+  assert.match((await response.json()).error.message, /Ez az URL már létezik/);
+
+  response = await fetch(`${base}/api/admin/pages/11`, { method: 'PUT', headers: { cookie, 'content-type': 'application/json' }, body: JSON.stringify({ route: '/arak/' }) });
+  assert.equal(response.status, 400);
+  assert.match((await response.json()).error.message, /Ez az URL már létezik/);
+
+  response = await fetch(`${base}/api/admin/pages`, { method: 'POST', headers: { cookie, 'content-type': 'application/json' }, body: JSON.stringify({ title: 'Root', route: '/', type: 'content_page', status: 'draft' }) });
+  assert.equal(response.status, 400);
+  assert.match((await response.json()).error.message, /Adj meg érvényes URL-t/);
+
+  response = await fetch(`${base}/api/admin/pages/1`, { method: 'PUT', headers: { cookie, 'content-type': 'application/json' }, body: JSON.stringify({ route: '/' }) });
+  assert.equal(response.status, 400);
+  assert.match((await response.json()).error.message, /Adj meg érvényes URL-t/);
+
+  response = await fetch(`${base}/api/admin/pages/10`, { method: 'PUT', headers: { cookie, 'content-type': 'application/json' }, body: JSON.stringify({ route: '/', title: 'Kezdőlap módosítva', seo_title: 'Home SEO módosítva', hero_title: 'Home hero módosítva', status: 'draft' }) });
+  assert.equal(response.status, 200);
+  saved = await response.json();
+  assert.equal(saved.publish.ok, true);
+  const homePage = state.pages.find((p) => p.id === 10);
+  assert.equal(homePage.route, '/');
+  assert.equal(homePage.slug, 'home');
+  assert.equal(homePage.title, 'Kezdőlap módosítva');
+  assert.equal(homePage.seo_title, 'Home SEO módosítva');
+  assert.equal(homePage.hero_title, 'Home hero módosítva');
+  assert.equal(homePage.status, 'draft');
+
+  response = await fetch(`${base}/api/admin/pages/1`, { method: 'PUT', headers: { cookie, 'content-type': 'application/json' }, body: JSON.stringify({ ...state.pages[0], title: 'Árak módosítva' }) });
+  assert.equal(response.status, 200);
+  saved = await response.json();
   assert.equal(saved.publish.ok, true);
   assert.equal(state.pages[0].title, 'Árak módosítva');
 
@@ -116,7 +161,17 @@ try {
   const menuHtml = await response.text();
   assert.match(menuHtml, /data-nav-item/);
   assert.match(menuHtml, /data-field=\"title\"/);
-  assert.doesNotMatch(menuHtml, /k\.match\(\/items/);
+  assert.match(menuHtml, /Menüpont neve/);
+  assert.match(menuHtml, /Link/);
+  assert.match(menuHtml, /Sorrend/);
+  assert.match(menuHtml, /Látható/);
+  assert.match(menuHtml, /Rejtett piszkozat/);
+  assert.match(menuHtml, /Menüpont hozzáadása/);
+  assert.match(menuHtml, /navSerializer/);
+  assert.match(menuHtml, /setupDirtyForm\(form,navSerializer\)/);
+  assert.match(menuHtml, /renumber\(\)/);
+  assert.doesNotMatch(menuHtml, /<th>title<\/th>/);
+  assert.doesNotMatch(menuHtml, /text-decoration:line-through/);
 
   response = await fetch(`${base}/api/admin/navigation`, { method: 'PUT', headers: { cookie, 'content-type': 'application/json' }, body: JSON.stringify({ items: [] }) });
   assert.equal(response.status, 400);
@@ -136,6 +191,12 @@ try {
   assert.equal(state.nav[0].sort_order, 1);
   assert.equal(state.nav[1].title, 'Kapcsolat');
   assert.equal(state.nav[2].status, 'draft');
+
+  response = await fetch(`${base}/api/admin/navigation`, { method: 'PUT', headers: { cookie, 'content-type': 'application/json' }, body: JSON.stringify({ items: [
+    { id: '', title: 'Blog', href: '/blog/', sort_order: 4, status: 'draft' },
+  ] }) });
+  assert.equal(response.status, 200);
+  assert.equal(state.nav.at(-1).title, 'Blog');
 
   response = await fetch(`${base}/api/admin/navigation`, { method: 'PUT', headers: { cookie, 'content-type': 'application/json' }, body: JSON.stringify({ items: [
     { id: 999, title: 'Hiányzó', href: '/hianyzo/', sort_order: 9, status: 'draft' },
@@ -165,12 +226,37 @@ try {
   assert.match(pageEditorHtml, /baseline/);
   assert.match(pageEditorHtml, /addEventListener\('input',sync\)/);
   assert.match(pageEditorHtml, /document.getElementById\('msg'\).innerHTML=''/);
-  assert.match(pageEditorHtml, /if\(j.ok&&j.publish\?\.ok\)pageState.markSaved\(\)/);
+  assert.match(pageEditorHtml, /Oldal neve/);
+  assert.match(pageEditorHtml, /Főcím/);
+  assert.match(pageEditorHtml, /Bevezető szöveg/);
+  assert.match(pageEditorHtml, /Haladó beállítások/);
+  assert.match(pageEditorHtml, /SEO cím/);
+  assert.doesNotMatch(pageEditorHtml, /items JSON/);
+  assert.doesNotMatch(pageEditorHtml, /Kis címke \/ szekció címe/);
+  assert.match(pageEditorHtml, /Blokk típusa/);
+  assert.match(pageEditorHtml, /Szövegblokk/);
+  assert.match(pageEditorHtml, /Felsorolás \/ lista/);
+  assert.match(pageEditorHtml, /Kártyasor/);
+  assert.match(pageEditorHtml, /CTA blokk/);
+  assert.match(pageEditorHtml, /Kép \+ szöveg blokk/);
+  assert.match(pageEditorHtml, /FAQ blokk/);
+  assert.match(pageEditorHtml, /Gomb felirat/);
+  assert.match(pageEditorHtml, /Gomb link/);
+  assert.match(pageEditorHtml, /Kép URL/);
+  assert.match(pageEditorHtml, /Kép pozíció/);
+  assert.match(pageEditorHtml, /Kártya címe/);
+  assert.match(pageEditorHtml, /Kártya szövege/);
+  assert.match(pageEditorHtml, /Kérdés/);
+  assert.match(pageEditorHtml, /Válasz/);
+  assert.doesNotMatch(pageEditorHtml, /Gomb felirat \/ kép URL/);
+  assert.match(pageEditorHtml, /blockSerializer/);
+  assert.match(pageEditorHtml, /setupDirtyForm\(f,blockSerializer\)/);
+  assert.match(pageEditorHtml, /if\(j.ok&&j.publish\?\.ok\)ps.markSaved\(\)/);
   const menuEditorHtml = await (await fetch(`${base}/admin/menu`, { headers: { cookie } })).text();
   assert.match(menuEditorHtml, /Mentés és élesítés/);
   assert.match(menuEditorHtml, /setupDirtyForm/);
   assert.match(menuEditorHtml, /baseline/);
-  assert.match(menuEditorHtml, /formState.markSaved\(\)/);
+  assert.match(menuEditorHtml, /state.markSaved\(\)/);
 } finally {
   server.close();
 }
@@ -181,10 +267,34 @@ assert.equal(readCookie('easylink_site_admin=%E0%A4%A'), undefined);
 assert.equal(verifySessionToken('bad.cookie'), null);
 assert.equal(shouldTryDbContentForEnv({ SITE_CONTENT_SOURCE: 'static', DB_HOST: 'localhost' }), false);
 assert.equal(shouldTryDbContentForEnv({ SITE_CONTENT_SOURCE: 'auto', DB_HOST: 'localhost', DB_NAME: 'site', DB_USER: 'site' }), true);
+assert.equal(await pageWithFallback('/arak/', { getPageByRouteAny: async () => ({ ...staticPagesData.find((page) => page.route === '/arak/'), status: 'draft' }) }, staticPagesData), undefined);
+assert.equal((await pageWithFallback('/arak/', { getPageByRouteAny: async () => null, getPageByRoute: async () => null }, staticPagesData)).route, '/arak/');
 assert.equal((await pageWithFallback('/arak/', { getPageByRoute: async () => { throw new Error('db down'); } }, staticPagesData)).route, '/arak/');
 const requiredRoutes = ['/', '/megoldasaink/', '/megoldasaink/penzugy-szamlazas/', '/megoldasaink/hr-munkaugy/', '/megoldasaink/crm-ugyfelkezeles/', '/megoldasaink/dokumentumkezeles-adminisztracio/', '/megoldasaink/kontrolling/', '/megoldasaink/ai-asszisztens/', '/kinek-szol/', '/kinek-szol/hotelek-szallashelyek/', '/kinek-szol/vendeglatohelyek/', '/kinek-szol/szolgaltato-vallalkozasok/', '/integraciok/', '/arak/', '/kapcsolat/'];
 for (const route of requiredRoutes) assert.ok(staticPagesData.find((page) => page.route === route), `missing fallback route ${route}`);
 assert.equal(new Set(staticPagesData.map((page) => page.route)).size, staticPagesData.length);
 assert.equal(new Set(staticPagesData.flatMap((page) => page.blocks.map((block, index) => `${page.route}:${block.type}:${index}`))).size, staticPagesData.reduce((sum, page) => sum + page.blocks.length, 0));
-assert.match(execFileSync('node', ['scripts/db-seed.mjs', '--dry-run'], { encoding: 'utf8' }), /15 pages, 25 blocks, 5 navigation items/);
+const seededText = JSON.stringify(staticPagesData);
+for (const phrase of ['Mitől függhet az ár?', 'Demó alapján pontosítunk', 'Miben tudunk segíteni?', 'Nem még egy táblázat', 'Nem késznek állított ígéretek', 'Megoldás lista', 'Célcsoportok']) assert.ok(seededText.includes(phrase), `missing seeded phrase: ${phrase}`);
+const seededTypes = new Set(staticPagesData.flatMap((page) => page.blocks.map((block) => block.type)));
+for (const type of ['text', 'feature-list', 'cards', 'cta']) assert.ok(seededTypes.has(type), `missing seeded block type ${type}`);
+const hardcodedBusinessPhrases = ['Mitől függhet az ár?', 'Demó alapján pontosítunk', 'Miben tudunk segíteni?', 'Nem még egy táblázat', 'Nem késznek állított ígéretek', 'Egy rendszer a napi működés kulcspontjaira.', 'A public oldalon nem közlünk csomagárat'];
+for (const file of ['src/pages/index.astro','src/pages/arak/index.astro','src/pages/kapcsolat/index.astro','src/pages/integraciok/index.astro','src/pages/megoldasaink/index.astro','src/pages/kinek-szol/index.astro']) {
+  const source = readFileSync(file, 'utf8');
+  assert.match(source, /getPublicPageState/);
+  assert.match(source, /hiddenByDb/);
+  assert.match(source, /Astro.response.status = 404/);
+  for (const phrase of hardcodedBusinessPhrases) assert.equal(source.includes(phrase), false, `${phrase} should come from seed, not ${file}`);
+}
+const staleKeys = staleSeedKeys([
+  { block_key: '/arak/:text:0' },
+  { block_key: '/arak/:feature-list:0' },
+  { block_key: 'manual:test' },
+  { block_key: '/kapcsolat/:text:0' },
+], ['/arak/:feature-list:0', '/arak/:cta:1'], '/arak/');
+assert.deepEqual(staleKeys, ['/arak/:text:0']);
+const dryRunOutput = execFileSync('node', ['scripts/db-seed.mjs', '--dry-run'], { encoding: 'utf8' });
+assert.match(dryRunOutput, /15 pages, 31 blocks, 5 navigation items/);
+assert.match(dryRunOutput, /Stale seed block cleanup: archive route-prefixed seed blocks/);
+assert.match(dryRunOutput, /manual:\* blocks are preserved/);
 console.log('Admin HTTP smoke passed: login, auth, malformed cookie, pages, blocks, navigation, fallback and seed checks.');

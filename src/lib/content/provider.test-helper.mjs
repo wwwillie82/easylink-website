@@ -5,8 +5,8 @@ export function shouldTryDbContentForEnv(env = {}) {
 }
 export async function pageWithFallback(route, dbReader, fallbackPages) {
   try {
-    const page = await dbReader?.getPageByRoute(route);
-    if (page?.status === 'published') return page;
+    const page = dbReader?.getPageByRouteAny ? await dbReader.getPageByRouteAny(route) : await dbReader?.getPageByRoute(route);
+    if (page) return page.status === 'published' ? page : undefined;
   } catch {}
   return fallbackPages.find((page) => page.route === route && page.status === 'published');
 }
