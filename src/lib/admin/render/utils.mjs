@@ -1,0 +1,4 @@
+export const esc = (v) => String(v ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+export const statusOptions = (value, labels = { published: 'Publikus', draft: 'Piszkozat', archived: 'Archivált' }) => ['published','draft','archived'].map((s)=>`<option value="${s}" ${value===s?'selected':''}>${labels[s]}</option>`).join('');
+export const pageTypeLabel = (type) => ({ home: 'Kezdőlap', pricing: 'Árak oldal', contact: 'Kapcsolat oldal', integrations: 'Integrációk oldal', solutions_index: 'Megoldások lista', audiences_index: 'Célcsoport lista', content_page: 'Általános tartalmi oldal' }[type] || 'Tartalmi oldal');
+export const parseItems = (v) => { try { const p = typeof v === 'string' ? JSON.parse(v || '[]') : (v ?? []); return Array.isArray(p) ? p : []; } catch { return []; } };

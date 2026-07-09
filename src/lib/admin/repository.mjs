@@ -1,26 +1,31 @@
 import crypto from 'node:crypto';
 import { parseJsonItems } from './validation.mjs';
 
+function normalizeRoute(value) { const raw = String(value || '').trim().toLowerCase().replace(/[^a-z0-9áéíóöőúüű\/-]+/g, '-'); const withStart = raw.startsWith('/') ? raw : `/${raw}`; return withStart.endsWith('/') ? withStart : `${withStart}/`; }
+function validationError(message) { const error = new Error(message); error.code = 'VALIDATION_ERROR'; error.status = 400; return error; }
+
 export function createAdminRepository(pool) {
   return {
     async findAdminUserByEmail(email) { const [r] = await pool.query('SELECT * FROM site_admin_users WHERE email=? LIMIT 1', [email]); return r[0] || null; },
     async markAdminLogin(id) { await pool.execute('UPDATE site_admin_users SET last_login_at=CURRENT_TIMESTAMP WHERE id=?', [id]); },
     async pages() { const [r] = await pool.query('SELECT id, route, slug, type, title, status, sort_order FROM site_pages ORDER BY sort_order, id'); return r; },
+    async createPage(p) { const route = normalizeRoute(p.route || p.slug || p.title); if (route === '/') throw validationError('Adj meg érvényes URL-t.'); const [existing] = await pool.query('SELECT id FROM site_pages WHERE route=? LIMIT 1', [route]); if (existing[0]) throw validationError('Ez az URL már létezik.'); const slug = route.replace(/^\//, '').replace(/\/$/, '') || 'home'; const [r] = await pool.execute('INSERT INTO site_pages (route, slug, type, title, seo_title, seo_description, hero_eyebrow, hero_title, hero_description, hero_asset, status, sort_order) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)', [route, slug, p.type || 'content_page', p.title, p.seo_title || p.title, p.seo_description || '', p.hero_eyebrow || '', p.hero_title || p.title, p.hero_description || '', p.hero_asset || '', p.status || 'draft', Number(p.sort_order || 999)]); return { id: r.insertId, route, slug }; },
     async page(id) { const [p] = await pool.query('SELECT * FROM site_pages WHERE id=?', [id]); if (!p[0]) return null; const [b] = await pool.query('SELECT * FROM site_content_blocks WHERE page_id=? ORDER BY sort_order,id', [id]); return { page: p[0], blocks: b }; },
-    async updatePage(id, p) { await pool.execute('UPDATE site_pages SET title=?, seo_title=?, seo_description=?, hero_eyebrow=?, hero_title=?, hero_description=?, hero_asset=?, status=?, sort_order=? WHERE id=?', [p.title, p.seo_title, p.seo_description, p.hero_eyebrow, p.hero_title, p.hero_description, p.hero_asset, p.status, Number(p.sort_order || 0), id]); },
+    async updatePage(id, p) { const current = await this.page(id); if (!current) throw new Error(`Page not found: ${id}`); const merged = { ...current.page, ...p }; const route = normalizeRoute(merged.route); const isExistingHome = current.page.route === '/' || current.page.type === 'home'; if (route === '/' && !isExistingHome) throw validationError('Adj meg érvényes URL-t.'); const [dupe] = await pool.query('SELECT id FROM site_pages WHERE route=? AND id<>? LIMIT 1', [route, id]); if (dupe[0]) throw validationError('Ez az URL már létezik.'); const slug = route === '/' ? 'home' : (merged.slug || route.replace(/^\//, '').replace(/\/$/, '') || 'home'); const [r] = await pool.execute('UPDATE site_pages SET route=?, slug=?, type=?, title=?, seo_title=?, seo_description=?, hero_eyebrow=?, hero_title=?, hero_description=?, hero_asset=?, status=?, sort_order=? WHERE id=?', [route, slug, merged.type, merged.title, merged.seo_title, merged.seo_description, merged.hero_eyebrow, merged.hero_title, merged.hero_description, merged.hero_asset, merged.status, Number(merged.sort_order || 0), id]); if (r.affectedRows === 0) throw new Error(`Page not found: ${id}`); },
     async upsertBlock(p) {
       const items = parseJsonItems(p.items);
       if (p.id) {
-        await pool.execute('UPDATE site_content_blocks SET type=?, title=?, body=?, items=?, sort_order=?, status=? WHERE id=?', [p.type, p.title, p.body, JSON.stringify(items), Number(p.sort_order || 0), p.status, p.id]);
+        const [r] = await pool.execute('UPDATE site_content_blocks SET type=?, title=?, body=?, items=?, sort_order=?, status=? WHERE id=?', [p.type, p.title, p.body, JSON.stringify(items), Number(p.sort_order || 0), p.status, p.id]);
+        if (r.affectedRows === 0) throw new Error(`Block not found: ${p.id}`);
         return { id: p.id };
       }
       const blockKey = p.block_key || `manual:${crypto.randomUUID()}`;
-      await pool.execute('INSERT INTO site_content_blocks (page_id, block_key, type, title, body, items, sort_order, status) VALUES (?,?,?,?,?,?,?,?)', [p.page_id, blockKey, p.type, p.title, p.body, JSON.stringify(items), Number(p.sort_order || 0), p.status]);
-      return { block_key: blockKey };
+      const [r] = await pool.execute('INSERT INTO site_content_blocks (page_id, block_key, type, title, body, items, sort_order, status) VALUES (?,?,?,?,?,?,?,?)', [p.page_id, blockKey, p.type, p.title, p.body, JSON.stringify(items), Number(p.sort_order || 0), p.status]);
+      return { id: r.insertId, block_key: blockKey };
     },
-    async deleteBlock(id) { await pool.execute('UPDATE site_content_blocks SET status=? WHERE id=?', ['archived', id]); },
+    async deleteBlock(id) { const [r] = await pool.execute('UPDATE site_content_blocks SET status=? WHERE id=?', ['archived', id]); if (r.affectedRows === 0) throw new Error(`Block not found: ${id}`); },
     async nav() { const [r] = await pool.query('SELECT * FROM site_navigation_items ORDER BY sort_order,id'); return r; },
-    async updateNav(items) { for (const item of items) { const [existing] = await pool.query('SELECT id FROM site_navigation_items WHERE id=? LIMIT 1', [item.id]); if (!existing[0]) throw new Error(`Navigation item not found: ${item.id}`); await pool.execute('UPDATE site_navigation_items SET title=?, href=?, sort_order=?, status=? WHERE id=?', [item.title, item.href, Number(item.sort_order || 0), item.status, item.id]); } },
+    async updateNav(items) { for (const item of items) { if (item.id) { const [existing] = await pool.query('SELECT id FROM site_navigation_items WHERE id=? LIMIT 1', [item.id]); if (!existing[0]) throw new Error(`Navigation item not found: ${item.id}`); await pool.execute('UPDATE site_navigation_items SET title=?, href=?, sort_order=?, status=? WHERE id=?', [item.title, item.href, Number(item.sort_order || 0), item.status, item.id]); } else { await pool.execute('INSERT INTO site_navigation_items (title, href, sort_order, status) VALUES (?,?,?,?)', [item.title, item.href, Number(item.sort_order || 0), item.status]); } } },
     async exportContentSnapshot() {
       const [pages] = await pool.query('SELECT * FROM site_pages ORDER BY id');
       const [blocks] = await pool.query('SELECT * FROM site_content_blocks ORDER BY id');

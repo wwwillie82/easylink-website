@@ -1,10 +1,10 @@
 export type ContentStatus = 'draft' | 'published' | 'archived';
 
 export type ContentBlock = {
-  type: 'text' | 'feature-list' | 'ai-preview' | 'network-visual';
+  type: 'text' | 'feature-list' | 'list' | 'cards' | 'card-grid' | 'cta' | 'image-text' | 'faq' | 'ai-preview' | 'network-visual';
   title: string;
   body?: string;
-  items?: string[];
+  items?: Array<string | { title?: string; text?: string; url?: string; label?: string; question?: string; answer?: string; image?: string; position?: 'left' | 'right' }>;
 };
 
 export type MediaPlaceholder = {

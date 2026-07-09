@@ -15,12 +15,14 @@ function authed(req, env) { return requireAuthFromRequest({ headers: { get: (nam
 
 function validateNavPayload(payload) {
   if (!Array.isArray(payload?.items) || payload.items.length === 0) return { ok: false, error: { code: 'INVALID_NAVIGATION_ITEMS', message: 'Legalább egy menüpont szükséges.' } };
-  const required = ['id', 'title', 'href', 'sort_order', 'status'];
+  const required = ['title', 'href', 'sort_order', 'status'];
   for (const [index, item] of payload.items.entries()) {
     if (!item || typeof item !== 'object') return { ok: false, error: { code: 'INVALID_NAVIGATION_ITEM', message: `Hibás menüpont: ${index + 1}.` } };
     for (const field of required) {
       if (item[field] === undefined || item[field] === null || String(item[field]).trim() === '') return { ok: false, error: { code: 'INVALID_NAVIGATION_ITEM', message: `Hiányzó menüpont mező: ${field}.` } };
     }
+    if (item.id !== undefined && item.id !== null && String(item.id).trim() !== '' && !/^\d+$/.test(String(item.id))) return { ok: false, error: { code: 'INVALID_NAVIGATION_ITEM', message: 'Hibás menüpont azonosító.' } };
+    if (!['published','draft','archived'].includes(item.status)) return { ok: false, error: { code: 'INVALID_NAVIGATION_STATUS', message: 'Hibás menüpont státusz.' } };
   }
   return { ok: true, data: payload.items };
 }
@@ -49,13 +51,13 @@ export function createAdminServer({ repo, env = process.env, publishService } = 
       const user = authed(req, env);
       if (!user) return url.pathname.startsWith('/api/') ? apiError(res, 401, 'UNAUTHENTICATED', 'Bejelentkezés szükséges.') : redirect(res, '/admin/login');
       if (url.pathname === '/api/admin/session') return json(res, 200, { ok: true, data: { user } });
-      if (url.pathname === '/api/admin/pages') return json(res, 200, { ok: true, data: await repo.pages() });
+      if (url.pathname === '/api/admin/pages') { if (req.method === 'POST') { const payload = await body(req); if (!payload.title || !payload.route) return apiError(res, 400, 'INVALID_PAGE', 'Oldalnév és URL szükséges.'); let data; try { data = await repo.createPage(payload); } catch (error) { if (error.status === 400 || error.code === 'VALIDATION_ERROR') return apiError(res, 400, 'INVALID_PAGE', error.message); throw error; } return json(res, 200, { ok: true, data, publish: await publishAfterSave(user, `Oldal létrehozás: ${data.id}`) }); } return json(res, 200, { ok: true, data: await repo.pages() }); }
       if (url.pathname.startsWith('/api/admin/pages/')) {
         const id = url.pathname.split('/').pop();
         const page = await repo.page(id);
         if (!page) return apiError(res, 404, 'PAGE_NOT_FOUND', 'Az oldal nem található.');
         if (req.method === 'GET') return json(res, 200, { ok: true, data: page });
-        await repo.updatePage(id, await body(req));
+        try { await repo.updatePage(id, await body(req)); } catch (error) { if (error.status === 400 || error.code === 'VALIDATION_ERROR') return apiError(res, 400, 'INVALID_PAGE', error.message); throw error; }
         return json(res, 200, { ok: true, publish: await publishAfterSave(user, `Oldal mentés: ${id}`) });
       }
       if (url.pathname === '/api/admin/blocks' && req.method === 'POST') {

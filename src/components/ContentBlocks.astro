@@ -1,44 +1,42 @@
 ---
 const { blocks = [] } = Astro.props;
 const blockLabels = {
-  text: 'Mire jó?',
-  'feature-list': 'Konkrét fókusz',
+  text: 'Tartalom',
+  'feature-list': 'Felsorolás',
+  list: 'Felsorolás',
+  cards: 'Kártyák',
+  'card-grid': 'Kártyák',
+  cta: 'Felhívás',
+  'image-text': 'Kép és szöveg',
+  faq: 'Gyakori kérdések',
   'ai-preview': 'AI és adatkapcsolat',
   'network-visual': 'Adatkapcsolat',
 };
+const asArray = (items) => Array.isArray(items) ? items : [];
+const textOf = (item) => typeof item === 'string' ? item : (item?.title ?? item?.text ?? item?.label ?? '');
 ---
 <section class="section light">
   <div class="container blocks">
-    {
-      blocks.map((block) => {
-        const eyebrow = blockLabels[block.type] ?? block.type;
-
-        return (
-          <article class:list={['content-card', `type-${block.type}`]}>
-            <span class="eyebrow">
-              {eyebrow}
-            </span>
-            <h2>
-              {block.title}
-            </h2>
-            {block.body && (
-              <p>
-                {block.body}
-              </p>
-            )}
-            {block.items && (
-              <ul>
-                {block.items.map((item) => (
-                  <li>
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </article>
-        );
-      })
-    }
+    {blocks.map((block) => {
+      const type = block.type === 'list' ? 'feature-list' : block.type;
+      const items = asArray(block.items);
+      const eyebrow = block.eyebrow ?? blockLabels[block.type] ?? block.type;
+      if (type === 'cta') {
+        const cta = items[0] ?? {};
+        return <article class="content-card type-cta"><span class="eyebrow">{eyebrow}</span><h2>{block.title}</h2>{block.body && <p>{block.body}</p>}{cta.url && <a class="button button-primary" href={cta.url}>{cta.label || 'Tovább'}</a>}</article>;
+      }
+      if (type === 'cards' || type === 'card-grid') {
+        return <article class="content-card type-cards"><span class="eyebrow">{eyebrow}</span><h2>{block.title}</h2>{block.body && <p>{block.body}</p>}<div class="mini-grid">{items.map((item) => <div class="mini-card"><h3>{item.title}</h3>{item.text && <p>{item.text}</p>}{item.url && <a href={item.url}>{item.label || 'Részletek'}</a>}</div>)}</div></article>;
+      }
+      if (type === 'image-text') {
+        const media = items[0] ?? {};
+        return <article class:list={['content-card', 'type-image-text', media.position === 'left' ? 'image-left' : 'image-right']}><div>{media.image && <img src={media.image} alt="" loading="lazy" />}</div><div><span class="eyebrow">{eyebrow}</span><h2>{block.title}</h2>{block.body && <p>{block.body}</p>}</div></article>;
+      }
+      if (type === 'faq') {
+        return <article class="content-card type-faq"><span class="eyebrow">{eyebrow}</span><h2>{block.title}</h2>{block.body && <p>{block.body}</p>}{items.map((item) => <details><summary>{item.question || item.title}</summary><p>{item.answer || item.text}</p></details>)}</article>;
+      }
+      return <article class:list={['content-card', `type-${type}`]}><span class="eyebrow">{eyebrow}</span><h2>{block.title}</h2>{block.body && <p>{block.body}</p>}{items.length > 0 && <ul>{items.map((item) => <li>{textOf(item)}</li>)}</ul>}</article>;
+    })}
   </div>
 </section>
 <style>
@@ -48,9 +46,16 @@ const blockLabels = {
   .content-card::before { content: ""; position: absolute; inset: 0 0 auto; height: 4px; background: linear-gradient(90deg, var(--color-neon), var(--color-cyan)); }
   .content-card h2 { color: var(--color-navy); font-size: clamp(1.22rem, 1.45vw, 1.62rem); font-weight: 700; line-height: 1.22; letter-spacing: -0.025em; }
   .content-card p { color: var(--color-ink); line-height: 1.68; }
-  .type-ai-preview, .type-network-visual { background: linear-gradient(135deg, var(--color-navy), #080a34); color: white; }
-  .type-ai-preview p, .type-network-visual p { color: rgba(255, 255, 255, 0.75); }
+  .mini-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-top: 16px; }
+  .mini-card { border: 1px solid rgba(15,17,89,.1); border-radius: 18px; padding: 16px; background: #f8faf7; }
+  .type-image-text { display: grid; grid-template-columns: .8fr 1.2fr; gap: 18px; align-items: center; }
+  .type-image-text.image-right > div:first-child { order: 2; }
+  .type-image-text img { width: 100%; border-radius: 18px; display: block; }
+  .type-ai-preview, .type-network-visual, .type-cta { background: linear-gradient(135deg, var(--color-navy), #080a34); color: white; }
+  .type-ai-preview p, .type-network-visual p, .type-cta p { color: rgba(255, 255, 255, 0.75); }
   li { margin: 10px 0; color: var(--color-navy); font-weight: 600; line-height: 1.58; }
   .type-ai-preview li, .type-network-visual li { color: rgba(255, 255, 255, 0.92); }
-  @media (max-width: 900px) { .blocks { grid-template-columns: 1fr; } }
+  details { border-top: 1px solid rgba(15,17,89,.12); padding: 12px 0; }
+  summary { cursor: pointer; font-weight: 800; color: var(--color-navy); }
+  @media (max-width: 900px) { .blocks, .type-image-text { grid-template-columns: 1fr; } .type-image-text.image-right > div:first-child { order: 0; } }
 </style>

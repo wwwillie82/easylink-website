@@ -30,12 +30,25 @@ export function mapPageRow(row: any, blocks: any[] = []): SitePage {
 
 export function createContentRepository(pool: Pool) {
   return {
-    async getPageByRoute(route: string) {
-      const [rows] = await pool.query('SELECT * FROM site_pages WHERE route = ? AND status = ? LIMIT 1', [route, 'published']);
+    async getPageByRouteAny(route: string) {
+      const [rows] = await pool.query('SELECT * FROM site_pages WHERE route = ? LIMIT 1', [route]);
       const page = rows[0];
       if (!page) return null;
       const [blocks] = await pool.query('SELECT * FROM site_content_blocks WHERE page_id = ? AND status = ? ORDER BY sort_order ASC, id ASC', [page.id, 'published']);
       return mapPageRow(page, blocks);
+    },
+    async getPageByRoute(route: string) {
+      const page = await this.getPageByRouteAny(route);
+      return page?.status === 'published' ? page : null;
+    },
+    async listContentPages() {
+      const [pages] = await pool.query('SELECT * FROM site_pages WHERE status = ? AND type = ? ORDER BY sort_order ASC, id ASC', ['published', 'content_page']);
+      const result = [];
+      for (const page of pages) {
+        const [blocks] = await pool.query('SELECT * FROM site_content_blocks WHERE page_id = ? AND status = ? ORDER BY sort_order ASC, id ASC', [page.id, 'published']);
+        result.push(mapPageRow(page, blocks));
+      }
+      return result;
     },
     async listNavigation() {
       const [rows] = await pool.query('SELECT title, href, sort_order AS sortOrder, status FROM site_navigation_items WHERE status = ? ORDER BY sort_order ASC, id ASC', ['published']);

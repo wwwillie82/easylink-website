@@ -1,68 +1,19 @@
 ---
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import Header from '@/components/Header.astro';
-import Hero from '@/components/Hero.astro';
-import ListingCards from '@/components/ListingCards.astro';
-import AiAssistantPreview from '@/components/AiAssistantPreview.astro';
-import IntegrationsStrip from '@/components/IntegrationsStrip.astro';
-import CTASection from '@/components/CTASection.astro';
+import PageHero from '@/components/PageHero.astro';
+import ContentBlocks from '@/components/ContentBlocks.astro';
 import Footer from '@/components/Footer.astro';
-import { publishedSolutions } from '@/content/solutions';
-import { publishedAudiences } from '@/content/audiences';
-import { getPageByRoute } from '@/lib/content/provider';
-const homePage = await getPageByRoute('/');
+import { getPublicPageState } from '@/lib/content/provider';
+const pageState = await getPublicPageState('/');
+const page = pageState.page;
+if (pageState.hiddenByDb) Astro.response.status = 404;
 ---
-
-<BaseLayout title={homePage?.seoTitle} description={homePage?.seoDescription}>
+<BaseLayout title={page?.seoTitle} description={page?.seoDescription}>
   <Header />
-  <main>
-    <Hero />
-
-    <section class="section light intro-section">
-      <div class="container intro-grid">
-        <div>
-          <span class="eyebrow">Public site előkészítés</span>
-          <h2>Nem még egy táblázat, hanem egy átlátható vezetői felület.</h2>
-        </div>
-        <div>
-          <p>
-            Az Easylink a pénzügy, adminisztráció, ügyfélkezelés és vezetői kontroll közös nyelvét készíti elő.
-            A cél: gyorsabb döntés, kevesebb kézi egyeztetés és később AI-val is kérdezhető üzleti adatok.
-          </p>
-        </div>
-      </div>
-    </section>
-
-    <section class="section light">
-      <div class="container">
-        <span class="eyebrow">Megoldásaink</span>
-        <h2>Egy rendszer a napi működés kulcspontjaira.</h2>
-        <ListingCards items={publishedSolutions.slice(0, 3)} basePath="/megoldasaink/" />
-        <p class="more"><a class="button button-secondary" href="/megoldasaink/">Összes megoldás</a></p>
-      </div>
-    </section>
-
-    <AiAssistantPreview />
-    <IntegrationsStrip />
-
-    <section class="section">
-      <div class="container">
-        <span class="eyebrow">Kinek szól?</span>
-        <h2>Hoteleknek, vendéglátóhelyeknek és szolgáltató vállalkozásoknak.</h2>
-        <ListingCards items={publishedAudiences} basePath="/kinek-szol/" />
-      </div>
-    </section>
-
-    <CTASection />
-  </main>
+  {pageState.hiddenByDb ? <main><section class="section"><div class="container"><h1>Az oldal nem található.</h1></div></section></main> : <main>
+    <PageHero eyebrow={page?.heroEyebrow} title={page?.heroTitle} description={page?.heroDescription} asset={page?.heroAsset || undefined} />
+    <ContentBlocks blocks={page?.blocks || []} />
+  </main>}
   <Footer />
 </BaseLayout>
-
-<style>
-  .more { margin-top: 28px; }
-  .light { background: var(--color-soft); }
-  h2 { max-width: 900px; }
-  .intro-section { padding-bottom: 18px; }
-  .intro-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 42px; align-items: start; }
-  @media (max-width: 800px) { .intro-grid { grid-template-columns: 1fr; } }
-</style>

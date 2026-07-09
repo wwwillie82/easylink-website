@@ -2,45 +2,18 @@
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import Header from '@/components/Header.astro';
 import PageHero from '@/components/PageHero.astro';
-import CTASection from '@/components/CTASection.astro';
+import ContentBlocks from '@/components/ContentBlocks.astro';
 import Footer from '@/components/Footer.astro';
-const deployUrl = import.meta.env.PUBLIC_DEPLOY_URL ?? 'https://deploy.easylink.hu';
-import { getPageByRoute } from '@/lib/content/provider';
-const page = await getPageByRoute('/kapcsolat/');
+import { getPublicPageState } from '@/lib/content/provider';
+const pageState = await getPublicPageState('/kapcsolat/');
+const page = pageState.page;
+if (pageState.hiddenByDb) Astro.response.status = 404;
 ---
-
-<BaseLayout title={page?.seoTitle ?? "Kapcsolat | Easylink"} description={page?.seoDescription ?? "Kapcsolat az Easylink csapattal."}>
+<BaseLayout title={page?.seoTitle} description={page?.seoDescription}>
   <Header />
-  <main>
-    <PageHero eyebrow={page?.heroEyebrow ?? "Kapcsolat"} title={page?.heroTitle ?? "Kapcsolódjunk össze."} description={page?.heroDescription ?? "Írj nekünk, vagy kérj demót a Deploy felületen keresztül."} />
-    <section class="section light">
-      <div class="container contact-grid">
-        <article class="card polished contact">
-          <h2>Kapcsolat</h2>
-          <p>Email: <a href="mailto:hello@easylink.hu">hello@easylink.hu</a></p>
-          <a class="button button-primary" href={deployUrl}>Demót kérek</a>
-        </article>
-        <article class="card polished contact">
-          <h2>Miben tudunk segíteni?</h2>
-          <ul>
-            <li>Megnézzük, mely modulok illenek a jelenlegi működésedhez.</li>
-            <li>Átbeszéljük a hotel/szálláshely, vendéglátó vagy szolgáltatói fókuszt.</li>
-            <li>Összegyűjtjük, milyen integrációs irányokat érdemes előkészíteni.</li>
-          </ul>
-        </article>
-      </div>
-    </section>
-    <CTASection />
-  </main>
+  {pageState.hiddenByDb ? <main><section class="section"><div class="container"><h1>Az oldal nem található.</h1></div></section></main> : <main>
+    <PageHero eyebrow={page?.heroEyebrow} title={page?.heroTitle} description={page?.heroDescription} asset={page?.heroAsset || undefined} />
+    <ContentBlocks blocks={page?.blocks || []} />
+  </main>}
   <Footer />
 </BaseLayout>
-
-<style>
-  .light { background: var(--color-soft); }
-  .contact-grid { display: grid; grid-template-columns: 0.85fr 1.15fr; gap: 22px; }
-  .contact { padding: 34px; border-radius: 28px; box-shadow: 0 22px 70px rgba(15,17,89,.1); }
-  .contact h2 { color: var(--color-navy); font-size: clamp(1.8rem, 4vw, 3rem); }
-  .contact a:not(.button) { color: var(--color-navy); font-weight: 800; }
-  li { margin: 12px 0; color: var(--color-navy); line-height: 1.55; font-weight: 600; }
-  @media (max-width: 860px) { .contact-grid { grid-template-columns: 1fr; } }
-</style>
