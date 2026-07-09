@@ -47,31 +47,20 @@ export function buildLiveSmokePlan() {
   const routeSet = new Set(pages.map((page) => page.route));
   for (const route of explicitRequiredRoutes) routeSet.add(route);
 
-  const contentChecks = pages
-    .filter((page) => requiredContentRoutes.has(page.route))
-    .map((page) => {
-      const checks = [];
-      if (page.heroTitle) checks.push(expected('page.heroTitle', page.heroTitle));
-      else if (page.title) checks.push(expected('page.title', page.title));
-
-      for (const [blockIndex, block] of (page.blocks ?? []).entries()) {
-        const prefix = `page.blocks[${blockIndex}]`;
-        const firstItem = Array.isArray(block.items) ? block.items[0] : undefined;
-
-        if (block.type === 'text' && page.route === '/' && block.title) checks.push(expected(`${prefix}.title`, block.title));
-        if (block.type === 'text' && page.route === '/') {
-          const body = representativeBody(block.body);
-          if (body) checks.push(expected(`${prefix}.body`, body));
-        }
-
-        if (block.type === 'cards' || block.type === 'card-grid') {
-          if (typeof firstItem === 'string') checks.push(expected(`${prefix}.items[0]`, firstItem));
-          else if (firstItem?.title) checks.push(expected(`${prefix}.items[0].title`, firstItem.title));
-        }
-      }
-
-      return { route: page.route, checks };
-    });
+  const contentChecks = [
+    { route: '/', checks: [
+      expected('home.hero.title', 'easyLink ERP'),
+      expected('home.hero.subtitle', 'Cégvezetés, könnyedén.'),
+      expected('home.hero.secondaryCta', 'Próbáld ki ingyen'),
+      expected('home.hero.primaryCta', 'Demót kérek'),
+      expected('home.hero.benefit', 'Átlátható működés'),
+    ] },
+    { route: '/megoldasaink/', checks: [expected('solutions.heading', 'Megoldásaink'), expected('solutions.card', 'Pénzügy és számlázás')] },
+    { route: '/kinek-szol/', checks: [expected('audiences.heading', 'Kinek szól?'), expected('audiences.card', 'Hoteleknek és szálláshelyeknek')] },
+    { route: '/integraciok/', checks: [expected('integrations.heading', 'Csomópontok'), expected('integrations.card', 'NAV Online Számla')] },
+    { route: '/arak/', checks: [expected('pricing.grid', 'Mitől függhet az ár?'), expected('pricing.cta', 'Demó alapján pontosítunk')] },
+    { route: '/kapcsolat/', checks: [expected('contact.grid', 'Miben tudunk segíteni?'), expected('contact.email', 'hello@easylink.hu')] },
+  ];
 
   return { routes: [...routeSet].sort(), contentChecks };
 }

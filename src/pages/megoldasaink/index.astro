@@ -2,18 +2,36 @@
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import Header from '@/components/Header.astro';
 import PageHero from '@/components/PageHero.astro';
-import ContentBlocks from '@/components/ContentBlocks.astro';
+import ListingCards from '@/components/ListingCards.astro';
+import CTASection from '@/components/CTASection.astro';
 import Footer from '@/components/Footer.astro';
+import { publishedSolutions } from '@/content/solutions';
 import { getPublicPageState } from '@/lib/content/provider';
 const pageState = await getPublicPageState('/megoldasaink/');
 const page = pageState.page;
 if (pageState.hiddenByDb) Astro.response.status = 404;
 ---
-<BaseLayout title={page?.seoTitle} description={page?.seoDescription}>
+
+<BaseLayout title={page?.seoTitle ?? "Megoldásaink | Easylink"} description={page?.seoDescription ?? "Easylink megoldások pénzügy, HR, CRM, dokumentumkezelés, kontrolling és AI területekre."}>
   <Header />
-  {pageState.hiddenByDb ? <main><section class="section"><div class="container"><h1>Az oldal nem található.</h1></div></section></main> : <main>
-    <PageHero eyebrow={page?.heroEyebrow} title={page?.heroTitle} description={page?.heroDescription} asset={page?.heroAsset || undefined} />
-    <ContentBlocks blocks={page?.blocks || []} />
-  </main>}
+  <main>
+    {pageState.hiddenByDb ? <section class="section"><div class="container"><h1>Az oldal nem található.</h1></div></section> : <>
+    <PageHero
+      eyebrow={page?.heroEyebrow ?? "megoldasaink"}
+      title={page?.heroTitle ?? "Megoldásaink"}
+      description={page?.heroDescription ?? "Valódi többoldalas struktúrában bemutatott, későbbi site admin szerkesztésre előkészített megoldások."}
+    />
+    <section class="section light">
+      <div class="container">
+        <ListingCards items={publishedSolutions} basePath="/megoldasaink/" />
+      </div>
+    </section>
+    <CTASection />
+    </>}
+  </main>
   <Footer />
 </BaseLayout>
+
+<style>
+  .light { background: var(--color-soft); }
+</style>

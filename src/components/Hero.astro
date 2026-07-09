@@ -1,4 +1,9 @@
 ---
+import type { SitePage } from '@/lib/content/static';
+
+type Props = { page?: SitePage; hero?: Partial<Pick<SitePage, 'heroEyebrow' | 'heroTitle' | 'heroDescription'>> };
+const { page, hero } = Astro.props;
+const heroData = { ...page, ...hero };
 const deployUrl = import.meta.env.PUBLIC_DEPLOY_URL ?? 'https://deploy.easylink.hu';
 
 const benefits = [
@@ -12,11 +17,11 @@ const benefits = [
   <div class="hero-bg" aria-hidden="true"></div>
   <div class="container hero-grid">
     <div class="hero-copy">
-      <span class="eyebrow">Easylink ügyvitel + AI</span>
-      <h1>easyLink ERP</h1>
+      <span class="eyebrow">{heroData?.heroEyebrow || 'Easylink ügyvitel + AI'}</span>
+      <h1>{heroData?.heroTitle || 'easyLink ERP'}</h1>
       <p class="hero-subtitle">Cégvezetés, könnyedén.</p>
       <p class="hero-description">
-        Felejtsd el a táblázatokat! Olyan ügyviteli rendszert adunk a kezedbe, amivel egyetlen, átlátható felületen irányíthatod a számlázást, az adminisztrációt és az ügyfélnyilvántartást.
+        {heroData?.heroDescription || 'Felejtsd el a táblázatokat! Olyan ügyviteli rendszert adunk a kezedbe, amivel egyetlen, átlátható felületen irányíthatod a számlázást, az adminisztrációt és az ügyfélnyilvántartást.'}
       </p>
       <div class="actions">
         <a class="button button-primary" href={deployUrl}>Demót kérek</a>

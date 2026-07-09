@@ -41,7 +41,7 @@ const detailPage = (section: 'megoldasaink' | 'kinek-szol', type: SitePageType, 
 
 export const staticPages: SitePage[] = [
   {
-    route: '/', slug: 'home', type: 'home', title: 'Easylink', seoTitle: 'Easylink | Ügyviteli rendszer KKV-knak', seoDescription: 'Modern Easylink public site ügyviteli, integrációs és AI asszisztens iránnyal.', heroEyebrow: 'Easylink public site', heroTitle: 'Ügyviteli rendszer, amely összeköti a napi működésed.', heroDescription: 'Pénzügy, CRM, dokumentumok, kontrolling és AI asszisztens irány egy vezetői felületen.', heroAsset: '/assets/nati/hero-bg-flow-03.webp', status: 'published', sortOrder: 0,
+    route: '/', slug: 'home', type: 'home', title: 'Easylink', seoTitle: 'Easylink | Ügyviteli rendszer KKV-knak', seoDescription: 'Modern Easylink public site ügyviteli, integrációs és AI asszisztens iránnyal.', heroEyebrow: 'Easylink ügyvitel + AI', heroTitle: 'easyLink ERP', heroDescription: 'Felejtsd el a táblázatokat! Olyan ügyviteli rendszert adunk a kezedbe, amivel egyetlen, átlátható felületen irányíthatod a számlázást, az adminisztrációt és az ügyfélnyilvántartást.', heroAsset: '/assets/nati/hero-bg-flow-03.webp', status: 'published', sortOrder: 0,
     blocks: [
       { type: 'text', title: 'Public site előkészítés', body: 'Nem még egy táblázat, hanem egy átlátható vezetői felület.' },
       { type: 'feature-list', title: 'Megoldásaink', items: publishedSolutions.slice(0, 3).map((item) => item.title) },
