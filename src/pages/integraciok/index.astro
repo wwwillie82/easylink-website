@@ -2,18 +2,65 @@
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import Header from '@/components/Header.astro';
 import PageHero from '@/components/PageHero.astro';
-import ContentBlocks from '@/components/ContentBlocks.astro';
+import CTASection from '@/components/CTASection.astro';
 import Footer from '@/components/Footer.astro';
+import { publishedIntegrations } from '@/content/integrations';
 import { getPublicPageState } from '@/lib/content/provider';
 const pageState = await getPublicPageState('/integraciok/');
 const page = pageState.page;
 if (pageState.hiddenByDb) Astro.response.status = 404;
 ---
-<BaseLayout title={page?.seoTitle} description={page?.seoDescription}>
+
+<BaseLayout title={page?.seoTitle ?? "Integrációk | Easylink"} description={page?.seoDescription ?? "NAV Online Számla, magyar bankok, Hostware, Számlázz.hu, Billingo és Cégjelző integrációs irányok."}>
   <Header />
-  {pageState.hiddenByDb ? <main><section class="section"><div class="container"><h1>Az oldal nem található.</h1></div></section></main> : <main>
-    <PageHero eyebrow={page?.heroEyebrow} title={page?.heroTitle} description={page?.heroDescription} asset={page?.heroAsset || undefined} />
-    <ContentBlocks blocks={page?.blocks || []} />
-  </main>}
+  <main>
+    {pageState.hiddenByDb ? <section class="section"><div class="container"><h1>Az oldal nem található.</h1></div></section> : <>
+    <PageHero
+      eyebrow={page?.heroEyebrow ?? "integraciok"}
+      title={page?.heroTitle ?? "Integrációk"}
+      description={page?.heroDescription ?? "Az integrációs registry előkészíti a későbbi partner- és adatkapcsolati tartalmakat. Ahol nincs bizonyított éles kapcsolat, ott integrációs irányként kommunikálunk."}
+      asset="/assets/nati/hero-bg-flow-02.webp"
+    />
+    <section class="section light network-section">
+      <div class="container intro">
+        <span class="eyebrow">Csomópontok</span>
+        <h2>Nem késznek állított ígéretek, hanem tisztán tagolt integrációs irányok.</h2>
+      </div>
+      <div class="container integration-grid">
+        {publishedIntegrations.map((item) => (
+          <article class="card integration-card">
+            <span>
+              {String(item.order).padStart(2, '0')}
+            </span>
+            <h3>
+              {item.title}
+            </h3>
+            <p>
+              {item.shortDescription}
+            </p>
+            <p class="detail">
+              {item.detail}
+            </p>
+          </article>
+        ))}
+      </div>
+    </section>
+    <CTASection />
+    </>}
+  </main>
   <Footer />
 </BaseLayout>
+
+<style>
+  .light { background: var(--color-soft); }
+  .network-section { background: linear-gradient(180deg, #f6f8f5, #fff); }
+  .intro { margin-bottom: 28px; }
+  .intro h2 { max-width: 920px; color: var(--color-navy); font-size: clamp(1.65rem, 2.5vw, 2.4rem); }
+  .integration-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--card-gap); }
+  .integration-card { position: relative; overflow: hidden; padding: var(--card-padding); border-radius: var(--radius-md); box-shadow: var(--shadow-card); }
+  .integration-card:before { content: ""; position: absolute; inset: 0 0 auto; height: 5px; background: linear-gradient(90deg, var(--color-neon), #16d7ff); }
+  .integration-card span { color: var(--color-neon); background: var(--color-navy); width: 40px; height: 40px; border-radius: 14px; display: grid; place-items: center; font-weight: 800; }
+  .integration-card h3 { color: var(--color-navy); }
+  .detail { color: var(--color-ink); font-weight: 400; }
+  @media (max-width: 860px) { .integration-grid { grid-template-columns: 1fr; } }
+</style>
