@@ -263,6 +263,8 @@ try {
   response = await fetch(`${base}/api/admin/pages`, { method: 'POST', headers: { cookie, 'content-type': 'application/json' }, body: JSON.stringify({ title: 'Teszt szerkeszthető', route: '/teszt-szerkesztheto/', type: 'content_page', status: 'draft' }) });
   assert.equal(response.status, 200);
   const editablePageId = (await response.json()).data.id;
+  response = await fetch(`${base}/api/admin/blocks`, { method: 'POST', headers: { cookie, 'content-type': 'application/json' }, body: JSON.stringify({ page_id: editablePageId, type: 'feature-list', title: 'Feature init', body: 'Body', items: '[{\"title\":\"Lista\",\"url\":\"/stale/\",\"linkLabel\":\"Régi\",\"order\":1}]', status: 'published', sort_order: 1 }) });
+  assert.equal(response.status, 200);
   const pageEditorHtml = await (await fetch(`${base}/admin/pages/${editablePageId}`, { headers: { cookie } })).text();
   assert.match(pageEditorHtml, /setupDirtyForm/);
   assert.match(pageEditorHtml, /baseline/);
@@ -307,6 +309,18 @@ try {
   assert.match(pageEditorHtml, /data-panel=\"items\"/);
   assert.match(pageEditorHtml, /data-panel=\"cta\"/);
   assert.match(pageEditorHtml, /data-panel=\"image-text\"/);
+  assert.match(pageEditorHtml, /data-panel=\"items\" data-list-editor hidden inert/);
+  assert.match(pageEditorHtml, /data-panel=\"cta\" hidden inert/);
+  assert.match(pageEditorHtml, /data-cta-label[^>]* disabled/);
+  assert.match(pageEditorHtml, /data-panel=\"image-text\" hidden inert/);
+  assert.match(pageEditorHtml, /data-image-url[^>]* disabled/);
+  assert.match(pageEditorHtml, /if\(show\)p\.removeAttribute\('inert'\);else p\.setAttribute\('inert',''\)/);
+  assert.match(pageEditorHtml, /const panels=\{items:\['feature-list','cards','faq'\]\.includes\(type\),cta:type==='cta','image-text':type==='image-text'\}/);
+  assert.match(pageEditorHtml, /data-field=\"item-url\" hidden>Cél URL \/ slug<input data-item-url[^>]* disabled/);
+  assert.match(pageEditorHtml, /data-field=\"item-label\" hidden>Link felirat<input data-item-label[^>]* disabled/);
+  assert.match(pageEditorHtml, /data-field=\"item-badge\" hidden>Sorrend \/ badge<input data-item-badge[^>]* disabled/);
+  assert.match(pageEditorHtml, /let items=\[\]/);
+  assert.match(pageEditorHtml, /f\.querySelector\('input\[name=\"items\"\]'\)\.value=JSON\.stringify\(items\)/);
   assert.match(pageEditorHtml, /data-field=\"item-label\"/);
   assert.match(pageEditorHtml, /data-field=\"item-badge\"/);
   assert.match(pageEditorHtml, /el.disabled=!show/);

@@ -4,6 +4,11 @@ export function parseJsonItems(input) {
   catch { throw Object.assign(new Error('Az items mezőnek érvényes JSON-nak kell lennie.'), { code: 'INVALID_BLOCK_JSON' }); }
 }
 
+export function normalizeBlockItems(type, items) {
+  if (type === 'text') return [];
+  return Array.isArray(items) ? items : [];
+}
+
 export function validateLoginPayload(payload) {
   const email = String(payload?.email || '').trim().toLowerCase();
   const password = String(payload?.password || '');
