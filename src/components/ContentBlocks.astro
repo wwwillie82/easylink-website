@@ -24,6 +24,9 @@ const linkAttrs = (value) => { const href = normalizePublicHref(value); return {
       const type = block.type === 'list' ? 'feature-list' : block.type;
       const items = asArray(block.items);
       const eyebrow = block.eyebrow ?? blockLabels[block.type] ?? block.type;
+      if (type === 'text') {
+        return <article class="content-card type-text"><span class="eyebrow">{eyebrow}</span><h2>{block.title}</h2>{block.body && <p>{block.body}</p>}</article>;
+      }
       if (type === 'cta') {
         const cta = items[0] ?? {};
         const link = linkAttrs(cta.url);
@@ -39,7 +42,10 @@ const linkAttrs = (value) => { const href = normalizePublicHref(value); return {
       if (type === 'faq') {
         return <article class="content-card type-faq"><span class="eyebrow">{eyebrow}</span><h2>{block.title}</h2>{block.body && <p>{block.body}</p>}{items.map((item) => <details><summary>{item.question || item.title}</summary><p>{item.answer || item.text}</p></details>)}</article>;
       }
-      return <article class:list={['content-card', `type-${type}`]}><span class="eyebrow">{eyebrow}</span><h2>{block.title}</h2>{block.body && <p>{block.body}</p>}{items.length > 0 && <ul>{items.map((item) => { const href = typeof item === 'object' ? normalizePublicHref(item.url || item.href) : ''; const label = textOf(item); return <li>{href ? <a href={href} target={publicHrefTarget(href)} rel={publicHrefRel(href)}>{label}</a> : label}</li>; })}</ul>}</article>;
+      if (type === 'feature-list') {
+        return <article class="content-card type-feature-list"><span class="eyebrow">{eyebrow}</span><h2>{block.title}</h2>{block.body && <p>{block.body}</p>}{items.length > 0 && <ul>{items.map((item) => { const href = typeof item === 'object' ? normalizePublicHref(item.url || item.href) : ''; const label = textOf(item); return <li>{href ? <a href={href} target={publicHrefTarget(href)} rel={publicHrefRel(href)}>{label}</a> : label}</li>; })}</ul>}</article>;
+      }
+      return <article class:list={['content-card', `type-${type}`]}><span class="eyebrow">{eyebrow}</span><h2>{block.title}</h2>{block.body && <p>{block.body}</p>}</article>;
     })}
   </div>
 </section>

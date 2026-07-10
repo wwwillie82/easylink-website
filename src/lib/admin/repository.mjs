@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import { parseJsonItems } from './validation.mjs';
+import { normalizeBlockItems, parseJsonItems } from './validation.mjs';
 
 function normalizeRoute(value) { const raw = String(value || '').trim().toLowerCase().replace(/[^a-z0-9áéíóöőúüű\/-]+/g, '-'); const withStart = raw.startsWith('/') ? raw : `/${raw}`; return withStart.endsWith('/') ? withStart : `${withStart}/`; }
 function validationError(message) { const error = new Error(message); error.code = 'VALIDATION_ERROR'; error.status = 400; return error; }
@@ -13,7 +13,7 @@ export function createAdminRepository(pool) {
     async page(id) { const [p] = await pool.query('SELECT * FROM site_pages WHERE id=?', [id]); if (!p[0]) return null; const [b] = await pool.query('SELECT * FROM site_content_blocks WHERE page_id=? ORDER BY sort_order,id', [id]); return { page: p[0], blocks: b }; },
     async updatePage(id, p) { const current = await this.page(id); if (!current) throw new Error(`Page not found: ${id}`); const merged = { ...current.page, ...p }; const route = normalizeRoute(merged.route); const isExistingHome = current.page.route === '/' || current.page.type === 'home'; if (route === '/' && !isExistingHome) throw validationError('Adj meg érvényes URL-t.'); const [dupe] = await pool.query('SELECT id FROM site_pages WHERE route=? AND id<>? LIMIT 1', [route, id]); if (dupe[0]) throw validationError('Ez az URL már létezik.'); const slug = route === '/' ? 'home' : (merged.slug || route.replace(/^\//, '').replace(/\/$/, '') || 'home'); const [r] = await pool.execute('UPDATE site_pages SET route=?, slug=?, type=?, title=?, seo_title=?, seo_description=?, hero_eyebrow=?, hero_title=?, hero_description=?, hero_asset=?, status=?, sort_order=? WHERE id=?', [route, slug, merged.type, merged.title, merged.seo_title, merged.seo_description, merged.hero_eyebrow, merged.hero_title, merged.hero_description, merged.hero_asset, merged.status, Number(merged.sort_order || 0), id]); if (r.affectedRows === 0) throw new Error(`Page not found: ${id}`); },
     async upsertBlock(p) {
-      const items = parseJsonItems(p.items);
+      const items = normalizeBlockItems(p.type, parseJsonItems(p.items));
       if (p.id) {
         const [r] = await pool.execute('UPDATE site_content_blocks SET type=?, title=?, body=?, items=?, sort_order=?, status=? WHERE id=?', [p.type, p.title, p.body, JSON.stringify(items), Number(p.sort_order || 0), p.status, p.id]);
         if (r.affectedRows === 0) throw new Error(`Block not found: ${p.id}`);
