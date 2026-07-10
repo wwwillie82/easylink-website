@@ -84,6 +84,8 @@ try {
   assert.match(pagesHtml, /button:hover,\.btn:hover/);
   assert.match(pagesHtml, /button:focus-visible,\.btn:focus-visible/);
   assert.match(pagesHtml, /button:disabled/);
+  assert.match(pagesHtml, /button:active,\.btn:active,\.admin-nav a:active/);
+  assert.match(pagesHtml, /transform:translateY\(1px\) scale\(\.99\)/);
 
   response = await fetch(`${base}/admin/dashboard`, { headers: { cookie }, redirect: 'manual' });
   assert.equal(response.status, 303);
@@ -221,11 +223,19 @@ try {
   response = await fetch(`${base}/admin/pages/1`, { headers: { cookie } });
   assert.equal(response.status, 200);
   assert.match(await response.text(), /Oldal szerkesztése/);
-  const pageEditorHtml = await (await fetch(`${base}/admin/pages/1`, { headers: { cookie } })).text();
+  const fixedPageEditorHtml = await (await fetch(`${base}/admin/pages/1`, { headers: { cookie } })).text();
+  assert.match(fixedPageEditorHtml, /nem ebből a blokklistából szerkeszthető/);
+  assert.doesNotMatch(fixedPageEditorHtml, /Blokk típusa/);
+  response = await fetch(`${base}/api/admin/pages`, { method: 'POST', headers: { cookie, 'content-type': 'application/json' }, body: JSON.stringify({ title: 'Teszt szerkeszthető', route: '/teszt-szerkesztheto/', type: 'content_page', status: 'draft' }) });
+  assert.equal(response.status, 200);
+  const editablePageId = (await response.json()).data.id;
+  const pageEditorHtml = await (await fetch(`${base}/admin/pages/${editablePageId}`, { headers: { cookie } })).text();
   assert.match(pageEditorHtml, /setupDirtyForm/);
   assert.match(pageEditorHtml, /baseline/);
   assert.match(pageEditorHtml, /addEventListener\('input',sync\)/);
-  assert.match(pageEditorHtml, /document.getElementById\('msg'\).innerHTML=''/);
+  assert.match(pageEditorHtml, /Nem mentett módosítások/);
+  assert.match(pageEditorHtml, /if\(dirty&&status\)status.innerHTML/);
+  assert.doesNotMatch(pageEditorHtml, /querySelector\('\.err'\)/);
   assert.match(pageEditorHtml, /Oldal neve/);
   assert.match(pageEditorHtml, /Főcím/);
   assert.match(pageEditorHtml, /Bevezető szöveg/);
@@ -252,11 +262,22 @@ try {
   assert.match(pageEditorHtml, /blockSerializer/);
   assert.match(pageEditorHtml, /setupDirtyForm\(f,blockSerializer\)/);
   assert.match(pageEditorHtml, /if\(j.ok&&j.publish\?\.ok\)ps.markSaved\(\)/);
+  assert.match(pageEditorHtml, /data-item-url/);
+  assert.match(pageEditorHtml, /data-cta-label/);
+  assert.match(pageEditorHtml, /data-cta-url/);
+  assert.match(pageEditorHtml, /data-image-url/);
+  assert.match(pageEditorHtml, /data-image-position/);
+  assert.match(pageEditorHtml, /f.addEventListener\('input'/);
+  assert.match(pageEditorHtml, /data-add-item/);
   const menuEditorHtml = await (await fetch(`${base}/admin/menu`, { headers: { cookie } })).text();
   assert.match(menuEditorHtml, /Mentés és élesítés/);
   assert.match(menuEditorHtml, /setupDirtyForm/);
   assert.match(menuEditorHtml, /baseline/);
   assert.match(menuEditorHtml, /state.markSaved\(\)/);
+  assert.match(menuEditorHtml, /is-archived-ui/);
+  assert.match(menuEditorHtml, /state.markSaving\(\)/);
+  assert.match(menuEditorHtml, /if\(j.ok\)state.markSaved\(\)/);
+  assert.doesNotMatch(menuEditorHtml, /location\.reload\(\)/);
 } finally {
   server.close();
 }
