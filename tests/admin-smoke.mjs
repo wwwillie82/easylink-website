@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import { mkdtemp } from 'node:fs/promises';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { once } from 'node:events';
 import { hashPassword, verifyPassword } from '../src/lib/db/client.mjs';
 import { readCookie, verifySessionToken } from '../src/lib/admin/auth.mjs';
@@ -28,6 +31,8 @@ const state = {
   snapshots: [],
   imported: null,
   publishCalls: 0,
+  media: [],
+  nextMediaId: 1,
   nav: [
     { id: 1, title: 'Árak', href: '/arak/', sort_order: 1, status: 'published' },
     { id: 2, title: 'Kapcsolat', href: '/kapcsolat/', sort_order: 2, status: 'published' },
@@ -45,6 +50,11 @@ const repo = {
   async updatePage(id, payload) { const page = state.pages.find((p) => String(p.id) === String(id)); const route = payload.route ? normalizeRoute(payload.route) : page.route; const isExistingHome = page.route === '/' || page.type === 'home'; if (route === '/' && !isExistingHome) throw validationError('Adj meg érvényes URL-t.'); if (state.pages.find((p) => p.route === route && String(p.id) !== String(id))) throw validationError('Ez az URL már létezik.'); Object.assign(page, payload, { route, slug: route === '/' ? 'home' : (payload.slug || page.slug) }); },
   async upsertBlock(payload) { JSON.parse(payload.items || 'null'); if (payload.id) { Object.assign(state.blocks.find((b) => String(b.id) === String(payload.id)), payload); return { id: payload.id }; } const block = { ...payload, id: state.blocks.length + 1, block_key: `manual:test-${state.blocks.length + 1}` }; state.blocks.push(block); return { id: block.id, block_key: block.block_key }; },
   async deleteBlock(id) { state.blocks.find((b) => String(b.id) === String(id)).status = 'archived'; },
+  async listMedia({ includeArchived = false } = {}) { return state.media.filter((m) => includeArchived || m.status !== 'archived').sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at))||b.id-a.id); },
+  async getMedia(id) { return state.media.find((m) => String(m.id) === String(id)) || null; },
+  async createMedia(payload) { const media = { id: state.nextMediaId++, path: payload.path, alt: payload.alt || '', type: payload.type || '', status: payload.status || 'active', created_at: new Date().toISOString() }; state.media.push(media); return media; },
+  async updateMedia(id, payload) { const media = state.media.find((m) => String(m.id) === String(id)); if (!media) return null; if (payload.status && !['active','archived'].includes(payload.status)) throw validationError('Hibás média státusz.'); media.alt = payload.alt ?? media.alt; media.status = payload.status || media.status; return media; },
+  async archiveMedia(id) { const media = state.media.find((m) => String(m.id) === String(id)); if (!media) return null; media.status = 'archived'; return media; },
   async nav() { return state.nav; },
   async updateNav(items) { for (const item of items) { if (item.id) { const nav = state.nav.find((n) => String(n.id) === String(item.id)); if (!nav) throw new Error(`Navigation item not found: ${item.id}`); Object.assign(nav, { title: item.title, href: item.href, sort_order: Number(item.sort_order), status: item.status }); } else { state.nav.push({ id: Math.max(...state.nav.map((n) => n.id)) + 1, title: item.title, href: item.href, sort_order: Number(item.sort_order), status: item.status }); } } state.nav.sort((a,b)=>a.sort_order-b.sort_order||a.id-b.id); },
 
@@ -56,7 +66,8 @@ const repo = {
 };
 
 const publishService = { isRunning: () => false, async publish() { state.publishCalls += 1; return { ok: true, status: 'success', contentSaved: true, published: true }; } };
-const server = createAdminServer({ repo, publishService, env: { SITE_ADMIN_SESSION_SECRET: sessionSecret, NODE_ENV: 'test' } });
+const mediaStorageDir = await mkdtemp(join(tmpdir(), 'easylink-admin-media-'));
+const server = createAdminServer({ repo, publishService, env: { SITE_ADMIN_SESSION_SECRET: sessionSecret, NODE_ENV: 'test', SITE_MEDIA_STORAGE_DIR: mediaStorageDir, SITE_MEDIA_MAX_BYTES: '80' } });
 server.listen(0);
 await once(server, 'listening');
 const base = `http://127.0.0.1:${server.address().port}`;
@@ -112,6 +123,64 @@ try {
   response = await fetch(`${base}/api/admin/pages`, { headers: { cookie } });
   assert.equal(response.status, 200);
   assert.equal((await response.json()).data[0].route, '/arak/');
+
+  response = await fetch(`${base}/admin/media`, { redirect: 'manual' });
+  assert.equal(response.status, 303);
+  response = await fetch(`${base}/api/admin/media`);
+  assert.equal(response.status, 401);
+  response = await fetch(`${base}/admin/media`, { headers: { cookie } });
+  assert.equal(response.status, 200);
+  const mediaHtml = await response.text();
+  assert.match(mediaHtml, /Média könyvtár/);
+  assert.match(mediaHtml, /type="file"/);
+  assert.match(mediaHtml, /Feltöltés/);
+  assert.match(mediaHtml, /URL másolása/);
+  assert.match(mediaHtml, /data-media-alt/);
+  assert.match(mediaHtml, /Alt mentése/);
+  assert.doesNotMatch(mediaHtml, /MVP skeleton/);
+  response = await fetch(`${base}/api/admin/media`, { headers: { cookie } });
+  assert.equal(response.status, 200);
+  assert.deepEqual((await response.json()).data, []);
+  const png = new Uint8Array([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a,0,0,0,0]);
+  let fd = new FormData();
+  fd.set('alt', 'Teszt kép');
+  fd.set('file', new Blob([png], { type: 'image/png' }), 'Teszt Kép.png');
+  response = await fetch(`${base}/api/admin/media`, { method: 'POST', headers: { cookie }, body: fd });
+  assert.equal(response.status, 200);
+  let mediaSaved = await response.json();
+  assert.match(mediaSaved.data.path, /^\/assets\/site-media\/\d{4}\/\d{2}\/teszt-kep-[a-f0-9]{8}\.png$/);
+  assert.equal(mediaSaved.data.type, 'image/png');
+  assert.equal(existsSync(join(mediaStorageDir, mediaSaved.data.path.replace('/assets/site-media/', ''))), true);
+  response = await fetch(`${base}/api/admin/media/${mediaSaved.data.id}/file`, { headers: { cookie } });
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('content-type'), 'image/png');
+  assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
+  response = await fetch(`${base}/api/admin/media/${mediaSaved.data.id}`, { method: 'PATCH', headers: { cookie, 'content-type': 'application/json' }, body: JSON.stringify({ alt: 'Javított alt' }) });
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).data.alt, 'Javított alt');
+  response = await fetch(`${base}/api/admin/media`, { headers: { cookie } });
+  assert.equal((await response.json()).data[0].alt, 'Javított alt');
+  response = await fetch(`${base}/api/admin/media/999`, { method: 'PATCH', headers: { cookie, 'content-type': 'application/json' }, body: JSON.stringify({ alt: 'Hiányzó' }) });
+  assert.equal(response.status, 404);
+  response = await fetch(`${base}/api/admin/media/${mediaSaved.data.id}`, { method: 'PATCH', headers: { cookie, 'content-type': 'application/json' }, body: JSON.stringify({ status: 'bad' }) });
+  assert.equal(response.status, 400);
+  fd = new FormData();
+  fd.set('file', new Blob(['<svg></svg>'], { type: 'image/svg+xml' }), 'bad.svg');
+  response = await fetch(`${base}/api/admin/media`, { method: 'POST', headers: { cookie }, body: fd });
+  assert.equal(response.status, 400);
+  fd = new FormData();
+  fd.set('file', new Blob([png], { type: 'image/jpeg' }), 'bad.jpg');
+  response = await fetch(`${base}/api/admin/media`, { method: 'POST', headers: { cookie }, body: fd });
+  assert.equal(response.status, 400);
+  fd = new FormData();
+  fd.set('file', new Blob([new Uint8Array(100)], { type: 'image/png' }), 'too-big.png');
+  response = await fetch(`${base}/api/admin/media`, { method: 'POST', headers: { cookie }, body: fd });
+  assert.equal(response.status, 400);
+  response = await fetch(`${base}/api/admin/media/${mediaSaved.data.id}`, { method: 'DELETE', headers: { cookie } });
+  assert.equal(response.status, 200);
+  assert.equal(state.media[0].status, 'archived');
+  response = await fetch(`${base}/api/admin/media`, { headers: { cookie } });
+  assert.deepEqual((await response.json()).data, []);
 
   response = await fetch(`${base}/api/admin/pages`, { method: 'POST', headers: { cookie, 'content-type': 'application/json' }, body: JSON.stringify({ title: 'Rólunk', route: '/rolunk/', type: 'content_page', status: 'draft' }) });
   assert.equal(response.status, 200);
@@ -319,6 +388,10 @@ try {
   assert.match(pageEditorHtml, /data-cta-label/);
   assert.match(pageEditorHtml, /data-cta-url/);
   assert.match(pageEditorHtml, /data-image-url/);
+  assert.match(pageEditorHtml, /Médiából választok/);
+  assert.match(pageEditorHtml, /data-media-picker-target/);
+  assert.match(pageEditorHtml, /openMediaPicker/);
+  assert.match(pageEditorHtml, /dispatchEvent\(new Event\('input'/);
   assert.match(pageEditorHtml, /data-image-position/);
   assert.match(pageEditorHtml, /f.addEventListener\('input'/);
   assert.match(pageEditorHtml, /data-add-item/);

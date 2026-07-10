@@ -3,6 +3,7 @@ import { chmod, mkdir, mkdtemp, readdir, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
+import { copyMediaToRelease } from './media-storage.mjs';
 
 export class PublishInProgressError extends Error { constructor() { super('Élesítés folyamatban, próbáld újra később.'); this.code = 'PUBLISH_IN_PROGRESS'; } }
 
@@ -87,9 +88,10 @@ export function createPublishService({ repo, env = process.env, build, deploy } 
       if (!built.ok) { await repo.markPublishFinished(snapshotId, { status: 'failed', build_log_excerpt: built.log }); return { ok: false, status: 'failed', contentSaved: true, liveUnchanged: true, error: built.log || 'Build hiba.' }; }
       const release = await validateRelease(releasePath, content);
       if (!release.ok) { await repo.markPublishFinished(snapshotId, { status: 'failed', build_log_excerpt: release.error, release_path: releasePath }); return { ok: false, status: 'failed', contentSaved: true, liveUnchanged: true, error: release.error }; }
+      const mediaCopy = await copyMediaToRelease({ releasePath, env });
       const deployed = await deployFn({ releasePath, content, env });
       if (!deployed.ok) { await repo.markPublishFinished(snapshotId, { status: 'failed', build_log_excerpt: deployed.log, release_path: releasePath }); return { ok: false, status: 'failed', contentSaved: true, liveUnchanged: true, error: deployed.log || 'Deploy hiba.' }; }
-      await repo.markPublishFinished(snapshotId, { status: 'success', build_log_excerpt: `${built.log || ''}\n${deployed.log || ''}`.trim(), release_path: releasePath });
+      await repo.markPublishFinished(snapshotId, { status: 'success', build_log_excerpt: `${built.log || ''}\nmedia-copy: ${mediaCopy.skipped ? 'skipped' : `${mediaCopy.copied} files`}\n${deployed.log || ''}`.trim(), release_path: releasePath });
       await repo.prunePublishSnapshots(20);
       return { ok: true, status: 'success', contentSaved: true, published: true, snapshotId, content_hash: hash };
     } finally { locked = false; }
