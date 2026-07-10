@@ -9,6 +9,8 @@ import { publishedSolutions } from '@/content/solutions';
 import { getPublicPageState } from '@/lib/content/provider';
 const pageState = await getPublicPageState('/megoldasaink/');
 const page = pageState.page;
+const cardsBlock = page?.blocks?.find((block) => ['cards', 'card-grid'].includes(block.type));
+const solutionCards = cardsBlock?.items?.length ? cardsBlock.items : publishedSolutions;
 if (pageState.hiddenByDb) Astro.response.status = 404;
 ---
 
@@ -23,7 +25,7 @@ if (pageState.hiddenByDb) Astro.response.status = 404;
     />
     <section class="section light">
       <div class="container">
-        <ListingCards items={publishedSolutions} basePath="/megoldasaink/" />
+        <ListingCards items={solutionCards} basePath="/megoldasaink/" />
       </div>
     </section>
     <CTASection />
