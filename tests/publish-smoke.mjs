@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { chmod, mkdir, mkdtemp, stat, writeFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createPublishService, contentHash, ensureWebrootPermissions, stableJson } from '../src/lib/admin/publish.mjs';
@@ -12,6 +13,9 @@ assert.equal(contentHash(content), contentHash(structuredClone(content)));
 const snapshots = [];
 let nextId = 1;
 let deployed = 0;
+const mediaStorage = await mkdtemp(join(tmpdir(), 'easylink-publish-media-'));
+await mkdir(join(mediaStorage, '2026', '07'), { recursive: true });
+await writeFile(join(mediaStorage, '2026', '07', 'kep-a1b2c3d4.png'), 'media');
 const repo = {
   async exportContentSnapshot() { return structuredClone(content); },
   async createPublishSnapshot(s) { snapshots.push({ id: nextId, ...s }); return nextId++; },
@@ -24,10 +28,12 @@ async function writeValidRelease(releasePath) {
   await writeFile(join(releasePath, 'index.html'), '<!doctype html><title>Home</title>');
   await writeFile(join(releasePath, 'arak', 'index.html'), '<!doctype html><title>Árak</title>');
 }
-const service = createPublishService({ repo, build: async ({ releasePath }) => { await writeValidRelease(releasePath); return { ok: true, log: 'built' }; }, deploy: async () => { deployed += 1; return { ok: true, log: 'deployed' }; } });
+let deployedRelease = '';
+const service = createPublishService({ repo, env: { SITE_MEDIA_STORAGE_DIR: mediaStorage }, build: async ({ releasePath }) => { await writeValidRelease(releasePath); return { ok: true, log: 'built' }; }, deploy: async ({ releasePath }) => { deployed += 1; deployedRelease = releasePath; return { ok: true, log: 'deployed' }; } });
 let result = await service.publish({ adminId: 1 });
 assert.equal(result.ok, true);
 assert.equal(deployed, 1);
+assert.equal(existsSync(join(deployedRelease, 'assets', 'site-media', '2026', '07', 'kep-a1b2c3d4.png')), true);
 
 const webroot = await mkdtemp(join(tmpdir(), 'easylink-webroot-'));
 await mkdir(join(webroot, 'nested'), { recursive: true, mode: 0o700 });
@@ -40,24 +46,28 @@ assert.equal((await stat(webroot)).mode & 0o777, 0o755);
 assert.equal((await stat(join(webroot, 'nested'))).mode & 0o777, 0o755);
 assert.equal((await stat(join(webroot, 'nested', 'index.html'))).mode & 0o777, 0o644);
 
+const noMediaStorage = createPublishService({ repo, env: { SITE_MEDIA_STORAGE_DIR: join(mediaStorage, 'missing') }, build: async ({ releasePath }) => { await writeValidRelease(releasePath); return { ok: true, log: 'built' }; }, deploy: async ({ releasePath }) => { deployed += 1; deployedRelease = releasePath; return { ok: true }; } });
+result = await noMediaStorage.publish();
+assert.equal(result.ok, true);
+assert.equal(deployed, 2);
 const emptyRelease = createPublishService({ repo, build: async () => ({ ok: true, log: 'claimed built but wrote nothing' }), deploy: async () => { deployed += 1; return { ok: true }; } });
 result = await emptyRelease.publish();
 assert.equal(result.ok, false);
 assert.equal(result.liveUnchanged, true);
 assert.match(result.error, /üres|index.html|Release/);
-assert.equal(deployed, 1);
+assert.equal(deployed, 2);
 
 const missingRoute = createPublishService({ repo, build: async ({ releasePath }) => { await writeFile(join(releasePath, 'index.html'), '<!doctype html>'); return { ok: true }; }, deploy: async () => { deployed += 1; return { ok: true }; } });
 result = await missingRoute.publish();
 assert.equal(result.ok, false);
 assert.match(result.error, /Release route hiányzik/);
-assert.equal(deployed, 1);
+assert.equal(deployed, 2);
 
 const failing = createPublishService({ repo, build: async () => ({ ok: false, log: 'compile failed' }), deploy: async () => { deployed += 1; return { ok: true }; } });
 result = await failing.publish();
 assert.equal(result.ok, false);
 assert.equal(result.liveUnchanged, true);
-assert.equal(deployed, 1);
+assert.equal(deployed, 2);
 
 let release;
 const locked = createPublishService({ repo, build: async ({ releasePath }) => { await writeValidRelease(releasePath); return await new Promise((resolve) => { release = resolve; }); }, deploy: async () => ({ ok: true }) });
