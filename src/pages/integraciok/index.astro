@@ -2,12 +2,15 @@
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import Header from '@/components/Header.astro';
 import PageHero from '@/components/PageHero.astro';
+import ListingCards from '@/components/ListingCards.astro';
 import CTASection from '@/components/CTASection.astro';
 import Footer from '@/components/Footer.astro';
 import { publishedIntegrations } from '@/content/integrations';
 import { getPublicPageState } from '@/lib/content/provider';
 const pageState = await getPublicPageState('/integraciok/');
 const page = pageState.page;
+const cardsBlock = page?.blocks?.find((block) => ['cards', 'card-grid'].includes(block.type));
+const integrationCards = cardsBlock?.items?.length ? cardsBlock.items : publishedIntegrations.map((item) => ({ title: item.title, text: item.shortDescription, order: item.order, status: item.status }));
 if (pageState.hiddenByDb) Astro.response.status = 404;
 ---
 
@@ -26,23 +29,8 @@ if (pageState.hiddenByDb) Astro.response.status = 404;
         <span class="eyebrow">Csomópontok</span>
         <h2>Nem késznek állított ígéretek, hanem tisztán tagolt integrációs irányok.</h2>
       </div>
-      <div class="container integration-grid">
-        {publishedIntegrations.map((item) => (
-          <article class="card integration-card">
-            <span>
-              {String(item.order).padStart(2, '0')}
-            </span>
-            <h3>
-              {item.title}
-            </h3>
-            <p>
-              {item.shortDescription}
-            </p>
-            <p class="detail">
-              {item.detail}
-            </p>
-          </article>
-        ))}
+      <div class="container">
+        <ListingCards items={integrationCards} />
       </div>
     </section>
     <CTASection />
@@ -56,11 +44,4 @@ if (pageState.hiddenByDb) Astro.response.status = 404;
   .network-section { background: linear-gradient(180deg, #f6f8f5, #fff); }
   .intro { margin-bottom: 28px; }
   .intro h2 { max-width: 920px; color: var(--color-navy); font-size: clamp(1.65rem, 2.5vw, 2.4rem); }
-  .integration-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--card-gap); }
-  .integration-card { position: relative; overflow: hidden; padding: var(--card-padding); border-radius: var(--radius-md); box-shadow: var(--shadow-card); }
-  .integration-card:before { content: ""; position: absolute; inset: 0 0 auto; height: 5px; background: linear-gradient(90deg, var(--color-neon), #16d7ff); }
-  .integration-card span { color: var(--color-neon); background: var(--color-navy); width: 40px; height: 40px; border-radius: 14px; display: grid; place-items: center; font-weight: 800; }
-  .integration-card h3 { color: var(--color-navy); }
-  .detail { color: var(--color-ink); font-weight: 400; }
-  @media (max-width: 860px) { .integration-grid { grid-template-columns: 1fr; } }
 </style>
