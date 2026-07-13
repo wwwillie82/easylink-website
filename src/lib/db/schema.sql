@@ -10,6 +10,13 @@ CREATE TABLE IF NOT EXISTS site_pages (
   hero_title VARCHAR(255) NULL,
   hero_description TEXT NULL,
   hero_asset VARCHAR(512) NULL,
+  hero_height VARCHAR(32) NULL,
+  hero_image_fit VARCHAR(32) NULL,
+  hero_image_position_x TINYINT UNSIGNED NULL,
+  hero_image_position_y TINYINT UNSIGNED NULL,
+  hero_image_position_mobile_x TINYINT UNSIGNED NULL,
+  hero_image_position_mobile_y TINYINT UNSIGNED NULL,
+  hero_overlay_strength VARCHAR(32) NULL,
   status VARCHAR(32) NOT NULL DEFAULT 'draft',
   sort_order INT NOT NULL DEFAULT 0,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -78,3 +85,12 @@ CREATE TABLE IF NOT EXISTS site_publish_snapshots (
   INDEX idx_site_publish_snapshots_status_created (status, created_at),
   INDEX idx_site_publish_snapshots_current (is_current)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+ALTER TABLE site_pages ADD COLUMN IF NOT EXISTS hero_height VARCHAR(32) NULL;
+ALTER TABLE site_pages ADD COLUMN IF NOT EXISTS hero_image_fit VARCHAR(32) NULL;
+ALTER TABLE site_pages ADD COLUMN IF NOT EXISTS hero_image_position_x TINYINT UNSIGNED NULL;
+ALTER TABLE site_pages ADD COLUMN IF NOT EXISTS hero_image_position_y TINYINT UNSIGNED NULL;
+ALTER TABLE site_pages ADD COLUMN IF NOT EXISTS hero_image_position_mobile_x TINYINT UNSIGNED NULL;
+ALTER TABLE site_pages ADD COLUMN IF NOT EXISTS hero_image_position_mobile_y TINYINT UNSIGNED NULL;
+ALTER TABLE site_pages ADD COLUMN IF NOT EXISTS hero_overlay_strength VARCHAR(32) NULL;
