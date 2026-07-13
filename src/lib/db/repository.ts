@@ -29,6 +29,7 @@ export function mapPageRow(row: any, blocks: any[] = []): SitePage {
     heroImagePositionMobileX: row.hero_image_position_mobile_x ?? undefined,
     heroImagePositionMobileY: row.hero_image_position_mobile_y ?? undefined,
     heroOverlayStrength: row.hero_overlay_strength ?? undefined,
+    heroImageScale: row.hero_image_scale ?? undefined,
     status: row.status,
     sortOrder: row.sort_order ?? 0,
     blocks: blocks.map((block) => ({ type: block.type, title: block.title, body: block.body ?? undefined, items: parseItems(block.items) } as ContentBlock)),

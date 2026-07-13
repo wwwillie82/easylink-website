@@ -1,10 +1,45 @@
 ---
 import type { SitePage } from '@/lib/content/static';
 
-type Props = { page?: SitePage; hero?: Partial<Pick<SitePage, 'heroEyebrow' | 'heroTitle' | 'heroDescription'>> };
+type Props = { page?: SitePage; hero?: Partial<Pick<SitePage, 'heroEyebrow' | 'heroTitle' | 'heroDescription' | 'heroAsset' | 'heroHeight' | 'heroImageFit' | 'heroImagePositionX' | 'heroImagePositionY' | 'heroImagePositionMobileX' | 'heroImagePositionMobileY' | 'heroOverlayStrength' | 'heroImageScale'>> };
 const { page, hero } = Astro.props;
 const heroData = { ...page, ...hero };
 const deployUrl = import.meta.env.PUBLIC_DEPLOY_URL ?? 'https://deploy.easylink.hu';
+
+
+const heightPadding = { compact: 'clamp(28px, 3.4vw, 44px) 0 clamp(18px, 2.4vw, 28px)', normal: 'clamp(38px, 4.6vw, 62px) 0 clamp(22px, 2.8vw, 34px)', tall: 'clamp(72px, 8vw, 120px) 0 clamp(28px, 3.2vw, 42px)', xlarge: 'clamp(96px, 11vw, 160px) 0 clamp(34px, 4vw, 54px)' };
+const bgSize = { cover: 'cover', contain: 'contain', stretch: '100% 100%' };
+const overlays = {
+  weak: ['rgba(7, 8, 45, 0.94) 0%, rgba(8, 10, 52, 0.82) 37%, rgba(8, 10, 52, 0.26) 62%, rgba(8, 10, 52, 0.08) 100%', 'rgba(7, 8, 45, 0.72), rgba(7, 8, 45, 0.02) 42%, rgba(7, 8, 45, 0.42)'],
+  normal: ['rgba(7, 8, 45, 0.98) 0%, rgba(8, 10, 52, 0.92) 37%, rgba(8, 10, 52, 0.38) 62%, rgba(8, 10, 52, 0.14) 100%', 'rgba(7, 8, 45, 0.88), rgba(7, 8, 45, 0.03) 42%, rgba(7, 8, 45, 0.58)'],
+  strong: ['rgba(7, 8, 45, 1) 0%, rgba(8, 10, 52, 0.96) 37%, rgba(8, 10, 52, 0.52) 62%, rgba(8, 10, 52, 0.24) 100%', 'rgba(7, 8, 45, 0.94), rgba(7, 8, 45, 0.08) 42%, rgba(7, 8, 45, 0.72)'],
+};
+const allowedHeight = Object.hasOwn(heightPadding, heroData?.heroHeight) ? heroData.heroHeight : 'normal';
+const allowedFit = Object.hasOwn(bgSize, heroData?.heroImageFit) ? heroData.heroImageFit : 'cover';
+const allowedOverlay = Object.hasOwn(overlays, heroData?.heroOverlayStrength) ? heroData.heroOverlayStrength : 'normal';
+const clampPercent = (value, fallback) => Number.isInteger(Number(value)) ? Math.min(100, Math.max(0, Number(value))) : fallback;
+const clampScale = (value) => Number.isInteger(Number(value)) ? Math.min(200, Math.max(50, Number(value))) : 100;
+const scaledBgSize = (fit, scale) => {
+  if (fit === 'stretch') return '100% 100%';
+  if (scale === 100) return bgSize[fit];
+  return `${scale}% auto`;
+};
+const x = clampPercent(heroData?.heroImagePositionX, 60);
+const y = clampPercent(heroData?.heroImagePositionY, 50);
+const mx = clampPercent(heroData?.heroImagePositionMobileX, 62);
+const my = clampPercent(heroData?.heroImagePositionMobileY, y);
+const scale = clampScale(heroData?.heroImageScale);
+const [overlayPrimary, overlaySecondary] = overlays[allowedOverlay];
+const styleVars = [
+  `--home-hero-asset: url('${heroData?.heroAsset || '/assets/nati/hero-bg-flow-03.webp'}')`,
+  `--home-hero-padding: ${heightPadding[allowedHeight]}`,
+  `--home-hero-bg-size: ${scaledBgSize(allowedFit, scale)}`,
+  `--home-hero-bg-position: ${x}% ${y}%`,
+  `--home-hero-bg-position-mobile: ${mx}% ${my}%`,
+  `--home-hero-overlay-primary: ${overlayPrimary}`,
+  `--home-hero-overlay-secondary: ${overlaySecondary}`,
+  `--home-hero-image-scale: ${scale}`,
+].join('; ');
 
 const benefits = [
   { title: 'Átlátható működés', text: 'Valós idejű adatok, tiszta kép.' },
@@ -13,7 +48,7 @@ const benefits = [
 ];
 ---
 
-<section id="top" class="hero">
+<section id="top" class="hero" style={styleVars}>
   <div class="hero-bg" aria-hidden="true"></div>
   <div class="container hero-grid">
     <div class="hero-copy">
@@ -47,18 +82,19 @@ const benefits = [
     min-height: var(--home-hero-min-height);
     color: white;
     background: var(--color-navy-deep);
-    padding: clamp(38px, 4.6vw, 62px) 0 clamp(22px, 2.8vw, 34px);
+    padding: var(--home-hero-padding);
   }
 
   .hero-bg {
     position: absolute;
     inset: 0;
     background-image:
-      linear-gradient(90deg, rgba(7, 8, 45, 0.98) 0%, rgba(8, 10, 52, 0.92) 37%, rgba(8, 10, 52, 0.38) 62%, rgba(8, 10, 52, 0.14) 100%),
-      linear-gradient(0deg, rgba(7, 8, 45, 0.88), rgba(7, 8, 45, 0.03) 42%, rgba(7, 8, 45, 0.58)),
-      url('/assets/nati/hero-bg-flow-03.webp');
-    background-size: cover;
-    background-position: 60% center;
+      linear-gradient(90deg, var(--home-hero-overlay-primary)),
+      linear-gradient(0deg, var(--home-hero-overlay-secondary)),
+      var(--home-hero-asset);
+    background-size: cover, cover, var(--home-hero-bg-size);
+    background-position: center, center, var(--home-hero-bg-position);
+    background-repeat: no-repeat, no-repeat, no-repeat;
     transform: scale(1.01);
   }
 
@@ -135,8 +171,9 @@ const benefits = [
     .hero-bg {
       background-image:
         linear-gradient(90deg, rgba(7, 8, 45, 0.96), rgba(7, 8, 45, 0.76)),
-        url('/assets/nati/hero-bg-flow-03.webp');
-      background-position: 62% center;
+        var(--home-hero-asset);
+      background-size: cover, var(--home-hero-bg-size);
+      background-position: center, var(--home-hero-bg-position-mobile);
     }
 
     .hero-grid { grid-template-columns: 1fr; }

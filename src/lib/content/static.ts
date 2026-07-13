@@ -25,6 +25,7 @@ export type SitePage = {
   heroImagePositionMobileX?: number;
   heroImagePositionMobileY?: number;
   heroOverlayStrength?: string;
+  heroImageScale?: number;
   status: ContentStatus;
   sortOrder: number;
   blocks: ContentBlock[];

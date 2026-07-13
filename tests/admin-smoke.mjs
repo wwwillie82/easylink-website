@@ -44,6 +44,7 @@ const validateHeroPayload = (payload) => {
   const enumFields = { hero_height: ['compact','normal','tall','xlarge'], hero_image_fit: ['cover','contain','stretch'], hero_overlay_strength: ['weak','normal','strong'] };
   for (const [field, allowed] of Object.entries(enumFields)) if (payload[field] !== undefined && payload[field] !== '' && payload[field] !== null && !allowed.includes(payload[field])) throw validationError('Hibás hero beállítás');
   for (const field of ['hero_image_position_x','hero_image_position_y','hero_image_position_mobile_x','hero_image_position_mobile_y']) if (payload[field] !== undefined && payload[field] !== '' && payload[field] !== null) { const n = Number(payload[field]); if (!Number.isInteger(n) || n < 0 || n > 100) throw validationError('Hibás hero pozíció'); }
+  if (payload.hero_image_scale !== undefined && payload.hero_image_scale !== '' && payload.hero_image_scale !== null) { const n = Number(payload.hero_image_scale); if (!Number.isInteger(n) || n < 50 || n > 200) throw validationError('Hibás hero kép méret'); }
 };
 const validationError = (message) => Object.assign(new Error(message), { status: 400, code: 'VALIDATION_ERROR' });
 const repo = {
@@ -233,7 +234,13 @@ try {
   assert.equal(state.pages[0].hero_image_fit, 'contain');
   assert.equal(state.pages[0].hero_image_position_x, '25');
   assert.equal(state.pages[0].hero_image_position_mobile_x, '');
-  for (const bad of [{ hero_image_fit: 'bad' }, { hero_height: 'huge' }, { hero_overlay_strength: 'dark' }, { hero_image_position_x: '-1' }, { hero_image_position_y: '101' }, { hero_image_position_mobile_x: 'abc' }]) {
+  response = await fetch(`${base}/api/admin/pages/1`, { method: 'PUT', headers: { cookie, 'content-type': 'application/json' }, body: JSON.stringify({ ...state.pages[0], hero_image_scale: '120' }) });
+  assert.equal(response.status, 200);
+  assert.equal(state.pages[0].hero_image_scale, '120');
+  response = await fetch(`${base}/api/admin/pages/1`, { method: 'PUT', headers: { cookie, 'content-type': 'application/json' }, body: JSON.stringify({ ...state.pages[0], hero_image_scale: '' }) });
+  assert.equal(response.status, 200);
+  assert.equal(state.pages[0].hero_image_scale, '');
+  for (const bad of [{ hero_image_fit: 'bad' }, { hero_height: 'huge' }, { hero_overlay_strength: 'dark' }, { hero_image_position_x: '-1' }, { hero_image_position_y: '101' }, { hero_image_position_mobile_x: 'abc' }, { hero_image_scale: '49' }, { hero_image_scale: '201' }, { hero_image_scale: 'abc' }, { hero_image_scale: '120.5' }]) {
     response = await fetch(`${base}/api/admin/pages/1`, { method: 'PUT', headers: { cookie, 'content-type': 'application/json' }, body: JSON.stringify({ ...state.pages[0], ...bad }) });
     assert.equal(response.status, 400);
   }
@@ -319,7 +326,7 @@ try {
   assert.match(await response.text(), /Oldal szerkesztése/);
   const fixedPageEditorHtml = await (await fetch(`${base}/admin/pages/1`, { headers: { cookie } })).text();
   assert.match(fixedPageEditorHtml, /nem ebből a blokklistából szerkeszthető/);
-  for (const label of ['Hero kép megjelenítés', 'Hero magasság', 'Kép illesztése', 'Vízszintes pozíció', 'Függőleges pozíció', 'Mobil vízszintes pozíció', 'Mobil függőleges pozíció', 'Sötét overlay erősség']) assert.match(fixedPageEditorHtml, new RegExp(label));
+  for (const label of ['Hero kép megjelenítés', 'Hero magasság', 'Kép illesztése', 'Vízszintes pozíció', 'Függőleges pozíció', 'Mobil vízszintes pozíció', 'Mobil függőleges pozíció', 'Sötét overlay erősség', 'Kép mérete / nagyítás', '100 = alapértelmezett']) assert.match(fixedPageEditorHtml, new RegExp(label));
   assert.doesNotMatch(fixedPageEditorHtml, /Blokk típusa/);
   if (!state.pages.find((p) => p.id === 20)) state.pages.push({ id: 20, route: '/megoldasaink/', slug: 'megoldasaink', type: 'solutions_index', title: 'Megoldásaink', status: 'published', sort_order: 10, seo_title: 'Megoldásaink', seo_description: 'Desc', hero_eyebrow: 'Megoldásaink', hero_title: 'Hero', hero_description: 'Hero desc', hero_asset: '/asset.webp' });
   if (!state.blocks.find((b) => b.id === 20)) state.blocks.push({ id: 20, page_id: 20, block_key: 'seed:/megoldasaink/:cards:0', type: 'cards', title: 'Megoldás lista', body: 'Body', items: '[{"title":"Pénzügy","text":"Szöveg","url":"/megoldasaink/penzugy-szamlazas/","linkLabel":"Részletek →","order":1}]', status: 'published', sort_order: 1 });

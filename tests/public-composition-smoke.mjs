@@ -23,20 +23,33 @@ for (const phrase of ['easyLink ERP', 'Cégvezetés, könnyedén.', 'Próbáld k
   assert.match(hero, new RegExp(phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
 }
 assert.doesNotMatch(hero, /PageHero/);
+for (const token of ['heroAsset', 'heroHeight', 'heroImageFit', 'heroImagePositionX', 'heroImagePositionY', 'heroImagePositionMobileX', 'heroImagePositionMobileY', 'heroOverlayStrength', 'heroImageScale']) {
+  assert.match(home, new RegExp(token));
+  assert.match(hero, new RegExp(token));
+}
+assert.match(hero, /style=\{styleVars\}/);
+assert.match(hero, /--home-hero-bg-size/);
+assert.match(hero, /if \(fit === 'stretch'\) return '100% 100%'/);
 
 
 const pageHero = await readFile('src/components/PageHero.astro', 'utf8');
 assert.match(pageHero, /asset = '\/assets\/nati\/hero-bg-flow-02\.webp'/);
 assert.match(pageHero, /style=\{styleVars\}/);
 const publicHeroAsset = '/assets/site-media/2026/07/test.webp';
-const renderPageHeroStyle = (asset = '/assets/nati/hero-bg-flow-02.webp', x = 66, y = 50) => `--page-hero-asset: url('${asset}'); --page-hero-bg-position: ${x}% ${y}%`;
+const renderPageHeroStyle = (asset = '/assets/nati/hero-bg-flow-02.webp', x = 66, y = 50, scale = 100) => `--page-hero-asset: url('${asset}'); --page-hero-bg-position: ${x}% ${y}%; --page-hero-image-scale: ${scale}`;
 assert.match(pageHero, /--page-hero-bg-size/);
 assert.match(pageHero, /--page-hero-bg-position/);
 assert.match(pageHero, /--page-hero-bg-position-mobile/);
+assert.match(pageHero, /imageScale = 100/);
+assert.match(pageHero, /clampScale = \(value\) => Number\.isInteger\(Number\(value\)\) \? Math\.min\(200, Math\.max\(50, Number\(value\)\)\) : 100/);
+assert.match(pageHero, /if \(fit === 'stretch'\) return '100% 100%'/);
+assert.match(pageHero, /if \(scale === 100\) return bgSize\[fit\]/);
+assert.match(pageHero, /`\$\{scale\}% auto`/);
 assert.match(pageHero, /--page-hero-overlay-left/);
 assert.match(pageHero, /cover: 'cover'/);
 assert.match(pageHero, /contain: 'contain'/);
 assert.match(pageHero, /stretch: '100% 100%'/);
+assert.doesNotMatch(pageHero, /imageScale[^;]*style/i);
 assert.match(pageHero, /background-size: cover, var\(--page-hero-bg-size\)/);
 assert.match(pageHero, /background-position: center, var\(--page-hero-bg-position\)/);
 assert.match(pageHero, /background-repeat: no-repeat, no-repeat;/);
@@ -110,6 +123,7 @@ assert.match(solutionsIndex, /asset=\{page\?\.heroAsset \|\| undefined\}/);
 assert.match(solutionsIndex, /height=\{page\?\.heroHeight\}/);
 assert.match(solutionsIndex, /imageFit=\{page\?\.heroImageFit\}/);
 assert.match(solutionsIndex, /overlayStrength=\{page\?\.heroOverlayStrength\}/);
+assert.match(solutionsIndex, /imageScale=\{page\?\.heroImageScale\}/);
 const integrationsIndex = await readFile('src/pages/integraciok/index.astro', 'utf8');
 assert.match(integrationsIndex, /import ListingCards from/);
 assert.match(integrationsIndex, /integrationCards/);
@@ -122,5 +136,6 @@ assert.match(integrationsIndex, /asset=\{page\?\.heroAsset \|\| "\/assets\/nati\
 assert.match(integrationsIndex, /height=\{page\?\.heroHeight\}/);
 assert.match(integrationsIndex, /imageFit=\{page\?\.heroImageFit\}/);
 assert.match(integrationsIndex, /overlayStrength=\{page\?\.heroOverlayStrength\}/);
+assert.match(integrationsIndex, /imageScale=\{page\?\.heroImageScale\}/);
 assert.match(renderPageHeroStyle(publicHeroAsset), /\/assets\/site-media\/2026\/07\/test\.webp/);
 assert.match(renderPageHeroStyle('' || '/assets/nati/hero-bg-flow-02.webp'), /\/assets\/nati\/hero-bg-flow-02\.webp/);

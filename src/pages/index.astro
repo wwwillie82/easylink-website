@@ -19,7 +19,7 @@ if (pageState.hiddenByDb) Astro.response.status = 404;
   <Header />
   <main>
     {pageState.hiddenByDb ? <section class="section"><div class="container"><h1>Az oldal nem található.</h1></div></section> : <>
-    <Hero page={homePage} />
+    <Hero page={homePage} hero={{ heroAsset: homePage?.heroAsset, heroHeight: homePage?.heroHeight, heroImageFit: homePage?.heroImageFit, heroImagePositionX: homePage?.heroImagePositionX, heroImagePositionY: homePage?.heroImagePositionY, heroImagePositionMobileX: homePage?.heroImagePositionMobileX, heroImagePositionMobileY: homePage?.heroImagePositionMobileY, heroOverlayStrength: homePage?.heroOverlayStrength, heroImageScale: homePage?.heroImageScale }} />
 
     <section class="section light intro-section">
       <div class="container intro-grid">
