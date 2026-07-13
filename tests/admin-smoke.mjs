@@ -326,7 +326,7 @@ try {
   assert.match(await response.text(), /Oldal szerkesztése/);
   const fixedPageEditorHtml = await (await fetch(`${base}/admin/pages/1`, { headers: { cookie } })).text();
   assert.match(fixedPageEditorHtml, /nem ebből a blokklistából szerkeszthető/);
-  for (const label of ['Hero kép megjelenítés', 'Hero magasság', 'Kép illesztése', 'Vízszintes pozíció', 'Függőleges pozíció', 'Mobil vízszintes pozíció', 'Mobil függőleges pozíció', 'Sötét overlay erősség', 'Kép mérete / nagyítás', '100 = alapértelmezett']) assert.match(fixedPageEditorHtml, new RegExp(label));
+  for (const label of ['Hero kép megjelenítés', 'Hero magasság', 'Kép illesztése', 'Vízszintes pozíció', 'Függőleges pozíció', 'Mobil vízszintes pozíció', 'Mobil függőleges pozíció', 'Sötét overlay erősség', 'Kép mérete / nagyítás', '100 = alapértelmezett', 'A magasság a hero blokk vizuális magasságát állítja']) assert.match(fixedPageEditorHtml, new RegExp(label));
   assert.doesNotMatch(fixedPageEditorHtml, /Blokk típusa/);
   if (!state.pages.find((p) => p.id === 20)) state.pages.push({ id: 20, route: '/megoldasaink/', slug: 'megoldasaink', type: 'solutions_index', title: 'Megoldásaink', status: 'published', sort_order: 10, seo_title: 'Megoldásaink', seo_description: 'Desc', hero_eyebrow: 'Megoldásaink', hero_title: 'Hero', hero_description: 'Hero desc', hero_asset: '/asset.webp' });
   if (!state.blocks.find((b) => b.id === 20)) state.blocks.push({ id: 20, page_id: 20, block_key: 'seed:/megoldasaink/:cards:0', type: 'cards', title: 'Megoldás lista', body: 'Body', items: '[{"title":"Pénzügy","text":"Szöveg","url":"/megoldasaink/penzugy-szamlazas/","linkLabel":"Részletek →","order":1}]', status: 'published', sort_order: 1 });
