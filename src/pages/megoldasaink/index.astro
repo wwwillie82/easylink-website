@@ -22,6 +22,7 @@ if (pageState.hiddenByDb) Astro.response.status = 404;
       eyebrow={page?.heroEyebrow ?? "megoldasaink"}
       title={page?.heroTitle ?? "Megoldásaink"}
       description={page?.heroDescription ?? "Valódi többoldalas struktúrában bemutatott, későbbi site admin szerkesztésre előkészített megoldások."}
+      asset={page?.heroAsset || undefined}
     />
     <section class="section light">
       <div class="container">

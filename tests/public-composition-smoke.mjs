@@ -24,6 +24,15 @@ for (const phrase of ['easyLink ERP', 'Cégvezetés, könnyedén.', 'Próbáld k
 }
 assert.doesNotMatch(hero, /PageHero/);
 
+
+const pageHero = await readFile('src/components/PageHero.astro', 'utf8');
+assert.match(pageHero, /asset = '\/assets\/nati\/hero-bg-flow-02\.webp'/);
+assert.match(pageHero, /style=\{`--page-hero-asset: url\('\$\{asset\}'\)`\}/);
+const publicHeroAsset = '/assets/site-media/2026/07/test.webp';
+const renderPageHeroStyle = (asset = '/assets/nati/hero-bg-flow-02.webp') => `--page-hero-asset: url('${asset}')`;
+assert.match(renderPageHeroStyle(publicHeroAsset), /\/assets\/site-media\/2026\/07\/test\.webp/);
+assert.match(renderPageHeroStyle(), /\/assets\/nati\/hero-bg-flow-02\.webp/);
+
 for (const file of ['src/pages/index.astro','src/pages/arak/index.astro','src/pages/kapcsolat/index.astro','src/pages/integraciok/index.astro','src/pages/megoldasaink/index.astro','src/pages/kinek-szol/index.astro']) {
   const source = await readFile(file, 'utf8');
   assert.match(source, /getPublicPageState/);
@@ -62,6 +71,7 @@ assert.match(solutionsIndex, /cardsBlock/);
 assert.match(solutionsIndex, /solutionCards/);
 assert.match(solutionsIndex, /const solutionCards = cardsBlock\?\.items\?\.length \? cardsBlock.items : publishedSolutions/);
 assert.match(solutionsIndex, /<ListingCards items=\{solutionCards\} basePath=\"\/megoldasaink\/\"/);
+assert.match(solutionsIndex, /asset=\{page\?\.heroAsset \|\| undefined\}/);
 const integrationsIndex = await readFile('src/pages/integraciok/index.astro', 'utf8');
 assert.match(integrationsIndex, /import ListingCards from/);
 assert.match(integrationsIndex, /integrationCards/);
@@ -70,3 +80,6 @@ assert.match(integrationsIndex, /publishedIntegrations.map\(\(item\) => \(\{ tit
 assert.doesNotMatch(integrationsIndex, /linkLabel: 'Részletek/);
 assert.doesNotMatch(integrationsIndex, /\.\.\.item/);
 assert.doesNotMatch(integrationsIndex, /integration-card/);
+assert.match(integrationsIndex, /asset=\{page\?\.heroAsset \|\| "\/assets\/nati\/hero-bg-flow-02\.webp"\}/);
+assert.match(renderPageHeroStyle(publicHeroAsset), /\/assets\/site-media\/2026\/07\/test\.webp/);
+assert.match(renderPageHeroStyle('' || '/assets/nati/hero-bg-flow-02.webp'), /\/assets\/nati\/hero-bg-flow-02\.webp/);

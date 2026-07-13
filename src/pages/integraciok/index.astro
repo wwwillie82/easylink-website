@@ -22,7 +22,7 @@ if (pageState.hiddenByDb) Astro.response.status = 404;
       eyebrow={page?.heroEyebrow ?? "integraciok"}
       title={page?.heroTitle ?? "Integrációk"}
       description={page?.heroDescription ?? "Az integrációs registry előkészíti a későbbi partner- és adatkapcsolati tartalmakat. Ahol nincs bizonyított éles kapcsolat, ott integrációs irányként kommunikálunk."}
-      asset="/assets/nati/hero-bg-flow-02.webp"
+      asset={page?.heroAsset || "/assets/nati/hero-bg-flow-02.webp"}
     />
     <section class="section light network-section">
       <div class="container intro">
