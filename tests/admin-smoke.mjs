@@ -40,6 +40,11 @@ const state = {
   ],
 };
 const normalizeRoute = (route) => { const withStart = String(route || '').startsWith('/') ? String(route || '') : `/${route}`; return withStart.endsWith('/') ? withStart : `${withStart}/`; };
+const validateHeroPayload = (payload) => {
+  const enumFields = { hero_height: ['compact','normal','tall','xlarge'], hero_image_fit: ['cover','contain','stretch'], hero_overlay_strength: ['weak','normal','strong'] };
+  for (const [field, allowed] of Object.entries(enumFields)) if (payload[field] !== undefined && payload[field] !== '' && payload[field] !== null && !allowed.includes(payload[field])) throw validationError('Hibás hero beállítás');
+  for (const field of ['hero_image_position_x','hero_image_position_y','hero_image_position_mobile_x','hero_image_position_mobile_y']) if (payload[field] !== undefined && payload[field] !== '' && payload[field] !== null) { const n = Number(payload[field]); if (!Number.isInteger(n) || n < 0 || n > 100) throw validationError('Hibás hero pozíció'); }
+};
 const validationError = (message) => Object.assign(new Error(message), { status: 400, code: 'VALIDATION_ERROR' });
 const repo = {
   async findAdminUserByEmail(email) { return email === state.user.email ? state.user : null; },
@@ -47,7 +52,7 @@ const repo = {
   async pages() { return state.pages; },
   async createPage(payload) { const route = normalizeRoute(payload.route); if (route === '/') throw validationError('Adj meg érvényes URL-t.'); if (state.pages.find((p) => p.route === route)) throw validationError('Ez az URL már létezik.'); const page = { id: Math.max(...state.pages.map((p) => p.id)) + 1, route, slug: route.replace(/^\//, '').replace(/\/$/, ''), type: payload.type || 'content_page', title: payload.title, status: payload.status || 'draft', sort_order: state.pages.length + 1, seo_title: payload.title, seo_description: '', hero_eyebrow: '', hero_title: payload.title, hero_description: '', hero_asset: '' }; state.pages.push(page); return { id: page.id, route: page.route, slug: page.slug }; },
   async page(id) { const page = state.pages.find((p) => String(p.id) === String(id)); return page ? { page, blocks: state.blocks.filter((b) => String(b.page_id) === String(id)) } : null; },
-  async updatePage(id, payload) { const page = state.pages.find((p) => String(p.id) === String(id)); const route = payload.route ? normalizeRoute(payload.route) : page.route; const isExistingHome = page.route === '/' || page.type === 'home'; if (route === '/' && !isExistingHome) throw validationError('Adj meg érvényes URL-t.'); if (state.pages.find((p) => p.route === route && String(p.id) !== String(id))) throw validationError('Ez az URL már létezik.'); Object.assign(page, payload, { route, slug: route === '/' ? 'home' : (payload.slug || page.slug) }); },
+  async updatePage(id, payload) { validateHeroPayload(payload); const page = state.pages.find((p) => String(p.id) === String(id)); const route = payload.route ? normalizeRoute(payload.route) : page.route; const isExistingHome = page.route === '/' || page.type === 'home'; if (route === '/' && !isExistingHome) throw validationError('Adj meg érvényes URL-t.'); if (state.pages.find((p) => p.route === route && String(p.id) !== String(id))) throw validationError('Ez az URL már létezik.'); Object.assign(page, payload, { route, slug: route === '/' ? 'home' : (payload.slug || page.slug) }); },
   async upsertBlock(payload) { JSON.parse(payload.items || 'null'); if (payload.id) { Object.assign(state.blocks.find((b) => String(b.id) === String(payload.id)), payload); return { id: payload.id }; } const block = { ...payload, id: state.blocks.length + 1, block_key: `manual:test-${state.blocks.length + 1}` }; state.blocks.push(block); return { id: block.id, block_key: block.block_key }; },
   async deleteBlock(id) { state.blocks.find((b) => String(b.id) === String(id)).status = 'archived'; },
   async listMedia({ includeArchived = false } = {}) { return state.media.filter((m) => includeArchived || m.status !== 'archived').sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at))||b.id-a.id); },
@@ -222,6 +227,17 @@ try {
   assert.equal(saved.publish.ok, true);
   assert.equal(state.pages[0].title, 'Árak módosítva');
 
+  response = await fetch(`${base}/api/admin/pages/1`, { method: 'PUT', headers: { cookie, 'content-type': 'application/json' }, body: JSON.stringify({ ...state.pages[0], hero_height: 'tall', hero_image_fit: 'contain', hero_image_position_x: '25', hero_image_position_y: '60', hero_image_position_mobile_x: '', hero_image_position_mobile_y: '', hero_overlay_strength: 'strong' }) });
+  assert.equal(response.status, 200);
+  assert.equal(state.pages[0].hero_height, 'tall');
+  assert.equal(state.pages[0].hero_image_fit, 'contain');
+  assert.equal(state.pages[0].hero_image_position_x, '25');
+  assert.equal(state.pages[0].hero_image_position_mobile_x, '');
+  for (const bad of [{ hero_image_fit: 'bad' }, { hero_height: 'huge' }, { hero_overlay_strength: 'dark' }, { hero_image_position_x: '-1' }, { hero_image_position_y: '101' }, { hero_image_position_mobile_x: 'abc' }]) {
+    response = await fetch(`${base}/api/admin/pages/1`, { method: 'PUT', headers: { cookie, 'content-type': 'application/json' }, body: JSON.stringify({ ...state.pages[0], ...bad }) });
+    assert.equal(response.status, 400);
+  }
+
   const beforeBlocks = state.blocks.length;
   response = await fetch(`${base}/api/admin/blocks`, { method: 'POST', headers: { cookie, 'content-type': 'application/json' }, body: JSON.stringify({ page_id: 1, type: 'text', title: 'New', body: 'Body', items: '["ok"]', status: 'published', sort_order: 2 }) });
   assert.equal(response.status, 200);
@@ -303,6 +319,7 @@ try {
   assert.match(await response.text(), /Oldal szerkesztése/);
   const fixedPageEditorHtml = await (await fetch(`${base}/admin/pages/1`, { headers: { cookie } })).text();
   assert.match(fixedPageEditorHtml, /nem ebből a blokklistából szerkeszthető/);
+  for (const label of ['Hero kép megjelenítés', 'Hero magasság', 'Kép illesztése', 'Vízszintes pozíció', 'Függőleges pozíció', 'Mobil vízszintes pozíció', 'Mobil függőleges pozíció', 'Sötét overlay erősség']) assert.match(fixedPageEditorHtml, new RegExp(label));
   assert.doesNotMatch(fixedPageEditorHtml, /Blokk típusa/);
   if (!state.pages.find((p) => p.id === 20)) state.pages.push({ id: 20, route: '/megoldasaink/', slug: 'megoldasaink', type: 'solutions_index', title: 'Megoldásaink', status: 'published', sort_order: 10, seo_title: 'Megoldásaink', seo_description: 'Desc', hero_eyebrow: 'Megoldásaink', hero_title: 'Hero', hero_description: 'Hero desc', hero_asset: '/asset.webp' });
   if (!state.blocks.find((b) => b.id === 20)) state.blocks.push({ id: 20, page_id: 20, block_key: 'seed:/megoldasaink/:cards:0', type: 'cards', title: 'Megoldás lista', body: 'Body', items: '[{"title":"Pénzügy","text":"Szöveg","url":"/megoldasaink/penzugy-szamlazas/","linkLabel":"Részletek →","order":1}]', status: 'published', sort_order: 1 });

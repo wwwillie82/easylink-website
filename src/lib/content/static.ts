@@ -18,6 +18,13 @@ export type SitePage = {
   heroTitle: string;
   heroDescription: string;
   heroAsset: string;
+  heroHeight?: string;
+  heroImageFit?: string;
+  heroImagePositionX?: number;
+  heroImagePositionY?: number;
+  heroImagePositionMobileX?: number;
+  heroImagePositionMobileY?: number;
+  heroOverlayStrength?: string;
   status: ContentStatus;
   sortOrder: number;
   blocks: ContentBlock[];
