@@ -13,6 +13,7 @@ const {
   imagePositionMobileX,
   imagePositionMobileY,
   overlayStrength = 'normal',
+  imageScale = 100,
 } = Astro.props;
 const normalPadding = variant === 'detail' ? 'clamp(28px, 3.6vw, 46px)' : 'clamp(36px, 4.4vw, 58px)';
 const normalPaddingMobile = variant === 'detail' ? 'clamp(24px, 4vw, 40px)' : 'clamp(36px, 4.4vw, 58px)';
@@ -28,17 +29,25 @@ const allowedHeight = Object.hasOwn(heightPadding, height) ? height : 'normal';
 const allowedFit = Object.hasOwn(bgSize, imageFit) ? imageFit : 'cover';
 const allowedOverlay = Object.hasOwn(overlays, overlayStrength) ? overlayStrength : 'normal';
 const clampPercent = (value, fallback) => Number.isInteger(Number(value)) ? Math.min(100, Math.max(0, Number(value))) : fallback;
+const clampScale = (value) => Number.isInteger(Number(value)) ? Math.min(200, Math.max(50, Number(value))) : 100;
+const scaledBgSize = (fit, scale) => {
+  if (fit === 'stretch') return '100% 100%';
+  if (scale === 100) return bgSize[fit];
+  return fit === 'cover' ? `${scale}% auto` : `${scale}% auto`;
+};
 const x = clampPercent(imagePositionX, 66);
 const y = clampPercent(imagePositionY, 50);
 const mx = clampPercent(imagePositionMobileX, x);
 const my = clampPercent(imagePositionMobileY, y);
+const scale = clampScale(imageScale);
 const [overlayLeft, overlayMid, overlayRight, overlayEnd, overlayOpacity] = overlays[allowedOverlay];
 const detailOverlayOpacity = String(Math.round(Number(overlayOpacity) * 0.8 * 1000) / 1000);
 const styleVars = [
   `--page-hero-asset: url('${asset}')`,
   `--page-hero-padding: ${heightPadding[allowedHeight]}`,
   `--page-hero-padding-mobile: ${heightPaddingMobile[allowedHeight]}`,
-  `--page-hero-bg-size: ${bgSize[allowedFit]}`,
+  `--page-hero-bg-size: ${scaledBgSize(allowedFit, scale)}`,
+  `--page-hero-image-scale: ${scale}`,
   `--page-hero-bg-position: ${x}% ${y}%`,
   `--page-hero-bg-position-mobile: ${mx}% ${my}%`,
   `--page-hero-overlay-left: ${overlayLeft}`,

@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS site_pages (
   hero_image_position_mobile_x TINYINT UNSIGNED NULL,
   hero_image_position_mobile_y TINYINT UNSIGNED NULL,
   hero_overlay_strength VARCHAR(32) NULL,
+  hero_image_scale TINYINT UNSIGNED NULL,
   status VARCHAR(32) NOT NULL DEFAULT 'draft',
   sort_order INT NOT NULL DEFAULT 0,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -94,3 +95,4 @@ ALTER TABLE site_pages ADD COLUMN IF NOT EXISTS hero_image_position_y TINYINT UN
 ALTER TABLE site_pages ADD COLUMN IF NOT EXISTS hero_image_position_mobile_x TINYINT UNSIGNED NULL;
 ALTER TABLE site_pages ADD COLUMN IF NOT EXISTS hero_image_position_mobile_y TINYINT UNSIGNED NULL;
 ALTER TABLE site_pages ADD COLUMN IF NOT EXISTS hero_overlay_strength VARCHAR(32) NULL;
+ALTER TABLE site_pages ADD COLUMN IF NOT EXISTS hero_image_scale TINYINT UNSIGNED NULL;
