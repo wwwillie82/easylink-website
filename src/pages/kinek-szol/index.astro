@@ -20,6 +20,7 @@ if (pageState.hiddenByDb) Astro.response.status = 404;
       eyebrow={page?.heroEyebrow ?? "kinek-szol"}
       title={page?.heroTitle ?? "Kinek szól?"}
       description={page?.heroDescription ?? "A public site külön route-okon mutatja be, mely vállalkozásoknak ad könnyebb cégvezetést az Easylink."}
+      asset={page?.heroAsset || undefined}
     />
     <section class="section light">
       <div class="container">

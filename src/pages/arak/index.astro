@@ -18,6 +18,7 @@ if (pageState.hiddenByDb) Astro.response.status = 404;
       eyebrow={page?.heroEyebrow ?? "arak"}
       title={page?.heroTitle ?? "Áraink"}
       description={page?.heroDescription ?? "Konkrét csomagárakat még nem publikálunk, és ezen az oldalon nem készül kalkulátor. A cél egy érthető public előkészítő oldal demó CTA-val."}
+      asset={page?.heroAsset || undefined}
     />
     <section class="section light">
       <div class="container price-grid">
