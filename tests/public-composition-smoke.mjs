@@ -59,6 +59,23 @@ assert.doesNotMatch(pageHero, /@media[\s\S]*background-repeat:\s*repeat/);
 assert.match(pageHero, /weak:/);
 assert.match(pageHero, /strong:/);
 
+const extractPxMapping = (name, key) => {
+  const match = pageHero.match(new RegExp(String.raw`const ${name} = \{[^}]*${key}: '(\d+)px'`));
+  assert.ok(match, `${name}.${key} px mapping missing`);
+  return Number(match[1]);
+};
+const listingMin = ['compact', 'normal', 'tall', 'xlarge'].map((key) => extractPxMapping('listingHeightMin', key));
+const listingMinMobile = ['compact', 'normal', 'tall', 'xlarge'].map((key) => extractPxMapping('listingHeightMinMobile', key));
+const detailMin = ['compact', 'normal', 'tall', 'xlarge'].map((key) => extractPxMapping('detailHeightMin', key));
+const detailMinMobile = ['compact', 'normal', 'tall', 'xlarge'].map((key) => extractPxMapping('detailHeightMinMobile', key));
+for (const values of [listingMin, listingMinMobile, detailMin, detailMinMobile]) {
+  assert.ok(values[0] < values[1] && values[1] < values[2] && values[2] < values[3], `min-height mapping must increase: ${values.join(',')}`);
+}
+assert.notEqual(extractPxMapping('listingHeightMin', 'normal'), extractPxMapping('detailHeightMin', 'normal'));
+assert.ok(extractPxMapping('detailHeightMin', 'normal') < extractPxMapping('listingHeightMin', 'normal'));
+assert.match(pageHero, /heightMin = variant === 'detail' \? detailHeightMin : listingHeightMin/);
+assert.match(pageHero, /heightMinMobile = variant === 'detail' \? detailHeightMinMobile : listingHeightMinMobile/);
+
 const extractClampStart = (name, key) => {
   const match = pageHero.match(new RegExp(String.raw`${name} = \{[^}]*${key}: 'clamp\((\d+)px,`));
   assert.ok(match, `${name}.${key} clamp mapping missing`);
@@ -72,7 +89,13 @@ assert.ok(compactPadding < 36, 'compact hero padding must be lower than normal d
 assert.ok(tallPadding > 36, 'tall hero padding must be higher than normal default');
 assert.ok(xlargePadding > tallPadding, 'xlarge hero padding must be higher than tall');
 assert.match(pageHero, /--page-hero-padding-mobile/);
-assert.match(pageHero, /\.page-hero \{ padding: var\(--page-hero-padding-mobile\) 0; \}/);
+assert.match(pageHero, /--page-hero-min-height/);
+assert.match(pageHero, /--page-hero-min-height-mobile/);
+assert.match(pageHero, /\.page-hero \{[^}]*min-height: var\(--page-hero-min-height\)/);
+assert.match(pageHero, /@media[\s\S]*\.page-hero \{[^}]*min-height: var\(--page-hero-min-height-mobile\)[^}]*padding: var\(--page-hero-padding-mobile\) 0;/);
+assert.match(pageHero, /<div class=\"container page-hero-grid\">/);
+assert.doesNotMatch(pageHero, /\.page-hero-grid \{[^}]*width: 100%/);
+assert.match(pageHero, /\.page-hero-grid \{[^}]*display: grid/);
 assert.doesNotMatch(pageHero, /@media[\s\S]*\.page-hero \{ padding: 36px 0 40px; \}/);
 assert.match(pageHero, /--page-hero-detail-overlay-opacity/);
 assert.match(pageHero, /detailOverlayOpacity = String\(Math\.round\(Number\(overlayOpacity\) \* 0\.8/);
@@ -87,6 +110,17 @@ for (const file of ['src/pages/index.astro','src/pages/arak/index.astro','src/pa
   assert.match(source, /hiddenByDb/);
   assert.match(source, /Astro\.response\.status = 404/);
 }
+
+for (const file of ['src/pages/arak/index.astro','src/pages/kapcsolat/index.astro','src/pages/integraciok/index.astro','src/pages/megoldasaink/index.astro','src/pages/kinek-szol/index.astro']) {
+  const source = await readFile(file, 'utf8');
+  assert.match(source, /<PageHero\b/);
+  assert.doesNotMatch(source, /variant="detail"/);
+}
+for (const file of ['src/pages/megoldasaink/[slug].astro','src/pages/kinek-szol/[slug].astro']) {
+  const source = await readFile(file, 'utf8');
+  assert.match(source, /<PageHero\b[\s\S]*variant="detail"/);
+}
+
 console.log('Public composition smoke passed: golden home composition, hero regression, explicit hidden guards.');
 
 const listingCards = await readFile('src/components/ListingCards.astro', 'utf8');

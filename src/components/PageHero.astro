@@ -17,8 +17,14 @@ const {
 } = Astro.props;
 const normalPadding = variant === 'detail' ? 'clamp(28px, 3.6vw, 46px)' : 'clamp(36px, 4.4vw, 58px)';
 const normalPaddingMobile = variant === 'detail' ? 'clamp(24px, 4vw, 40px)' : 'clamp(36px, 4.4vw, 58px)';
-const heightPadding = { compact: 'clamp(24px, 3vw, 34px)', normal: normalPadding, tall: 'clamp(84px, 10vw, 142px)', xlarge: 'clamp(112px, 14vw, 190px)' };
-const heightPaddingMobile = { compact: 'clamp(22px, 5vw, 32px)', normal: normalPaddingMobile, tall: 'clamp(58px, 11vw, 92px)', xlarge: 'clamp(76px, 14vw, 124px)' };
+const heightPadding = { compact: 'clamp(24px, 3vw, 34px)', normal: normalPadding, tall: 'clamp(64px, 7vw, 94px)', xlarge: 'clamp(84px, 9vw, 124px)' };
+const heightPaddingMobile = { compact: 'clamp(22px, 5vw, 32px)', normal: normalPaddingMobile, tall: 'clamp(44px, 8vw, 62px)', xlarge: 'clamp(56px, 10vw, 78px)' };
+const listingHeightMin = { compact: '310px', normal: '380px', tall: '450px', xlarge: '520px' };
+const listingHeightMinMobile = { compact: '250px', normal: '300px', tall: '350px', xlarge: '400px' };
+const detailHeightMin = { compact: '260px', normal: '320px', tall: '380px', xlarge: '440px' };
+const detailHeightMinMobile = { compact: '220px', normal: '260px', tall: '300px', xlarge: '340px' };
+const heightMin = variant === 'detail' ? detailHeightMin : listingHeightMin;
+const heightMinMobile = variant === 'detail' ? detailHeightMinMobile : listingHeightMinMobile;
 const bgSize = { cover: 'cover', contain: 'contain', stretch: '100% 100%' };
 const overlays = {
   weak: ['rgba(8, 10, 52, 0.9)', 'rgba(8, 10, 52, 0.72)', 'rgba(8, 10, 52, 0.18)', 'rgba(8, 10, 52, 0.04)', '0.92'],
@@ -46,6 +52,8 @@ const styleVars = [
   `--page-hero-asset: url('${asset}')`,
   `--page-hero-padding: ${heightPadding[allowedHeight]}`,
   `--page-hero-padding-mobile: ${heightPaddingMobile[allowedHeight]}`,
+  `--page-hero-min-height: ${heightMin[allowedHeight]}`,
+  `--page-hero-min-height-mobile: ${heightMinMobile[allowedHeight]}`,
   `--page-hero-bg-size: ${scaledBgSize(allowedFit, scale)}`,
   `--page-hero-image-scale: ${scale}`,
   `--page-hero-bg-position: ${x}% ${y}%`,
@@ -69,7 +77,7 @@ const styleVars = [
   </div>
 </section>
 <style>
-  .page-hero { position: relative; overflow: hidden; background: var(--color-navy-deep); color: white; padding: var(--page-hero-padding) 0; }
+  .page-hero { position: relative; overflow: hidden; min-height: var(--page-hero-min-height); background: var(--color-navy-deep); color: white; padding: var(--page-hero-padding) 0; display: flex; align-items: center; }
   .page-hero::before { content: ""; position: absolute; inset: 0; background-image: linear-gradient(90deg, var(--page-hero-overlay-left) 0%, var(--page-hero-overlay-mid) 43%, var(--page-hero-overlay-right) 72%, var(--page-hero-overlay-end) 100%), var(--page-hero-asset); background-size: cover, var(--page-hero-bg-size); background-position: center, var(--page-hero-bg-position); background-repeat: no-repeat, no-repeat; opacity: var(--page-hero-overlay-opacity); }
   .page-hero-detail::before { opacity: var(--page-hero-detail-overlay-opacity); }
   .page-hero-grid { position: relative; z-index: 1; display: grid; grid-template-columns: minmax(0, 1fr) minmax(200px, 0.45fr); gap: clamp(18px, 3vw, 34px); align-items: center; }
@@ -80,5 +88,5 @@ const styleVars = [
   .page-hero p { max-width: 720px; color: rgba(255, 255, 255, 0.8); font-size: var(--text-body-lg); }
   .page-hero-visual { min-height: clamp(120px, 14vw, 180px); position: relative; pointer-events: none; background: radial-gradient(circle at 58% 42%, rgba(174, 255, 0, 0.14), transparent 34%); }
   .page-hero-detail .page-hero-visual { min-height: 104px; opacity: 0.68; }
-  @media (max-width: 860px) { .page-hero { padding: var(--page-hero-padding-mobile) 0; } .page-hero::before { background-image: linear-gradient(90deg, var(--page-hero-overlay-left), var(--page-hero-overlay-mid)), var(--page-hero-asset); background-position: center, var(--page-hero-bg-position-mobile); } .page-hero-grid { grid-template-columns: 1fr; } .page-hero-visual { min-height: 100px; } }
+  @media (max-width: 860px) { .page-hero { min-height: var(--page-hero-min-height-mobile); padding: var(--page-hero-padding-mobile) 0; } .page-hero::before { background-image: linear-gradient(90deg, var(--page-hero-overlay-left), var(--page-hero-overlay-mid)), var(--page-hero-asset); background-position: center, var(--page-hero-bg-position-mobile); } .page-hero-grid { grid-template-columns: 1fr; } .page-hero-visual { min-height: 100px; } }
 </style>
