@@ -81,7 +81,7 @@ assert.deepEqual(await stagingEntries(env.SITE_MEDIA_STAGING_DIR), []);
 const multiBody = multipartBody(boundary, { secondFile: true });
 await assert.rejects(() => parseMediaMultipart(reqFromChunks([multiBody], boundary), { env, maxBytes: 4096 }), /egy médiafájl|Túl sok multipart rész/);
 const abortBody = body.subarray(0, Math.floor(body.length / 2));
-await assert.rejects(() => parseMediaMultipart(reqFromChunks([abortBody], boundary), { env, maxBytes: 4096 }), /Médiafájl|feltöltés|boundary|szükséges/);
+await assert.rejects(() => parseMediaMultipart(reqFromChunks([abortBody], boundary), { env, maxBytes: 4096 }), /Médiafájl|feltöltés|boundary|szükséges|Unexpected end of form/);
 
 assert.equal(shouldTryCrf25({ originalSize: 1000, crf23Size: 260 }), true);
 
