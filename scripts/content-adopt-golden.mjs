@@ -7,12 +7,12 @@ import ts from 'typescript';
 import { getDatabaseConfig, createPool } from '../src/lib/db/client.mjs';
 
 const ROOT = path.resolve(new URL('..', import.meta.url).pathname);
-const APPLY_GROUPS = new Set(['solutions', 'audiences']);
-const PROTECTED_GROUPS = new Set(['integrations', 'pricing', 'contact', 'home']);
+const APPLY_GROUPS = new Set(['solutions', 'audiences', 'integrations', 'pricing', 'contact']);
+const HOME_GROUP = 'home';
 const RISK_RE = /telex|placeholder|teszt|test|lorem|dummy|kártya|kartya/i;
 
 function usage() {
-  return `Golden content adopt/backfill dry-run\n\nUsage:\n  node scripts/content-adopt-golden.mjs [--dry-run] [--apply --yes] [--group solutions|audiences|integrations|pricing|contact|all] [--route /path/]\n\nDefaults to --dry-run. Apply is allowed only for solutions/audiences and requires --yes.\n`;
+  return `Golden content adopt/backfill dry-run\n\nUsage:\n  node scripts/content-adopt-golden.mjs [--dry-run] [--apply --yes] [--group solutions|audiences|integrations|pricing|contact|all] [--route /path/]\n\nDefaults to --dry-run. Apply requires --yes and an explicit --route. Home remains dry-run only.\n`;
 }
 
 export function parseArgs(argv = process.argv.slice(2)) {
@@ -72,9 +72,39 @@ function pageFromItem(item, section, type, group) {
   };
 }
 
+function indexCards(items, section) {
+  return items.map((item) => ({
+    title: item.title,
+    text: item.shortDescription,
+    url: `/${section}/${item.slug}/`,
+    linkLabel: 'Részletek →',
+    order: item.order,
+  }));
+}
+
+function solutionsIndexManifest(solutions) {
+  return {
+    group: 'solutions', route: '/megoldasaink/', applyAllowed: true, requiresApproval: true,
+    page: { title: 'Megoldásaink', slug: 'megoldasaink', type: 'solutions_index', seoTitle: 'Megoldásaink | Easylink', seoDescription: 'Easylink ügyviteli megoldások.', heroEyebrow: 'Megoldásaink', heroTitle: 'Egy rendszer a napi működés kulcspontjaira.', heroDescription: 'Moduláris ügyviteli irányok pénzügyre, CRM-re, dokumentumokra, kontrollingra és AI-ra.', heroAsset: '/assets/nati/hero-bg-flow-01.webp' },
+    blocks: [
+      { type: 'cards', title: 'Megoldásaink', body: 'Publikált megoldáskártyák a src/content/solutions.ts golden forrásból.', items: indexCards(solutions, 'megoldasaink'), sort_order: 10, status: 'published' },
+    ],
+  };
+}
+
+function audiencesIndexManifest(audiences) {
+  return {
+    group: 'audiences', route: '/kinek-szol/', applyAllowed: true, requiresApproval: true,
+    page: { title: 'Kinek szól?', slug: 'kinek-szol', type: 'audiences_index', seoTitle: 'Kinek szól? | Easylink', seoDescription: 'Easylink célcsoportok.', heroEyebrow: 'Kinek szól?', heroTitle: 'Iparági fókusz, admin-kompatibilis tartalommal.', heroDescription: 'Iparági fókuszú ügyviteli struktúrák.', heroAsset: '/assets/nati/hero-bg-flow-02.webp' },
+    blocks: [
+      { type: 'cards', title: 'Kinek szól?', body: 'Publikált célcsoportkártyák a src/content/audiences.ts golden forrásból.', items: indexCards(audiences, 'kinek-szol'), sort_order: 10, status: 'published' },
+    ],
+  };
+}
+
 function integrationsManifest(integrations) {
   return {
-    group: 'integrations', route: '/integraciok/', applyAllowed: false, requiresApproval: true,
+    group: 'integrations', route: '/integraciok/', applyAllowed: true, requiresApproval: true,
     page: { title: 'Integrációk', slug: 'integraciok', type: 'integrations', seoTitle: 'Integrációk | Easylink', seoDescription: 'Integrációs irányok és adatkapcsolatok.', heroEyebrow: 'Integrációk', heroTitle: 'Kapcsolódások, adatáramlás, tisztább működés.', heroDescription: 'Az Easylink célja, hogy a fontos üzleti adatok összekapcsolhatók legyenek.', heroAsset: '/assets/nati/hero-bg-flow-01.webp' },
     blocks: [
       { type: 'text', title: 'Csomópontok', body: 'Nem késznek állított ígéretek, hanem tisztán tagolt integrációs irányok.', sort_order: 10, status: 'published' },
@@ -85,20 +115,20 @@ function integrationsManifest(integrations) {
 }
 
 const pricingManifest = () => ({
-  group: 'pricing', route: '/arak/', applyAllowed: false, requiresApproval: true,
+  group: 'pricing', route: '/arak/', applyAllowed: true, requiresApproval: true,
   page: { title: 'Árak', slug: 'arak', type: 'pricing', seoTitle: 'Árak | Easylink', seoDescription: 'Easylink árazási irányok.', heroEyebrow: 'Árak', heroTitle: 'Árazás, ami a működésedhez igazodik.', heroDescription: 'Az Easylink bevezetés modulokra, integrációs igényre és ügyviteli folyamatokra szabható.', heroAsset: '/assets/nati/hero-bg-flow-02.webp' },
   blocks: [
     { type: 'feature-list', title: 'Mitől függhet az ár?', items: ['Választott moduloktól: pénzügy, CRM, dokumentumkezelés, kontrolling vagy AI irány.', 'Cégmérettől, felhasználói köröktől és adminisztrációs összetettségtől.', 'Előkészített vagy később bizonyított integrációktól.', 'Bevezetési, adat-előkészítési és támogatási igényektől.'], sort_order: 10, status: 'published' },
-    { type: 'text', title: 'Demó alapján pontosítunk', body: 'A public oldalon nem közlünk csomagárat. Demó során a modulokat, a cégméretet és az integrációs előkészítést együtt mérjük fel.', sort_order: 20, status: 'published' },
+    { type: 'text', title: 'Demó alapján pontosítunk', body: 'A public oldalon nem közlünk konkrét díjat. Demó során a modulokat, a cégméretet és az integrációs előkészítést együtt mérjük fel.', sort_order: 20, status: 'published' },
     { type: 'cta', title: 'Kérj demót, és beszéljük át a modulokat.', body: 'A pontos ajánlat a választott funkcióktól, cégmérettől és integrációs igényektől függ.', items: [{ label: 'Demót kérek', url: '/kapcsolat/' }], sort_order: 30, status: 'published' },
   ],
 });
 
 const contactManifest = () => ({
-  group: 'contact', route: '/kapcsolat/', applyAllowed: false, requiresApproval: true,
+  group: 'contact', route: '/kapcsolat/', applyAllowed: true, requiresApproval: true,
   page: { title: 'Kapcsolat', slug: 'kapcsolat', type: 'contact', seoTitle: 'Kapcsolat | Easylink', seoDescription: 'Kapcsolatfelvétel Easylink bevezetéshez.', heroEyebrow: 'Kapcsolat', heroTitle: 'Kapcsolódjunk össze.', heroDescription: 'Kérj bemutatót vagy egyeztetést az Easylink bevezetési lehetőségeiről.', heroAsset: '/assets/nati/hero-bg-flow-03.webp' },
   blocks: [
-    { type: 'cta', title: 'Kapcsolat', body: 'Email: hello@easylink.hu', items: [{ label: 'Demót kérek', url: 'https://deploy.easylink.hu' }], sort_order: 10, status: 'published' },
+    { type: 'cta', title: 'Kapcsolat', body: 'Email: hello@easylink.hu', items: [{ label: 'Írj nekünk', url: 'mailto:hello@easylink.hu' }], sort_order: 10, status: 'published' },
     { type: 'feature-list', title: 'Miben tudunk segíteni?', items: ['Megnézzük, mely modulok illenek a jelenlegi működésedhez.', 'Átbeszéljük a hotel/szálláshely, vendéglátó vagy szolgáltatói fókuszt.', 'Összegyűjtjük, milyen integrációs irányokat érdemes előkészíteni.'], sort_order: 20, status: 'published' },
   ],
 });
@@ -107,7 +137,7 @@ const homeManifest = () => ({
   group: 'home', route: '/', applyAllowed: false, requiresApproval: true,
   page: { title: 'Easylink', slug: 'home', type: 'home', seoTitle: 'Easylink | Ügyviteli rendszer KKV-knak', seoDescription: 'Modern Easylink public site ügyviteli, integrációs és AI asszisztens iránnyal.', heroEyebrow: 'Easylink ügyvitel + AI', heroTitle: 'easyLink ERP', heroDescription: 'Felejtsd el a táblázatokat! Olyan ügyviteli rendszert adunk a kezedbe, amivel egyetlen, átlátható felületen irányíthatod a számlázást, az adminisztrációt és az ügyfélnyilvántartást.', heroAsset: '/assets/nati/hero-bg-flow-03.webp' },
   blocks: [],
-  note: 'Home golden layout komponált Astro layout marad; első körben nincs automatikus backfill.',
+  note: 'Home golden layout komponált Astro layout, kézi döntést igényel; első körben nincs automatikus backfill/apply.',
 });
 
 export async function buildGoldenManifest() {
@@ -117,7 +147,9 @@ export async function buildGoldenManifest() {
     loadTsExport('src/content/integrations.ts', 'integrations'),
   ]);
   return [
+    solutionsIndexManifest(solutions.filter((i) => i.status === 'published').sort((a,b)=>a.order-b.order)),
     ...solutions.filter((i) => i.status === 'published').sort((a,b)=>a.order-b.order).map((i) => pageFromItem(i, 'megoldasaink', 'solution_detail', 'solutions')),
+    audiencesIndexManifest(audiences.filter((i) => i.status === 'published').sort((a,b)=>a.order-b.order)),
     ...audiences.filter((i) => i.status === 'published').sort((a,b)=>a.order-b.order).map((i) => pageFromItem(i, 'kinek-szol', 'audience_detail', 'audiences')),
     integrationsManifest(integrations.filter((i) => i.status === 'published').sort((a,b)=>a.order-b.order)),
     pricingManifest(),
@@ -172,8 +204,8 @@ async function withTransaction(db, fn) {
 }
 
 export async function applyRoute(entry, db) {
-  if (!entry.applyAllowed || PROTECTED_GROUPS.has(entry.group)) throw new Error(`Apply requires manual approval and is disabled for group: ${entry.group}`);
-  if (!APPLY_GROUPS.has(entry.group)) throw new Error(`Apply is only enabled for solutions/audiences, got: ${entry.group}`);
+  if (!entry.applyAllowed || entry.group === HOME_GROUP) throw new Error(`Apply requires manual approval and is disabled for group: ${entry.group}`);
+  if (!APPLY_GROUPS.has(entry.group)) throw new Error(`Apply is not enabled for group: ${entry.group}`);
   return withTransaction(db, async (tx) => {
     const page = await tx.getPageByRoute(entry.route);
     if (!page) throw new Error(`Cannot apply without existing DB page: ${entry.route}`);
@@ -225,7 +257,7 @@ async function main() {
   const manifest = await buildGoldenManifest();
   const selected = manifest.filter((e) => (args.group === 'all' || e.group === args.group) && (!args.route || e.route === args.route));
   if (selected.length === 0) throw new Error('No manifest entries matched the selected group/route.');
-  if (args.apply && selected.some((e) => !e.applyAllowed || !APPLY_GROUPS.has(e.group))) throw new Error('Apply is disabled for integrations/pricing/contact/home. Select only --group solutions or --group audiences, or an allowed route.');
+  if (args.apply && selected.some((e) => !e.applyAllowed || !APPLY_GROUPS.has(e.group) || e.group === HOME_GROUP)) throw new Error('Apply is disabled for home. Select an explicitly allowed --route.');
   const hasConfig = Boolean(getDatabaseConfig(process.env));
   if (!hasConfig) {
     console.log(JSON.stringify({ mode: args.apply ? 'apply' : 'dry-run', db: 'unavailable-no-config', entries: selected }, null, 2));
