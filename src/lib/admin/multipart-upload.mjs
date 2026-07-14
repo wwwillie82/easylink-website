@@ -37,7 +37,7 @@ export async function parseMediaMultipart(req, { env = process.env, maxBytes, st
   return await new Promise((resolve, reject) => {
     let busboy;
     try {
-      busboy = Busboy({ headers: req.headers, limits: { fileSize: maxBytes, fieldSize: 8192, fields: 1, files: 1, parts: 2 } });
+      busboy = Busboy({ headers: req.headers, limits: { fileSize: maxBytes, fieldSize: 8192, fields: 1, files: 1, parts: 3 } });
       busboyRef = busboy;
     } catch (error) { reject(mediaValidationError(error.message || 'Hibás multipart kérés.', 'INVALID_MULTIPART')); return; }
 
