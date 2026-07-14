@@ -5,7 +5,7 @@ import path from 'node:path';
 
 export const DEFAULT_MEDIA_PUBLIC_BASE_URL = '/assets/site-media';
 export const DEFAULT_MEDIA_MAX_BYTES = 5_242_880;
-export const DEFAULT_MEDIA_VIDEO_MAX_BYTES = 52_428_800;
+export const DEFAULT_MEDIA_VIDEO_MAX_BYTES = 209_715_200;
 export const DEFAULT_FFMPEG_PATH = '/usr/bin/ffmpeg';
 export const DEFAULT_FFPROBE_PATH = '/usr/bin/ffprobe';
 const allowed = {
