@@ -3,14 +3,18 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
 import Header from '@/components/Header.astro';
 import PageHero from '@/components/PageHero.astro';
 import ListingCards from '@/components/ListingCards.astro';
+import ContentBlocks from '@/components/ContentBlocks.astro';
 import CTASection from '@/components/CTASection.astro';
 import Footer from '@/components/Footer.astro';
 import { publishedAudiences } from '@/content/audiences';
 import { getPublicPageState } from '@/lib/content/provider';
+import { findRoleBlock, withoutBlocks } from '@/lib/content/blockRoles';
 const pageState = await getPublicPageState('/kinek-szol/');
 const page = pageState.page;
-const cardsBlock = page?.blocks?.find((block) => ['cards', 'card-grid'].includes(block.type));
+const cardsBlock = findRoleBlock(page?.blocks, 'golden-cards', (block) => ['cards', 'card-grid'].includes(block.type));
 const audienceCards = cardsBlock?.items?.length ? cardsBlock.items : publishedAudiences;
+const ctaSectionBlock = findRoleBlock(page?.blocks, 'cta-section', (block) => block.type === 'cta');
+const remainingBlocks = withoutBlocks(page?.blocks, [cardsBlock, ctaSectionBlock]);
 if (pageState.hiddenByDb) Astro.response.status = 404;
 ---
 
@@ -37,7 +41,8 @@ if (pageState.hiddenByDb) Astro.response.status = 404;
         <ListingCards items={audienceCards} basePath="/kinek-szol/" />
       </div>
     </section>
-    <CTASection />
+    {remainingBlocks.length > 0 && <ContentBlocks blocks={remainingBlocks} />}
+    <CTASection block={ctaSectionBlock} />
     </>}
   </main>
   <Footer />

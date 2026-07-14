@@ -3,15 +3,17 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
 import Header from '@/components/Header.astro';
 import PageHero from '@/components/PageHero.astro';
 import CTASection from '@/components/CTASection.astro';
+import ContentBlocks from '@/components/ContentBlocks.astro';
 import Footer from '@/components/Footer.astro';
 import { getPublicPageState } from '@/lib/content/provider';
+import { findRoleBlock, withoutBlocks } from '@/lib/content/blockRoles';
 const pageState = await getPublicPageState('/arak/');
 const page = pageState.page;
-const featureBlock = page?.blocks?.find((block) => block.type === 'feature-list');
-const textBlock = page?.blocks?.find((block) => block.type === 'text');
-const ctaBlock = page?.blocks?.find((block) => block.type === 'cta');
+const featureBlock = findRoleBlock(page?.blocks, 'pricing-features', (block) => block.type === 'feature-list');
+const textBlock = findRoleBlock(page?.blocks, 'pricing-explainer', (block) => block.type === 'text');
+const ctaBlock = findRoleBlock(page?.blocks, 'pricing-cta', (block) => block.type === 'cta');
 const priceFeatures = featureBlock?.items?.length ? featureBlock.items : ['Választott moduloktól: pénzügy, CRM, dokumentumkezelés, kontrolling vagy AI irány.', 'Cégmérettől, felhasználói köröktől és adminisztrációs összetettségtől.', 'Előkészített vagy később bizonyított integrációktól.', 'Bevezetési, adat-előkészítési és támogatási igényektől.'];
-const ctaItem = ctaBlock?.items?.[0];
+const remainingBlocks = withoutBlocks(page?.blocks, [featureBlock, textBlock, ctaBlock]);
 if (pageState.hiddenByDb) Astro.response.status = 404;
 ---
 
@@ -48,7 +50,8 @@ if (pageState.hiddenByDb) Astro.response.status = 404;
         </article>
       </div>
     </section>
-    <CTASection title={ctaBlock?.title ?? "Kérj demót, és beszéljük át a modulokat."} description={ctaBlock?.body ?? "A pontos ajánlat a választott funkcióktól, cégmérettől és integrációs igényektől függ."} primaryLabel={ctaItem?.label ?? "Demót kérek"} />
+    <CTASection block={ctaBlock} title="Kérj demót, és beszéljük át a modulokat." description="A pontos ajánlat a választott funkcióktól, cégmérettől és integrációs igényektől függ." primaryLabel="Demót kérek" />
+    {remainingBlocks.length > 0 && <ContentBlocks blocks={remainingBlocks} />}
     </>}
   </main>
   <Footer />

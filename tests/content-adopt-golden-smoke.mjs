@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { buildGoldenManifest, diffManifest, applyManifest, parseArgs } from '../scripts/content-adopt-golden.mjs';
+import { buildGoldenManifest, diffManifest, applyManifest, parseArgs, diffCtaDefaults, applyCtaDefaults } from '../scripts/content-adopt-golden.mjs';
 
 const manifest = await buildGoldenManifest();
 const routes = manifest.map((e) => e.route);
@@ -84,6 +84,7 @@ function createFixtureDb() {
       { id: 44, page_id: 3, type: 'text', title: 'Mire jó?', body: 'archived old golden shape must stay archived', items: null, sort_order: 9, status: 'archived' },
       { id: 99, page_id: 3, type: 'text', title: 'Régi teszt blokk', body: 'dummy test content', items: null, sort_order: 99, status: 'published' },
       { id: 101, page_id: 30, type: 'text', title: 'TELEX KÁRTYA', body: 'placeholder integration', items: null, sort_order: 10, status: 'published' },
+      { id: 102, page_id: 12, block_key: 'golden:cta-section', type: 'cta', title: 'Archived CTA', body: 'Old', items: JSON.stringify([{ presentationRole: 'cta-section', label: 'Old' }]), sort_order: 900, status: 'archived' },
     ],
     nextBlockId: 200,
   };
@@ -91,9 +92,10 @@ function createFixtureDb() {
     state,
     async getPageByRoute(route) { return state.pages.find((p) => p.route === route) || null; },
     async listBlocks(pageId) { return state.blocks.filter((b) => String(b.page_id) === String(pageId)).sort((a,b)=>a.sort_order-b.sort_order||a.id-b.id).map(clone); },
+    async listNonHomePages() { return state.pages.filter((p) => p.route !== '/' && p.type !== 'home' && p.status !== 'archived').map(clone); },
     async updatePageFields(id, page) { Object.assign(state.pages.find((p) => p.id === id), { title: page.title, seo_title: page.seoTitle, seo_description: page.seoDescription, hero_title: page.heroTitle }); },
-    async updateBlock(id, block) { Object.assign(state.blocks.find((b) => b.id === id), { type: block.type, title: block.title, body: block.body ?? null, items: block.items === undefined ? null : JSON.stringify(block.items), sort_order: block.sort_order, status: block.status }); },
-    async insertBlock(pageId, block) { state.blocks.push({ id: state.nextBlockId++, page_id: pageId, type: block.type, title: block.title, body: block.body ?? null, items: block.items === undefined ? null : JSON.stringify(block.items), sort_order: block.sort_order, status: block.status }); },
+    async updateBlock(id, block) { const current = state.blocks.find((b) => b.id === id); Object.assign(current, { block_key: block.block_key || current.block_key, type: block.type, title: block.title, body: block.body ?? null, items: block.items === undefined ? null : JSON.stringify(block.items), sort_order: block.sort_order, status: block.status }); },
+    async insertBlock(pageId, block) { state.blocks.push({ id: state.nextBlockId++, page_id: pageId, block_key: block.block_key, type: block.type, title: block.title, body: block.body ?? null, items: block.items === undefined ? null : JSON.stringify(block.items), sort_order: block.sort_order, status: block.status }); },
     async archiveBlock(id) { state.blocks.find((b) => b.id === id).status = 'archived'; },
     async createAuditSnapshot(label) { state.snapshots.push({ label, status: 'success', is_current: 0, content_json: { pages: clone(state.pages), blocks: clone(state.blocks), navigation: [], settings: [], media: [] } }); },
     async transaction(fn) { return fn(adapter); },
@@ -130,6 +132,18 @@ let integrationsBlocks = await applyDb.listBlocks(30);
 assert.match(JSON.stringify(integrationsBlocks), /Előkészített kapcsolódási irányok|nem kész runtime integrációs állítások/i);
 await applyManifest(manifest, applyDb, { route: '/arak/' });
 assert.doesNotMatch(JSON.stringify(await applyDb.listBlocks(40)), /\b\d+[ .]?Ft\b|kalkulátor/i);
+let pricingBlocks = await applyDb.listBlocks(40);
+const pricingCta = pricingBlocks.find((b) => b.block_key === '/arak/:cta:2');
+assert.ok(pricingCta, 'pricing CTA should be adopted with its stable block_key');
+const customizedPricingItems = JSON.parse(pricingCta.items);
+customizedPricingItems[0] = { ...customizedPricingItems[0], eyebrow: 'Saját eyebrow', label: 'Saját demó', url: '/sajat/', secondaryLabel: 'Saját második', secondaryUrl: '/sajat-masodik/', extra: 'keep' };
+await applyDb.updateBlock(pricingCta.id, { ...pricingCta, title: 'Saját CTA cím', body: 'Saját CTA leírás', items: customizedPricingItems });
+const pricingDry = await diffManifest(manifest, applyDb, { route: '/arak/' });
+assert.ok(pricingDry[0].actions.some((a) => a.action === 'keep' && a.blockId === pricingCta.id), 'customized pricing CTA with required fields must be keep');
+assert.ok(!pricingDry[0].actions.some((a) => a.action === 'update' && a.blockId === pricingCta.id), 'customized pricing CTA must not be endlessly updated');
+const beforePricingReapply = clone(applyDb.state.blocks);
+await applyManifest(manifest, applyDb, { route: '/arak/' });
+assert.deepEqual(applyDb.state.blocks, beforePricingReapply, 'second pricing apply must be a true no-op for customized complete CTA');
 await applyManifest(manifest, applyDb, { route: '/kapcsolat/' });
 assert.match(JSON.stringify(await applyDb.listBlocks(50)), /hello@easylink\.hu/);
 await applyManifest(manifest, applyDb, { route: '/megoldasaink/' });
@@ -137,7 +151,7 @@ assert.match(JSON.stringify(await applyDb.listBlocks(2)), /Pénzügy és száml�
 await applyManifest(manifest, applyDb, { route: '/kinek-szol/' });
 assert.match(JSON.stringify(await applyDb.listBlocks(12)), /Hoteleknek és szálláshelyeknek/);
 await applyManifest(manifest, applyDb, { route: '/megoldasaink/penzugy-szamlazas/' });
-assert.equal(applyDb.state.snapshots.length, 6);
+assert.equal(applyDb.state.snapshots.length, 7);
 assert.equal(applyDb.state.snapshots.at(-1).status, 'success');
 assert.equal(applyDb.state.snapshots.at(-1).is_current, 0);
 assert.match(applyDb.state.snapshots.at(-1).label, /^golden-adopt-before:\/megoldasaink\/penzugy-szamlazas\/$/);
@@ -157,5 +171,27 @@ assert.equal(pageBlocks.find((b) => b.id === 43).status, 'draft');
 assert.equal(pageBlocks.find((b) => b.id === 44).status, 'archived');
 assert.equal(pageBlocks.filter((b) => b.title === 'Mire jó?' && b.status === 'published').length, 1);
 assert.deepEqual(applyDb.state.blocks, afterFirstApply, 'apply must be idempotent after first normalization');
+
+
+const ctaDb = createFixtureDb();
+const oldDeployUrl = process.env.PUBLIC_DEPLOY_URL;
+process.env.PUBLIC_DEPLOY_URL = 'https://custom.deploy.test';
+const ctaDry = await diffCtaDefaults(ctaDb);
+process.env.PUBLIC_DEPLOY_URL = oldDeployUrl;
+assert.ok(ctaDry.some((d) => d.route === '/megoldasaink/' && d.action === 'insert'));
+assert.match(JSON.stringify(ctaDry.find((d) => d.route === '/megoldasaink/').target), /https:\/\/custom\.deploy\.test/);
+assert.ok(ctaDry.some((d) => d.route === '/kinek-szol/' && d.action === 'reactivate' && d.blockId === 102));
+assert.ok(!ctaDry.some((d) => d.route === '/arak/'), 'pricing route already has its own DB CTA and must not receive default CTASection backfill');
+await applyCtaDefaults(ctaDb);
+assert.equal(ctaDb.state.snapshots.at(-1).label, 'cta-defaults-adopt-before:all-non-home');
+assert.ok(ctaDb.state.blocks.some((b) => b.block_key === 'golden:cta-section' && b.page_id === 2));
+assert.equal(ctaDb.state.blocks.find((b) => b.id === 102).status, 'published');
+await applyManifest(manifest, ctaDb, { route: '/megoldasaink/' });
+assert.equal(ctaDb.state.blocks.filter((b) => b.page_id === 2 && b.block_key === 'golden:cta-section').length, 1);
+assert.equal(ctaDb.state.blocks.find((b) => b.page_id === 2 && b.block_key === 'golden:cta-section').status, 'published');
+const afterRouteApply = clone(ctaDb.state.blocks);
+const ctaSecond = await applyCtaDefaults(ctaDb);
+assert.ok(ctaSecond.every((d) => d.action === 'keep'), 'second CTA defaults apply must be no-op after route adopt');
+assert.deepEqual(ctaDb.state.blocks, afterRouteApply, 'CTA defaults apply must not duplicate blocks after route adopt');
 
 console.log('Content adopt golden smoke passed: manifest routes, rollback-compatible snapshot, non-published safety, golden pénzügy content, dry-run safety, guarded apply, idempotency, protected groups.');

@@ -16,7 +16,7 @@ function usage() {
 }
 
 export function parseArgs(argv = process.argv.slice(2)) {
-  const args = { dryRun: true, apply: false, yes: false, group: 'all', route: '', help: false };
+  const args = { dryRun: true, apply: false, yes: false, group: 'all', route: '', help: false, ctaDefaults: false };
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
     if (a === '--help' || a === '-h') args.help = true;
@@ -25,11 +25,12 @@ export function parseArgs(argv = process.argv.slice(2)) {
     else if (a === '--yes') args.yes = true;
     else if (a === '--group') args.group = argv[++i] || '';
     else if (a === '--route') args.route = normalizeRoute(argv[++i] || '');
+    else if (a === '--cta-defaults') args.ctaDefaults = true;
     else throw new Error(`Unknown argument: ${a}`);
   }
   if (!['solutions','audiences','integrations','pricing','contact','home','all'].includes(args.group)) throw new Error(`Invalid --group: ${args.group}`);
   if (args.apply && !args.yes) throw new Error('--apply requires --yes. Refusing to modify DB.');
-  if (args.apply && !args.route) throw new Error('Apply requires an explicit --route in this first release.');
+  if (args.apply && !args.route && !args.ctaDefaults) throw new Error('Apply requires an explicit --route unless --cta-defaults is used.');
   return args;
 }
 
@@ -48,7 +49,7 @@ async function loadTsExport(relativePath, exportName) {
 }
 
 const cloneItems = (items) => items === undefined ? undefined : JSON.parse(JSON.stringify(items));
-const targetBlock = (block, index) => ({ type: block.type, title: block.title, body: block.body, items: cloneItems(block.items), sort_order: (index + 1) * 10, status: 'published' });
+const targetBlock = (block, index) => ({ block_key: `golden:content:${index + 1}:${block.type}`, type: block.type, title: block.title, body: block.body, items: cloneItems(block.items), sort_order: (index + 1) * 10, status: 'published' });
 
 function pageFromItem(item, section, type, group) {
   const route = `/${section}/${item.slug}/`;
@@ -87,7 +88,7 @@ function solutionsIndexManifest(solutions) {
     group: 'solutions', route: '/megoldasaink/', applyAllowed: true, requiresApproval: true,
     page: { title: 'Megoldásaink', slug: 'megoldasaink', type: 'solutions_index', seoTitle: 'Megoldásaink | Easylink', seoDescription: 'Easylink ügyviteli megoldások.', heroEyebrow: 'Megoldásaink', heroTitle: 'Egy rendszer a napi működés kulcspontjaira.', heroDescription: 'Válaszd ki, melyik működési területet szeretnéd átláthatóbbá tenni: pénzügy, HR, CRM, dokumentumkezelés, kontrolling vagy AI támogatás.', heroAsset: '/assets/nati/hero-bg-flow-01.webp' },
     blocks: [
-      { type: 'cards', title: 'Megoldásaink', body: 'Válaszd ki, melyik működési területet szeretnéd átláthatóbbá tenni: pénzügy, HR, CRM, dokumentumkezelés, kontrolling vagy AI támogatás.', items: indexCards(solutions, 'megoldasaink'), sort_order: 10, status: 'published' },
+      { block_key: '/megoldasaink/:cards:0', type: 'cards', title: 'Megoldásaink', body: 'Válaszd ki, melyik működési területet szeretnéd átláthatóbbá tenni: pénzügy, HR, CRM, dokumentumkezelés, kontrolling vagy AI támogatás.', items: indexCards(solutions, 'megoldasaink'), sort_order: 10, status: 'published' },
     ],
   };
 }
@@ -97,7 +98,7 @@ function audiencesIndexManifest(audiences) {
     group: 'audiences', route: '/kinek-szol/', applyAllowed: true, requiresApproval: true,
     page: { title: 'Kinek szól?', slug: 'kinek-szol', type: 'audiences_index', seoTitle: 'Kinek szól? | Easylink', seoDescription: 'Easylink célcsoportok.', heroEyebrow: 'Kinek szól?', heroTitle: 'Ügyvitel a vállalkozásod működéséhez igazítva.', heroDescription: 'Az Easylink különböző működési modellekhez igazítható: szálláshelyeknek, vendéglátóhelyeknek és szolgáltató vállalkozásoknak.', heroAsset: '/assets/nati/hero-bg-flow-02.webp' },
     blocks: [
-      { type: 'cards', title: 'Kinek szól?', body: 'Az Easylink különböző működési modellekhez igazítható: szálláshelyeknek, vendéglátóhelyeknek és szolgáltató vállalkozásoknak.', items: indexCards(audiences, 'kinek-szol'), sort_order: 10, status: 'published' },
+      { block_key: '/kinek-szol/:cards:0', type: 'cards', title: 'Kinek szól?', body: 'Az Easylink különböző működési modellekhez igazítható: szálláshelyeknek, vendéglátóhelyeknek és szolgáltató vállalkozásoknak.', items: indexCards(audiences, 'kinek-szol'), sort_order: 10, status: 'published' },
     ],
   };
 }
@@ -107,9 +108,9 @@ function integrationsManifest(integrations) {
     group: 'integrations', route: '/integraciok/', applyAllowed: true, requiresApproval: true,
     page: { title: 'Integrációk', slug: 'integraciok', type: 'integrations', seoTitle: 'Integrációk | Easylink', seoDescription: 'Integrációs irányok és adatkapcsolatok.', heroEyebrow: 'Integrációk', heroTitle: 'Kapcsolódások, adatáramlás, tisztább működés.', heroDescription: 'Az Easylink célja, hogy a fontos üzleti adatok összekapcsolhatók legyenek.', heroAsset: '/assets/nati/hero-bg-flow-01.webp' },
     blocks: [
-      { type: 'text', title: 'Csomópontok', body: 'Nem késznek állított ígéretek, hanem tisztán tagolt integrációs irányok.', sort_order: 10, status: 'published' },
-      { type: 'cards', title: 'Integrációs irányok', body: 'Előkészített kapcsolódási irányok: nem kész runtime integrációs állítások.', items: integrations.map((i) => ({ title: i.title, text: i.shortDescription })), sort_order: 20, status: 'published' },
-      { type: 'text', title: 'Fontos keret', body: 'A public tartalom integrációs irányokat és előkészített kapcsolódásokat mutat be; kész éles kapcsolatot csak bizonyított implementáció után kommunikálunk.', sort_order: 30, status: 'published' },
+      { block_key: '/integraciok/:text:0', type: 'text', title: 'Csomópontok', body: 'Nem késznek állított ígéretek, hanem tisztán tagolt integrációs irányok.', sort_order: 10, status: 'published' },
+      { block_key: '/integraciok/:cards:1', type: 'cards', title: 'Integrációs irányok', body: 'Előkészített kapcsolódási irányok: nem kész runtime integrációs állítások.', items: integrations.map((i) => ({ title: i.title, text: i.shortDescription })), sort_order: 20, status: 'published' },
+      { block_key: '/integraciok/:text:2', type: 'text', title: 'Fontos keret', body: 'A public tartalom integrációs irányokat és előkészített kapcsolódásokat mutat be; kész éles kapcsolatot csak bizonyított implementáció után kommunikálunk.', sort_order: 30, status: 'published' },
     ],
   };
 }
@@ -118,9 +119,9 @@ const pricingManifest = () => ({
   group: 'pricing', route: '/arak/', applyAllowed: true, requiresApproval: true,
   page: { title: 'Árak', slug: 'arak', type: 'pricing', seoTitle: 'Árak | Easylink', seoDescription: 'Easylink árazási irányok.', heroEyebrow: 'Árak', heroTitle: 'Árazás, ami a működésedhez igazodik.', heroDescription: 'Az Easylink bevezetés modulokra, integrációs igényre és ügyviteli folyamatokra szabható.', heroAsset: '/assets/nati/hero-bg-flow-02.webp' },
   blocks: [
-    { type: 'feature-list', title: 'Mitől függhet az ár?', items: ['Választott moduloktól: pénzügy, CRM, dokumentumkezelés, kontrolling vagy AI irány.', 'Cégmérettől, felhasználói köröktől és adminisztrációs összetettségtől.', 'Előkészített vagy később bizonyított integrációktól.', 'Bevezetési, adat-előkészítési és támogatási igényektől.'], sort_order: 10, status: 'published' },
-    { type: 'text', title: 'Demó alapján pontosítunk', body: 'A public oldalon nem közlünk konkrét díjat. Demó során a modulokat, a cégméretet és az integrációs előkészítést együtt mérjük fel.', sort_order: 20, status: 'published' },
-    { type: 'cta', title: 'Kérj demót, és beszéljük át a modulokat.', body: 'A pontos ajánlat a választott funkcióktól, cégmérettől és integrációs igényektől függ.', items: [{ label: 'Demót kérek', url: '/kapcsolat/' }], sort_order: 30, status: 'published' },
+    { block_key: '/arak/:feature-list:0', type: 'feature-list', title: 'Mitől függhet az ár?', items: ['Választott moduloktól: pénzügy, CRM, dokumentumkezelés, kontrolling vagy AI irány.', 'Cégmérettől, felhasználói köröktől és adminisztrációs összetettségtől.', 'Előkészített vagy később bizonyított integrációktól.', 'Bevezetési, adat-előkészítési és támogatási igényektől.'], sort_order: 10, status: 'published' },
+    { block_key: '/arak/:text:1', type: 'text', title: 'Demó alapján pontosítunk', body: 'A public oldalon nem közlünk konkrét díjat. Demó során a modulokat, a cégméretet és az integrációs előkészítést együtt mérjük fel.', sort_order: 20, status: 'published' },
+    { block_key: '/arak/:cta:2', type: 'cta', title: 'Kérj demót, és beszéljük át a modulokat.', body: 'A pontos ajánlat a választott funkcióktól, cégmérettől és integrációs igényektől függ.', items: [{ eyebrow: 'Következő lépés', label: 'Demót kérek', url: '/kapcsolat/', secondaryLabel: 'Próbáld ki ingyen', secondaryUrl: defaultDeployUrl(), presentationRole: 'pricing-cta' }], sort_order: 30, status: 'published' },
   ],
 });
 
@@ -128,8 +129,8 @@ const contactManifest = () => ({
   group: 'contact', route: '/kapcsolat/', applyAllowed: true, requiresApproval: true,
   page: { title: 'Kapcsolat', slug: 'kapcsolat', type: 'contact', seoTitle: 'Kapcsolat | Easylink', seoDescription: 'Kapcsolatfelvétel Easylink bevezetéshez.', heroEyebrow: 'Kapcsolat', heroTitle: 'Kapcsolódjunk össze.', heroDescription: 'Kérj bemutatót vagy egyeztetést az Easylink bevezetési lehetőségeiről.', heroAsset: '/assets/nati/hero-bg-flow-03.webp' },
   blocks: [
-    { type: 'cta', title: 'Kapcsolat', body: 'Email: hello@easylink.hu', items: [{ label: 'Írj nekünk', url: 'mailto:hello@easylink.hu' }], sort_order: 10, status: 'published' },
-    { type: 'feature-list', title: 'Miben tudunk segíteni?', items: ['Megnézzük, mely modulok illenek a jelenlegi működésedhez.', 'Átbeszéljük a hotel/szálláshely, vendéglátó vagy szolgáltatói fókuszt.', 'Összegyűjtjük, milyen integrációs irányokat érdemes előkészíteni.'], sort_order: 20, status: 'published' },
+    { block_key: '/kapcsolat/:cta:0', type: 'cta', title: 'Kapcsolat', body: 'Email: hello@easylink.hu', items: [{ label: 'Írj nekünk', url: 'mailto:hello@easylink.hu' }], sort_order: 10, status: 'published' },
+    { block_key: '/kapcsolat/:feature-list:1', type: 'feature-list', title: 'Miben tudunk segíteni?', items: ['Megnézzük, mely modulok illenek a jelenlegi működésedhez.', 'Átbeszéljük a hotel/szálláshely, vendéglátó vagy szolgáltatói fókuszt.', 'Összegyűjtjük, milyen integrációs irányokat érdemes előkészíteni.'], sort_order: 20, status: 'published' },
   ],
 });
 
@@ -161,12 +162,18 @@ export async function buildGoldenManifest() {
 const canonical = (value) => JSON.stringify(value ?? null);
 const preview = (value) => typeof value === 'string' ? value.slice(0, 120) : canonical(value).slice(0, 120);
 const blockMatches = (block, target) => block.type === target.type && block.title === target.title && (block.body ?? undefined) === (target.body ?? undefined) && canonical(parseItems(block.items)) === canonical(target.items);
+const sameBlockKey = (block, target) => target.block_key && block.block_key === target.block_key;
 const sameShape = (block, target) => block.type === target.type && block.title === target.title;
 const parseItems = (items) => {
   if (Array.isArray(items)) return items;
   if (typeof items === 'string' && items.trim()) { try { return JSON.parse(items); } catch { return items; } }
   return undefined;
 };
+const pricingCtaHasRequiredFields = (block) => {
+  const first = parseItems(block?.items)?.[0];
+  return Boolean(first && typeof first === 'object' && ['eyebrow','label','url','secondaryLabel','secondaryUrl'].every((key) => Object.prototype.hasOwnProperty.call(first, key)));
+};
+function isCtaSectionBlock(block) { return String(block.block_key || '').includes(':cta-section') || String(block.block_key || '') === 'golden:cta-section' || parseItems(block.items)?.some?.((item) => item?.presentationRole === 'cta-section' || item?.role === 'cta-section'); }
 const isRiskyBlock = (block) => RISK_RE.test(`${block.title || ''}\n${block.body || ''}\n${preview(block.items || '')}`);
 
 export async function diffRoute(entry, db) {
@@ -185,11 +192,13 @@ export async function diffRoute(entry, db) {
   for (const target of entry.blocks) {
     const exact = publishedBlocks.find((b) => !used.has(b.id) && blockMatches(b, target));
     if (exact) { used.add(exact.id); actions.push({ action: 'keep', blockId: exact.id, targetTitle: target.title }); continue; }
+    const keyed = publishedBlocks.find((b) => !used.has(b.id) && sameBlockKey(b, target));
+    if (keyed) { used.add(keyed.id); actions.push(target.block_key === '/arak/:cta:2' && pricingCtaHasRequiredFields(keyed) ? { action: 'keep', blockId: keyed.id, targetTitle: target.title } : { action: 'update', blockId: keyed.id, target }); continue; }
     const shaped = publishedBlocks.find((b) => !used.has(b.id) && sameShape(b, target));
-    if (shaped) { used.add(shaped.id); actions.push({ action: 'update', blockId: shaped.id, target }); continue; }
-    actions.push({ action: 'insert', target, reason: nonPublishedBlocks.some((b) => sameShape(b, target)) ? 'non-published matching block ignored' : undefined });
+    if (shaped) { used.add(shaped.id); actions.push(target.block_key === '/arak/:cta:2' && pricingCtaHasRequiredFields(shaped) ? { action: 'keep', blockId: shaped.id, targetTitle: target.title } : { action: 'update', blockId: shaped.id, target }); continue; }
+    actions.push({ action: 'insert', target, reason: nonPublishedBlocks.some((b) => sameBlockKey(b, target) || sameShape(b, target)) ? 'non-published matching block ignored' : undefined });
   }
-  for (const block of publishedBlocks) if (!used.has(block.id)) actions.push({ action: 'archive', blockId: block.id, reason: isRiskyBlock(block) ? 'dangerous/test placeholder marker' : 'extra block not in golden manifest' });
+  for (const block of publishedBlocks) { if (isCtaSectionBlock(block)) { used.add(block.id); actions.push({ action: 'keep-supplemental', blockId: block.id, targetTitle: block.title }); continue; } if (!used.has(block.id)) actions.push({ action: 'archive', blockId: block.id, reason: isRiskyBlock(block) ? 'dangerous/test placeholder marker' : 'extra block not in golden manifest' }); }
   return { route: entry.route, group: entry.group, applyAllowed: entry.applyAllowed, requiresApproval: entry.requiresApproval, page: page ? { id: page.id, status: page.status, type: page.type, title: page.title } : null, existingBlockIds: blocks.map((b) => b.id), actions, risks };
 }
 
@@ -203,6 +212,52 @@ async function withTransaction(db, fn) {
   return fn(db);
 }
 
+
+const defaultDeployUrl = () => process.env.PUBLIC_DEPLOY_URL || 'https://deploy.easylink.hu';
+const defaultCtaBlock = () => ({
+  block_key: 'golden:cta-section',
+  type: 'cta',
+  title: 'Készen állsz könnyedebben vezetni a céged?',
+  body: 'Kérj demót vagy próbáld ki ingyen a konfigurált Deploy felületen.',
+  items: [{ eyebrow: 'Következő lépés', label: 'Demót kérek', url: defaultDeployUrl(), secondaryLabel: 'Próbáld ki ingyen', secondaryUrl: defaultDeployUrl(), presentationRole: 'cta-section' }],
+  sort_order: 900,
+  status: 'published',
+});
+
+const hasActiveCtaSection = (blocks) => blocks.some((block) => block.status !== 'archived' && isCtaSectionBlock(block));
+
+export async function diffCtaDefaults(db) {
+  const pages = (await db.listNonHomePages()).filter((page) => page.type !== 'pricing' && page.route !== '/arak/');
+  const diffs = [];
+  for (const page of pages) {
+    const blocks = await db.listBlocks(page.id);
+    diffs.push({ route: page.route, page: { id: page.id, type: page.type, status: page.status }, action: hasActiveCtaSection(blocks) ? 'keep' : (blocks.some(isCtaSectionBlock) ? 'reactivate' : 'insert'), blockId: blocks.find(isCtaSectionBlock)?.id, target: hasActiveCtaSection(blocks) ? undefined : defaultCtaBlock() });
+  }
+  return diffs;
+}
+
+export async function applyCtaDefaults(db) {
+  return withTransaction(db, async (tx) => {
+    if (tx.createAuditSnapshot) await tx.createAuditSnapshot('cta-defaults-adopt-before:all-non-home');
+    const diffs = await diffCtaDefaults(tx);
+    for (const diff of diffs) { if (diff.action === 'insert') await tx.insertBlock(diff.page.id, diff.target); if (diff.action === 'reactivate') await tx.updateBlock(diff.blockId, diff.target); }
+    return diffCtaDefaults(tx);
+  });
+}
+
+export function formatCtaDiff(diffs) {
+  return diffs.map((d) => `\nRoute: ${d.route}\n  db page: id=${d.page.id} status=${d.page.status} type=${d.page.type}\n  ${d.action}${d.target ? ` -> ${d.target.type} "${d.target.title}" block_key=${d.target.block_key}` : ''}`).join('\n');
+}
+
+
+function mergeMissingCtaFields(existingBlock, target) {
+  if (target?.block_key !== '/arak/:cta:2') return target;
+  const existingItems = parseItems(existingBlock?.items);
+  const current = Array.isArray(existingItems) && existingItems[0] && typeof existingItems[0] === 'object' ? existingItems[0] : {};
+  const desired = target.items?.[0] || {};
+  return { ...target, items: [{ ...desired, ...current }] };
+}
+
 export async function applyRoute(entry, db) {
   if (!entry.applyAllowed || entry.group === HOME_GROUP) throw new Error(`Apply requires manual approval and is disabled for group: ${entry.group}`);
   if (!APPLY_GROUPS.has(entry.group)) throw new Error(`Apply is not enabled for group: ${entry.group}`);
@@ -214,7 +269,7 @@ export async function applyRoute(entry, db) {
     const current = await tx.listBlocks(page.id);
     const diff = await diffRoute(entry, { getPageByRoute: async () => page, listBlocks: async () => current });
     for (const action of diff.actions) {
-      if (action.action === 'update') await tx.updateBlock(action.blockId, action.target);
+      if (action.action === 'update') await tx.updateBlock(action.blockId, mergeMissingCtaFields(current.find((b) => b.id === action.blockId), action.target));
       if (action.action === 'insert') await tx.insertBlock(page.id, action.target);
       if (action.action === 'archive') await tx.archiveBlock(action.blockId);
     }
@@ -240,10 +295,11 @@ export function formatDiff(diffs) {
 export function createMysqlDbAdapter(pool) {
   const adapterFor = (conn) => ({
     async getPageByRoute(route) { const [rows] = await conn.query('SELECT * FROM site_pages WHERE route=? LIMIT 1', [route]); return rows[0] || null; },
+    async listNonHomePages() { const [rows] = await conn.query("SELECT * FROM site_pages WHERE route<>? AND type<>? AND status<>? ORDER BY sort_order,id", ['/', 'home', 'archived']); return rows; },
     async listBlocks(pageId) { const [rows] = await conn.query('SELECT * FROM site_content_blocks WHERE page_id=? ORDER BY sort_order,id', [pageId]); return rows; },
     async updatePageFields(id, page) { await conn.execute('UPDATE site_pages SET title=?, seo_title=?, seo_description=?, hero_eyebrow=?, hero_title=?, hero_description=?, hero_asset=? WHERE id=?', [page.title, page.seoTitle, page.seoDescription, page.heroEyebrow, page.heroTitle, page.heroDescription, page.heroAsset, id]); },
     async updateBlock(id, b) { await conn.execute('UPDATE site_content_blocks SET type=?, title=?, body=?, items=?, sort_order=?, status=? WHERE id=?', [b.type, b.title, b.body ?? null, b.items === undefined ? null : JSON.stringify(b.items), b.sort_order, b.status, id]); },
-    async insertBlock(pageId, b) { await conn.execute('INSERT INTO site_content_blocks (page_id, block_key, type, title, body, items, sort_order, status) VALUES (?,?,?,?,?,?,?,?)', [pageId, `golden:${b.sort_order}:${b.type}:${b.title}`, b.type, b.title, b.body ?? null, b.items === undefined ? null : JSON.stringify(b.items), b.sort_order, b.status]); },
+    async insertBlock(pageId, b) { await conn.execute('INSERT INTO site_content_blocks (page_id, block_key, type, title, body, items, sort_order, status) VALUES (?,?,?,?,?,?,?,?)', [pageId, b.block_key || `golden:${b.sort_order}:${b.type}:${b.title}`, b.type, b.title, b.body ?? null, b.items === undefined ? null : JSON.stringify(b.items), b.sort_order, b.status]); },
     async archiveBlock(id) { await conn.execute('UPDATE site_content_blocks SET status=? WHERE id=?', ['archived', id]); },
     async createAuditSnapshot(label) { const [pages] = await conn.query('SELECT * FROM site_pages ORDER BY id'); const [blocks] = await conn.query('SELECT * FROM site_content_blocks ORDER BY id'); const [navigation] = await conn.query('SELECT * FROM site_navigation_items ORDER BY id'); const [settings] = await conn.query('SELECT * FROM site_settings ORDER BY `key`'); const [media] = await conn.query('SELECT * FROM site_media_assets ORDER BY id'); const content = JSON.stringify({ label, source: 'content-adopt-golden', pages, blocks, navigation, settings, media }); const hash = crypto.createHash('sha256').update(content).digest('hex'); await conn.execute('INSERT INTO site_publish_snapshots (label, content_json, content_hash, status, is_current) VALUES (?,?,?,?,?)', [label, content, hash, 'success', 0]); },
     async transaction(fn) { const c = await pool.getConnection(); try { await c.beginTransaction(); const result = await fn(adapterFor(c)); await c.commit(); return result; } catch (error) { await c.rollback(); throw error; } finally { c.release(); } },
@@ -257,7 +313,7 @@ async function main() {
   const manifest = await buildGoldenManifest();
   const selected = manifest.filter((e) => (args.group === 'all' || e.group === args.group) && (!args.route || e.route === args.route));
   if (selected.length === 0) throw new Error('No manifest entries matched the selected group/route.');
-  if (args.apply && selected.some((e) => !e.applyAllowed || !APPLY_GROUPS.has(e.group) || e.group === HOME_GROUP)) throw new Error('Apply is disabled for home. Select an explicitly allowed --route.');
+  if (!args.ctaDefaults && args.apply && selected.some((e) => !e.applyAllowed || !APPLY_GROUPS.has(e.group) || e.group === HOME_GROUP)) throw new Error('Apply is disabled for home. Select an explicitly allowed --route.');
   const hasConfig = Boolean(getDatabaseConfig(process.env));
   if (!hasConfig) {
     console.log(JSON.stringify({ mode: args.apply ? 'apply' : 'dry-run', db: 'unavailable-no-config', entries: selected }, null, 2));
@@ -267,7 +323,8 @@ async function main() {
   const pool = await createPool();
   try {
     const db = createMysqlDbAdapter(pool);
-    if (args.apply) console.log(formatDiff(await applyManifest(selected, db, args)));
+    if (args.ctaDefaults) console.log(formatCtaDiff(args.apply ? await applyCtaDefaults(db) : await diffCtaDefaults(db)));
+    else if (args.apply) console.log(formatDiff(await applyManifest(selected, db, args)));
     else console.log(formatDiff(await diffManifest(selected, db, args)));
   } finally { await pool.end?.(); }
 }

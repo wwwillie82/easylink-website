@@ -4,25 +4,37 @@ import { deployUrl } from '@/content/siteNavigation';
 const {
   title,
   description = 'Kérj demót vagy próbáld ki ingyen a konfigurált Deploy felületen.',
+  eyebrow = 'Következő lépés',
   primaryLabel = 'Demót kérek',
   secondaryLabel = 'Próbáld ki ingyen',
+  primaryHref = deployUrl,
+  secondaryHref = deployUrl,
+  block,
 } = Astro.props;
+const cta = block?.items?.[0] ?? {};
+const resolvedEyebrow = cta.eyebrow ?? eyebrow;
+const resolvedTitle = block?.title ?? title;
+const resolvedDescription = block?.body ?? description;
+const resolvedPrimaryLabel = cta.label ?? primaryLabel;
+const resolvedPrimaryHref = cta.url || primaryHref;
+const resolvedSecondaryLabel = cta.secondaryLabel ?? secondaryLabel;
+const resolvedSecondaryHref = cta.secondaryUrl || secondaryHref;
 ---
 
 <section class="section cta">
   <div class="container box">
-    <span class="eyebrow">Következő lépés</span>
+    <span class="eyebrow">{resolvedEyebrow}</span>
     <h2>
       {
-        title ?? (
+        resolvedTitle ?? (
           <>Készen állsz könnyedebben vezetni a céged?</>
         )
       }
     </h2>
-    <p>{description}</p>
+    <p>{resolvedDescription}</p>
     <div class="actions">
-      <a class="button button-primary" href={deployUrl}>{primaryLabel}</a>
-      <a class="button button-secondary" href={deployUrl}>{secondaryLabel}</a>
+      <a class="button button-primary" href={resolvedPrimaryHref}>{resolvedPrimaryLabel}</a>
+      <a class="button button-secondary" href={resolvedSecondaryHref}>{resolvedSecondaryLabel}</a>
     </div>
   </div>
 </section>
