@@ -88,7 +88,7 @@ export function createPublishService({ repo, env = process.env, build, deploy } 
       if (!built.ok) { await repo.markPublishFinished(snapshotId, { status: 'failed', build_log_excerpt: built.log }); return { ok: false, status: 'failed', contentSaved: true, liveUnchanged: true, error: built.log || 'Build hiba.' }; }
       const release = await validateRelease(releasePath, content);
       if (!release.ok) { await repo.markPublishFinished(snapshotId, { status: 'failed', build_log_excerpt: release.error, release_path: releasePath }); return { ok: false, status: 'failed', contentSaved: true, liveUnchanged: true, error: release.error }; }
-      const mediaCopy = await copyMediaToRelease({ releasePath, env });
+      const mediaCopy = await copyMediaToRelease({ releasePath, env, media: content.media });
       const deployed = await deployFn({ releasePath, content, env });
       if (!deployed.ok) { await repo.markPublishFinished(snapshotId, { status: 'failed', build_log_excerpt: deployed.log, release_path: releasePath }); return { ok: false, status: 'failed', contentSaved: true, liveUnchanged: true, error: deployed.log || 'Deploy hiba.' }; }
       await repo.markPublishFinished(snapshotId, { status: 'success', build_log_excerpt: `${built.log || ''}\nmedia-copy: ${mediaCopy.skipped ? 'skipped' : `${mediaCopy.copied} files`}\n${deployed.log || ''}`.trim(), release_path: releasePath });

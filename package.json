@@ -19,12 +19,15 @@
     "smoke:live": "node scripts/smoke-live-site.mjs",
     "smoke:composition": "node tests/public-composition-smoke.mjs",
     "smoke:media-storage": "node tests/media-storage-smoke.mjs",
-    "smoke:content-adopt": "node tests/content-adopt-golden-smoke.mjs"
+    "smoke:content-adopt": "node tests/content-adopt-golden-smoke.mjs",
+    "admin:media-worker": "node scripts/media-worker.mjs",
+    "smoke:media-video": "node tests/media-video-smoke.mjs"
   },
   "dependencies": {
     "astro": "7.0.5",
     "typescript": "6.0.3",
-    "mysql2": "3.11.5"
+    "mysql2": "3.11.5",
+    "busboy": "1.6.0"
   },
   "devDependencies": {}
 }

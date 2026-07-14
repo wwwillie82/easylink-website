@@ -1,11 +1,12 @@
 import http from 'node:http';
-import { readFile } from 'node:fs/promises';
-import { Readable } from 'node:stream';
+import { createReadStream } from 'node:fs';
+import { open, readFile, stat } from 'node:fs/promises';
 import { authenticate, signSession, sessionCookie, clearSessionCookie, requireAuthFromRequest } from './auth.mjs';
 import { parseJsonItems, validateLoginPayload } from './validation.mjs';
 import { layout, loginHtml, mediaPanel, navHtml, pageForm, pagesTable, publishPanel } from './render.mjs';
 import { createPublishService, PublishInProgressError } from './publish.mjs';
-import { mediaConfig, mediaValidationError, storagePathForPublicPath, storeMediaFile } from './media-storage.mjs';
+import { datedMediaTarget, finalizeStagedMediaFile, isVideoType, maxRequestBytes, mediaConfig, mediaValidationError, removeFileQuietly, storagePathForPublicPath, validateMediaFile } from './media-storage.mjs';
+import { parseMediaMultipart } from './multipart-upload.mjs';
 
 const apiError = (res, status, code, message) => json(res, status, { ok: false, error: { code, message } });
 const json = (res, status, body, headers = {}) => { res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', ...headers }); res.end(JSON.stringify(body)); };
@@ -16,12 +17,13 @@ async function body(req) { const raw = await rawBody(req); if (!raw) return {}; 
 function wantsHtml(req) { return String(req.headers.accept || '').includes('text/html'); }
 function authed(req, env) { return requireAuthFromRequest({ headers: { get: (name) => req.headers[name.toLowerCase()] || '' } }, env); }
 async function multipart(req, env) {
-  const maxBytes = mediaConfig(env).maxBytes;
+  const maxBytes = maxRequestBytes(env);
   const len = Number(req.headers['content-length'] || 0);
-  if (len && len > maxBytes + 4096) throw mediaValidationError('A feltöltés túl nagy.', 'MEDIA_FILE_TOO_LARGE');
-  const request = new Request('http://localhost/upload', { method: 'POST', headers: req.headers, body: Readable.toWeb(req), duplex: 'half' });
-  return request.formData();
+  if (len && len > maxBytes + 8192) throw mediaValidationError('A feltöltés túl nagy.', 'MEDIA_FILE_TOO_LARGE');
+  return parseMediaMultipart(req, { env, maxBytes });
 }
+async function readHeader(filePath) { const fh = await open(filePath, 'r'); try { const b = Buffer.alloc(64); const { bytesRead } = await fh.read(b, 0, b.length, 0); return b.subarray(0, bytesRead); } finally { await fh.close(); } }
+function sendFileRange(req, res, filePath, type) { return stat(filePath).then((s) => { const size = s.size; const headers = { 'content-type': type || 'application/octet-stream', 'cache-control': 'private, max-age=60', 'x-content-type-options': 'nosniff', 'accept-ranges': 'bytes' }; const range = req.headers.range; if (!range) { res.writeHead(200, { ...headers, 'content-length': size }); return createReadStream(filePath).pipe(res); } const m = /^bytes=(\d*)-(\d*)$/.exec(String(range)); if (!m) { res.writeHead(416, { ...headers, 'content-range': `bytes */${size}`, 'content-length': 0 }); return res.end(); } let start = m[1] === '' ? 0 : Number(m[1]); let end = m[2] === '' ? size - 1 : Number(m[2]); if (m[1] === '' && m[2] !== '') { const suffix = Number(m[2]); start = Math.max(0, size - suffix); end = size - 1; } if (!Number.isInteger(start) || !Number.isInteger(end) || start < 0 || end < start || start >= size) { res.writeHead(416, { ...headers, 'content-range': `bytes */${size}`, 'content-length': 0 }); return res.end(); } end = Math.min(end, size - 1); res.writeHead(206, { ...headers, 'content-range': `bytes ${start}-${end}/${size}`, 'content-length': end - start + 1 }); return createReadStream(filePath, { start, end }).pipe(res); }); }
 
 function validateNavPayload(payload) {
   if (!Array.isArray(payload?.items) || payload.items.length === 0) return { ok: false, error: { code: 'INVALID_NAVIGATION_ITEMS', message: 'Legalább egy menüpont szükséges.' } };
@@ -82,16 +84,37 @@ export function createAdminServer({ repo, env = process.env, publishService } = 
       if (url.pathname === '/api/admin/media') {
         if (req.method === 'GET') return json(res, 200, { ok: true, data: await repo.listMedia() });
         if (req.method === 'POST') {
+          let stagedPath = '';
+          let keepStaging = false;
+          let finalizedStoragePath = '';
+          let dbSaved = false;
           try {
             const form = await multipart(req, env);
-            const file = form.get('file');
-            if (!file || typeof file.arrayBuffer !== 'function') return apiError(res, 400, 'MEDIA_FILE_REQUIRED', 'Képfájl szükséges.');
-            const stored = await storeMediaFile({ file, alt: form.get('alt') || '', env });
-            const data = await repo.createMedia({ path: stored.path, alt: stored.alt, type: stored.type, status: 'active' });
+            const file = form.file;
+            stagedPath = file?.stagingPath || '';
+            if (!file?.stagingPath) return apiError(res, 400, 'MEDIA_FILE_REQUIRED', 'Médiafájl szükséges.');
+            const alt = form.fields.alt || '';
+            const header = await readHeader(file.stagingPath);
+            const valid = validateMediaFile({ filename: file.originalName, contentType: file.contentType, buffer: header, size: file.size, maxBytes: mediaConfig(env).maxBytes, videoMaxBytes: mediaConfig(env).videoMaxBytes });
+            if (isVideoType(valid.type)) {
+              const target = datedMediaTarget({ originalName: file.originalName, env });
+              const data = await repo.createMedia({ path: target.publicPath, alt: String(alt || '').trim(), type: valid.type, status: 'active', processing_status: 'queued', staging_path: file.stagingPath, original_size_bytes: file.size });
+              keepStaging = true;
+              dbSaved = true;
+              return json(res, 200, { ok: true, data });
+            }
+            const stored = await finalizeStagedMediaFile({ stagingPath: file.stagingPath, originalName: file.originalName, alt, contentType: file.contentType, env });
+            stagedPath = '';
+            finalizedStoragePath = stored.storagePath;
+            const data = await repo.createMedia({ path: stored.path, alt: stored.alt, type: stored.type, status: 'active', processing_status: 'ready', original_size_bytes: stored.size, final_size_bytes: stored.size });
+            dbSaved = true;
             return json(res, 200, { ok: true, data });
           } catch (error) {
             if (error.status === 400 || error.code?.startsWith?.('MEDIA_') || error.code?.startsWith?.('INVALID_MEDIA') || error.code === 'EMPTY_MEDIA_FILE') return apiError(res, 400, error.code || 'INVALID_MEDIA_UPLOAD', error.message);
             throw error;
+          } finally {
+            if (stagedPath && !keepStaging) await removeFileQuietly(stagedPath);
+            if (finalizedStoragePath && !dbSaved) await removeFileQuietly(finalizedStoragePath);
           }
         }
       }
@@ -103,6 +126,7 @@ export function createAdminServer({ repo, env = process.env, publishService } = 
         if (parts[4] === 'file' && req.method === 'GET') {
           try {
             const filePath = storagePathForPublicPath(media.path, env);
+            if (isVideoType(media.type)) return sendFileRange(req, res, filePath, media.type);
             const data = await readFile(filePath);
             res.writeHead(200, { 'content-type': media.type || 'application/octet-stream', 'cache-control': 'private, max-age=60', 'x-content-type-options': 'nosniff' });
             return res.end(data);
@@ -124,7 +148,7 @@ export function createAdminServer({ repo, env = process.env, publishService } = 
       if (url.pathname === '/admin/pages') return html(res, pagesTable(await repo.pages()), 200, '/admin/pages');
       if (url.pathname.startsWith('/admin/pages/')) { const page = await repo.page(url.pathname.split('/').pop()); return page ? html(res, pageForm(page), 200, '/admin/pages') : html(res, '<p class="msg err">Az oldal nem található.</p>', 404); }
       if (url.pathname === '/admin/menu') return html(res, `<h2>Menü</h2>${navHtml(await repo.nav())}`, 200, '/admin/menu');
-      if (url.pathname === '/admin/media') return html(res, mediaPanel({ maxBytes: mediaConfig(env).maxBytes }), 200, '/admin/media');
+      if (url.pathname === '/admin/media') return html(res, mediaPanel({ maxBytes: mediaConfig(env).maxBytes, videoMaxBytes: mediaConfig(env).videoMaxBytes }), 200, '/admin/media');
       return url.pathname.startsWith('/api/') ? apiError(res, 404, 'NOT_FOUND', 'Not found') : html(res, '<p class="msg err">Nem található.</p>', 404);
     } catch (error) {
       const message = env.NODE_ENV === 'production' ? 'Szerverhiba.' : error.message;

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
-import { mkdtemp } from 'node:fs/promises';
+import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { once } from 'node:events';
@@ -107,7 +107,7 @@ const repo = {
   async deleteBlock(id) { state.blocks.find((b) => String(b.id) === String(id)).status = 'archived'; },
   async listMedia({ includeArchived = false } = {}) { return state.media.filter((m) => includeArchived || m.status !== 'archived').sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at))||b.id-a.id); },
   async getMedia(id) { return state.media.find((m) => String(m.id) === String(id)) || null; },
-  async createMedia(payload) { const media = { id: state.nextMediaId++, path: payload.path, alt: payload.alt || '', type: payload.type || '', status: payload.status || 'active', created_at: new Date().toISOString() }; state.media.push(media); return media; },
+  async createMedia(payload) { const media = { id: state.nextMediaId++, processing_status: 'ready', ...payload, path: payload.path, alt: payload.alt || '', type: payload.type || '', status: payload.status || 'active', created_at: new Date().toISOString() }; state.media.push(media); return media; },
   async updateMedia(id, payload) { const media = state.media.find((m) => String(m.id) === String(id)); if (!media) return null; if (payload.status && !['active','archived'].includes(payload.status)) throw validationError('Hibás média státusz.'); media.alt = payload.alt ?? media.alt; media.status = payload.status || media.status; return media; },
   async archiveMedia(id) { const media = state.media.find((m) => String(m.id) === String(id)); if (!media) return null; media.status = 'archived'; return media; },
   async nav() { return state.nav; },
@@ -232,7 +232,7 @@ try {
   response = await fetch(`${base}/api/admin/media`, { method: 'POST', headers: { cookie }, body: fd });
   assert.equal(response.status, 200);
   let mediaSaved = await response.json();
-  assert.match(mediaSaved.data.path, /^\/assets\/site-media\/\d{4}\/\d{2}\/teszt-kep-[a-f0-9]{8}\.png$/);
+  assert.match(mediaSaved.data.path, /^\/assets\/site-media\/\d{4}\/\d{2}\/teszt-k[a-z-]*p-[a-f0-9]{8}\.png$/);
   assert.equal(mediaSaved.data.type, 'image/png');
   assert.equal(existsSync(join(mediaStorageDir, mediaSaved.data.path.replace('/assets/site-media/', ''))), true);
   response = await fetch(`${base}/api/admin/media/${mediaSaved.data.id}/file`, { headers: { cookie } });
@@ -260,6 +260,36 @@ try {
   fd.set('file', new Blob([new Uint8Array(100)], { type: 'image/png' }), 'too-big.png');
   response = await fetch(`${base}/api/admin/media`, { method: 'POST', headers: { cookie }, body: fd });
   assert.equal(response.status, 400);
+
+  const mp4 = new Uint8Array([...Buffer.from([0,0,0,24]), ...Buffer.from('ftypisom'), ...new Uint8Array(32)]);
+  fd = new FormData();
+  fd.set('file', new Blob([mp4], { type: 'video/mp4' }), 'Teszt Video.mp4');
+  response = await fetch(`${base}/api/admin/media`, { method: 'POST', headers: { cookie }, body: fd });
+  assert.equal(response.status, 200);
+  const videoQueued = await response.json();
+  assert.equal(videoQueued.data.type, 'video/mp4');
+  assert.equal(videoQueued.data.processing_status, 'queued');
+  assert.equal(existsSync(videoQueued.data.staging_path), true);
+  response = await fetch(`${base}/admin/media`, { headers: { cookie } });
+  const videoHtml = await response.text();
+  assert.match(videoHtml, /accept="image\/webp,image\/jpeg,image\/png,video\/mp4"/);
+  assert.match(videoHtml, /Videó queued|processing_status/);
+  assert.match(videoHtml, /Csak kész média választható/);
+  const readyPath = '/assets/site-media/2026/07/ready-a1b2c3d4.mp4';
+  await mkdir(join(mediaStorageDir, '2026', '07'), { recursive: true });
+  await writeFile(join(mediaStorageDir, '2026', '07', 'ready-a1b2c3d4.mp4'), Buffer.from('0123456789'));
+  state.media.push({ id: state.nextMediaId++, path: readyPath, alt: 'Ready video', type: 'video/mp4', status: 'active', processing_status: 'ready', original_size_bytes: 100, final_size_bytes: 25, created_at: new Date().toISOString() });
+  response = await fetch(`${base}/admin/media`, { headers: { cookie } });
+  assert.match(await response.text(), /<video controls preload="metadata"/);
+  response = await fetch(`${base}/api/admin/media/${state.nextMediaId - 1}/file`, { headers: { cookie, range: 'bytes=2-5' } });
+  assert.equal(response.status, 206);
+  assert.equal(response.headers.get('accept-ranges'), 'bytes');
+  assert.equal(response.headers.get('content-range'), 'bytes 2-5/10');
+  assert.equal(await response.text(), '2345');
+  response = await fetch(`${base}/api/admin/media/${state.nextMediaId - 1}/file`, { headers: { cookie, range: 'bytes=20-30' } });
+  assert.equal(response.status, 416);
+
+  for (const m of state.media.filter((x)=>String(x.id)!==String(mediaSaved.data.id))) m.status = 'archived';
   response = await fetch(`${base}/api/admin/media/${mediaSaved.data.id}`, { method: 'DELETE', headers: { cookie } });
   assert.equal(response.status, 200);
   assert.equal(state.media[0].status, 'archived');

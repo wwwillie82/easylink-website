@@ -20,6 +20,11 @@ assert.equal(validateMediaFile({ filename: 'kep.png', contentType: 'image/png', 
 assert.throws(() => validateMediaFile({ filename: 'kep.jpg', contentType: 'image/jpeg', buffer: png, maxBytes: 64 }), /tartalma/);
 assert.throws(() => validateMediaFile({ filename: 'kep.svg', contentType: 'image/svg+xml', buffer: Buffer.from('<svg/>'), maxBytes: 64 }), /WebP/);
 assert.throws(() => validateMediaFile({ filename: 'kep.png', contentType: 'image/png', buffer: Buffer.alloc(65), maxBytes: 64 }), /túl nagy/);
+const mp4 = Buffer.concat([Buffer.from([0,0,0,24]), Buffer.from('ftypisom'), Buffer.alloc(16)]);
+assert.equal(validateMediaFile({ filename: 'video.mp4', contentType: 'video/mp4', buffer: mp4, size: 100, maxBytes: 64, videoMaxBytes: 128 }).type, 'video/mp4');
+assert.throws(() => validateMediaFile({ filename: 'video.mp4', contentType: 'application/octet-stream', buffer: mp4, videoMaxBytes: 128 }), /MIME/);
+assert.throws(() => validateMediaFile({ filename: 'video.mp4', contentType: 'video/mp4', buffer: Buffer.from('not mp4'), videoMaxBytes: 128 }), /MP4/);
+assert.throws(() => validateMediaFile({ filename: 'video.mp4', contentType: 'video/mp4', buffer: mp4, size: 129, videoMaxBytes: 128 }), /túl nagy/);
 const stored = await storeMediaFile({ file: new File([png], 'Teszt Kép.png', { type: 'image/png' }), alt: 'Alt', env, now: new Date(Date.UTC(2026, 6, 10)) });
 assert.match(stored.path, /^\/assets\/site-media\/2026\/07\/teszt-kep-[a-f0-9]{8}\.png$/);
 assert.equal(existsSync(storagePathForPublicPath(stored.path, env)), true);
