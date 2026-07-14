@@ -45,7 +45,7 @@ const linkAttrs = (value) => { const href = normalizePublicHref(value); return {
       if (type === 'feature-list') {
         return <article class="content-card type-feature-list"><span class="eyebrow">{eyebrow}</span><h2>{block.title}</h2>{block.body && <p>{block.body}</p>}{items.length > 0 && <ul>{items.map((item) => { const href = typeof item === 'object' ? normalizePublicHref(item.url || item.href) : ''; const label = textOf(item); return <li>{href ? <a href={href} target={publicHrefTarget(href)} rel={publicHrefRel(href)}>{label}</a> : label}</li>; })}</ul>}</article>;
       }
-      return <article class:list={['content-card', `type-${type}`]}><span class="eyebrow">{eyebrow}</span><h2>{block.title}</h2>{block.body && <p>{block.body}</p>}</article>;
+      return <article class:list={['content-card', `type-${type}`]}><span class="eyebrow">{eyebrow}</span><h2>{block.title}</h2>{block.body && <p>{block.body}</p>}{items.length > 0 && <ul>{items.map((item) => <li>{textOf(item)}</li>)}</ul>}</article>;
     })}
   </div>
 </section>

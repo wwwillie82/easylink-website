@@ -32,7 +32,7 @@ export function mapPageRow(row: any, blocks: any[] = []): SitePage {
     heroImageScale: row.hero_image_scale ?? undefined,
     status: row.status,
     sortOrder: row.sort_order ?? 0,
-    blocks: blocks.map((block) => ({ type: block.type, title: block.title, body: block.body ?? undefined, items: parseItems(block.items) } as ContentBlock)),
+    blocks: blocks.map((block) => ({ blockKey: block.block_key, type: block.type, title: block.title, body: block.body ?? undefined, items: parseItems(block.items) } as ContentBlock)),
   };
 }
 

@@ -1,10 +1,11 @@
 export type ContentStatus = 'draft' | 'published' | 'archived';
 
 export type ContentBlock = {
-  type: 'text' | 'feature-list' | 'list' | 'cards' | 'card-grid' | 'cta' | 'image-text' | 'faq' | 'ai-preview' | 'network-visual';
+  type: 'text' | 'feature-list' | 'list' | 'cards' | 'card-grid' | 'cta' | 'image-text' | 'faq' | 'ai-preview' | 'network-visual' | string;
+  blockKey?: string;
   title: string;
   body?: string;
-  items?: Array<string | { title?: string; text?: string; url?: string; label?: string; question?: string; answer?: string; image?: string; position?: 'left' | 'right' }>;
+  items?: Array<string | { title?: string; text?: string; url?: string; label?: string; secondaryLabel?: string; secondaryUrl?: string; eyebrow?: string; presentationRole?: string; role?: string; question?: string; answer?: string; image?: string; position?: 'left' | 'right'; [key: string]: unknown }>;
 };
 
 export type MediaPlaceholder = {

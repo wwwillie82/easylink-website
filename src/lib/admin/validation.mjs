@@ -5,8 +5,9 @@ export function parseJsonItems(input) {
 }
 
 export function normalizeBlockItems(type, items) {
-  if (type === 'text') return [];
-  return Array.isArray(items) ? items : [];
+  if (items === null) return [];
+  if (!Array.isArray(items)) throw Object.assign(new Error('Az items mezőnek JSON tömbnek kell lennie.'), { code: 'INVALID_BLOCK_ITEMS' });
+  return items;
 }
 
 export function validateLoginPayload(payload) {

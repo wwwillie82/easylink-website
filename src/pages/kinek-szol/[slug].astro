@@ -3,10 +3,11 @@ import BaseLayout from '@/layouts/BaseLayout.astro';
 import Header from '@/components/Header.astro';
 import PageHero from '@/components/PageHero.astro';
 import ContentBlocks from '@/components/ContentBlocks.astro';
-import RelatedLinks from '@/components/RelatedLinks.astro';
 import CTASection from '@/components/CTASection.astro';
+import RelatedLinks from '@/components/RelatedLinks.astro';
 import Footer from '@/components/Footer.astro';
 import { publishedAudiences } from '@/content/audiences';
+import { findRoleBlock, withoutBlocks } from '@/lib/content/blockRoles';
 import { getDetailPage } from '@/lib/content/provider';
 
 export function getStaticPaths() {
@@ -15,6 +16,8 @@ export function getStaticPaths() {
 
 const props = Astro.props;
 const item = await getDetailPage('audience_detail', props.item.slug) ?? props.item;
+const ctaSectionBlock = findRoleBlock(item.blocks, 'cta-section', (block) => block.type === 'cta');
+const contentBlocks = withoutBlocks(item.blocks, [ctaSectionBlock]);
 const related = publishedAudiences
   .filter((entry) => entry.slug !== item.slug)
   .map((entry) => ({ title: entry.title, href: `/kinek-szol/${entry.slug}/` }));
@@ -24,9 +27,9 @@ const related = publishedAudiences
   <Header />
   <main>
     <PageHero eyebrow="Kinek szól?" title={item.heroTitle} description={item.heroDescription} variant="detail" asset={item.heroAsset || undefined} height={item.heroHeight} imageFit={item.heroImageFit} imagePositionX={item.heroImagePositionX} imagePositionY={item.heroImagePositionY} imagePositionMobileX={item.heroImagePositionMobileX} imagePositionMobileY={item.heroImagePositionMobileY} overlayStrength={item.heroOverlayStrength} imageScale={item.heroImageScale} />
-    <ContentBlocks blocks={item.blocks} />
+    <ContentBlocks blocks={contentBlocks} />
     <RelatedLinks links={related} />
-    <CTASection />
+    <CTASection block={ctaSectionBlock} />
   </main>
   <Footer />
 </BaseLayout>

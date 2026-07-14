@@ -11,6 +11,51 @@ import { shouldTryDbContentForEnv, pageWithFallback } from '../src/lib/content/p
 import { staticPagesData } from '../src/lib/content/static-seed-data.mjs';
 import { createAdminServer } from '../src/lib/admin/server.mjs';
 import { staleSeedKeys } from '../scripts/db-seed.mjs';
+import { blockForm, pageEditorJs, movedBlockOrder, parseItemRowRaw, serializeEditorItems, sortOrderForMovedBlock } from '../src/lib/admin/render/blocks.mjs';
+
+
+const editedCard = serializeEditorItems({ type: 'cards', rows: [{ raw: { title: 'Old', text: 'Body', href: '/old', badge: 'Beta', extra: 'keep' }, title: 'New', text: 'Body', url: '/old', linkLabel: '', order: 'Beta' }] });
+assert.deepEqual(editedCard, [{ title: 'New', text: 'Body', href: '/old', badge: 'Beta', extra: 'keep' }]);
+const editedCta = serializeEditorItems({ type: 'cta', first: { eyebrow: 'Next', label: 'Old label', url: '/demo', secondaryLabel: 'Try', secondaryUrl: '/try', presentationRole: 'cta-section', role: 'legacy', extra: 'keep' }, rows: { eyebrow: 'Next', label: 'New label', url: '/demo', secondaryLabel: 'Try', secondaryUrl: '/try' } });
+assert.deepEqual(editedCta, [{ eyebrow: 'Next', label: 'New label', url: '/demo', secondaryLabel: 'Try', secondaryUrl: '/try', presentationRole: 'cta-section', role: 'legacy', extra: 'keep' }]);
+const editedImageText = serializeEditorItems({ type: 'image-text', first: { image: '/old.webp', alt: 'Old alt', position: 'left', extra: 'keep' }, rows: { image: '/new.webp', alt: 'Old alt', position: 'left' } });
+assert.deepEqual(editedImageText, [{ image: '/new.webp', alt: 'Old alt', position: 'left', extra: 'keep' }]);
+const editedFaq = serializeEditorItems({ type: 'faq', rows: [{ raw: { question: 'Old?', answer: 'Old answer', extra: 'keep' }, title: 'New?', text: 'Old answer' }] });
+assert.deepEqual(editedFaq, [{ question: 'New?', answer: 'Old answer', extra: 'keep' }]);
+assert.throws(() => serializeEditorItems({ type: 'raw', rawItemsText: '{bad' }), SyntaxError);
+
+const textFeature = serializeEditorItems({ type: 'feature-list', rows: [{ raw: { text: 'Régi text', href: '/valami/', extra: 'keep' }, title: 'Új text' }] });
+assert.deepEqual(textFeature, [{ text: 'Új text', href: '/valami/', extra: 'keep' }]);
+const titleFeature = serializeEditorItems({ type: 'feature-list', rows: [{ raw: { title: 'Régi title', href: '/title/', extra: 'keep' }, title: 'Új title' }] });
+assert.deepEqual(titleFeature, [{ title: 'Új title', href: '/title/', extra: 'keep' }]);
+const stringFeature = serializeEditorItems({ type: 'feature-list', rows: [{ raw: 'Régi string', title: 'Új string' }] });
+assert.deepEqual(stringFeature, ['Új string']);
+assert.deepEqual(serializeEditorItems({ type: 'feature-list', rows: [{ raw: { text: 'Törlendő', href: '/x', extra: 'drop' }, title: '' }] }), []);
+assert.throws(() => parseItemRowRaw('{bad'), SyntaxError);
+const oneBlockMove = movedBlockOrder([{ id: 'fixed-a', fixed: true, sortOrder: 10 }, { id: 'free-a', fixed: false, sortOrder: 20 }, { id: 'free-b', fixed: false, sortOrder: 30 }, { id: 'fixed-b', fixed: true, sortOrder: 900 }], 1, 'down');
+assert.equal(oneBlockMove.moved.id, 'free-a');
+assert.equal(oneBlockMove.sortOrder, 465);
+assert.deepEqual(oneBlockMove.domOrder.map((entry)=>entry.id), ['fixed-a', 'free-b', 'free-a', 'fixed-b']);
+const upwardMove = movedBlockOrder([{ id: 'fixed-a', fixed: true, sortOrder: 10 }, { id: 'free-a', fixed: false, sortOrder: 20 }, { id: 'free-b', fixed: false, sortOrder: 30 }, { id: 'fixed-b', fixed: true, sortOrder: 900 }], 2, 'up');
+assert.equal(upwardMove.sortOrder, 15);
+assert.deepEqual(upwardMove.domOrder.map((entry)=>entry.id), ['fixed-a', 'free-b', 'free-a', 'fixed-b']);
+assert.throws(() => movedBlockOrder([{ id: 'fixed-a', fixed: true, sortOrder: 10 }, { id: 'free-a', fixed: false, sortOrder: 20 }], 1, 'up'), /Nincs elegendő sorrendi hely/);
+assert.throws(() => sortOrderForMovedBlock([{ id: 'prev', fixed: false, sortOrder: 10 }, { id: 'moved', fixed: false, sortOrder: 11 }, { id: 'next', fixed: false, sortOrder: 11 }], 1), /Nincs elegendő sorrendi hely/);
+assert.deepEqual([{ id: 'fixed-a', fixed: true, sortOrder: 10 }, { id: 'fixed-b', fixed: true, sortOrder: 900 }].map((entry)=>entry.sortOrder), [10, 900]);
+assert.doesNotMatch(pageEditorJs(1), /const raw=\{\.\.\.\(first|first is not defined/);
+const fixedBlockHtml = blockForm({ id: 501, page_id: 20, block_key: '/megoldasaink/:cards:0', type: 'cards', title: 'Cards', body: '', items: [{ title: 'A', extra: 'keep' }], status: 'published', sort_order: 10 });
+assert.match(fixedBlockHtml, /data-fixed-presentation="true"/);
+assert.match(fixedBlockHtml, /Rögzített megjelenési hely/);
+assert.match(fixedBlockHtml, /data-raw-item="\{&quot;title&quot;:&quot;A&quot;,&quot;extra&quot;:&quot;keep&quot;\}"/);
+const textFeatureHtml = blockForm({ id: 503, page_id: 20, block_key: 'manual:text-feature', type: 'feature-list', title: 'Feature', body: '', items: [{ text: 'Text alapú listaelem', href: '/x', extra: 'keep' }, { title: 'Title alapú listaelem', href: '/y', extra: 'keep' }], status: 'published', sort_order: 30 });
+assert.match(textFeatureHtml, /value="Text alapú listaelem"/);
+assert.match(textFeatureHtml, /value="Title alapú listaelem"/);
+assert.match(fixedBlockHtml, /data-move-block="up" class="secondary" disabled/);
+const freeRoleHtml = blockForm({ id: 502, page_id: 20, block_key: 'manual:free', type: 'cta', title: 'Manual', body: '', items: [{ role: 'unknown-custom-role', label: 'A', extra: 'keep' }], status: 'published', sort_order: 20 });
+assert.doesNotMatch(freeRoleHtml, /data-fixed-presentation="true"/);
+assert.doesNotMatch(freeRoleHtml, /data-move-block="up" class="secondary" disabled/);
+assert.match(pageEditorJs(1), /!isFixedBlock\(sib\)/);
+assert.match(pageEditorJs(1), /if\(isFixedBlock\(f\)\)return/);
 
 const sessionSecret = 'test-session-secret-long-enough';
 const state = {
@@ -26,7 +71,11 @@ const state = {
     { id: 20, page_id: 20, block_key: 'seed:/megoldasaink/:cards:0', type: 'cards', title: 'Megoldás lista', body: 'Body', items: '[{"title":"Pénzügy","text":"Szöveg","url":"/megoldasaink/penzugy-szamlazas/","linkLabel":"Részletek →","order":1}]', status: 'published', sort_order: 1 },
     { id: 21, page_id: 20, block_key: 'seed:/megoldasaink/:text:1', type: 'text', title: 'Nem renderelt', body: 'Body', items: '[]', status: 'published', sort_order: 2 },
     { id: 22, page_id: 22, block_key: 'seed:/megoldasaink-fallback/:feature-list:0', type: 'feature-list', title: 'Régi nem renderelt feature', body: 'Body', items: '["Régi"]', status: 'published', sort_order: 1 },
-    { id: 23, page_id: 23, block_key: 'seed:/integraciok-fallback/:text:0', type: 'text', title: 'Régi nem renderelt integráció szöveg', body: 'Body', items: '[]', status: 'published', sort_order: 1 }],
+    { id: 23, page_id: 23, block_key: 'seed:/integraciok-fallback/:text:0', type: 'text', title: 'Régi nem renderelt integráció szöveg', body: 'Body', items: '[]', status: 'published', sort_order: 1 },
+    { id: 70, page_id: 70, block_key: 'fixed:a', type: 'text', title: 'fixed A', body: 'Fixed A', items: '[]', status: 'published', sort_order: 10 },
+    { id: 71, page_id: 70, block_key: 'free:a', type: 'text', title: 'free A', body: 'Free A', items: '[]', status: 'published', sort_order: 20 },
+    { id: 72, page_id: 70, block_key: 'free:b', type: 'text', title: 'free B', body: 'Free B', items: '[]', status: 'published', sort_order: 30 },
+    { id: 73, page_id: 70, block_key: 'fixed:b', type: 'text', title: 'fixed B', body: 'Fixed B', items: '[]', status: 'published', sort_order: 900 }],
 
   snapshots: [],
   imported: null,
@@ -92,6 +141,35 @@ try {
   assert.match(cookie, /HttpOnly/);
   assert.equal(response.headers.get('location'), '/admin/pages');
 
+
+  const orderBlocks = () => state.blocks.filter((b) => b.page_id === 70).sort((a,b)=>Number(a.sort_order)-Number(b.sort_order)||a.id-b.id);
+  const orderTitles = () => orderBlocks().map((b) => b.title);
+  const orderEntries = () => orderBlocks().map((b) => ({ id: b.id, fixed: b.title.startsWith('fixed'), sortOrder: Number(b.sort_order) }));
+  assert.deepEqual(orderTitles(), ['fixed A', 'free A', 'free B', 'fixed B']);
+  const downMove = movedBlockOrder(orderEntries(), 1, 'down');
+  assert.equal(downMove.moved.id, 71);
+  assert.equal(downMove.sortOrder, 465);
+  const freeA = state.blocks.find((b) => b.id === 71);
+  response = await fetch(`${base}/api/admin/blocks`, { method: 'POST', headers: { cookie, 'content-type': 'application/json' }, body: JSON.stringify({ ...freeA, sort_order: downMove.sortOrder }) });
+  assert.equal(response.status, 200);
+  assert.deepEqual(orderTitles(), ['fixed A', 'free B', 'free A', 'fixed B']);
+  assert.equal(state.blocks.find((b) => b.id === 72).sort_order, 30);
+  assert.equal(state.blocks.find((b) => b.id === 70).sort_order, 10);
+  assert.equal(state.blocks.find((b) => b.id === 73).sort_order, 900);
+  const beforeContentSaveOrders = orderBlocks().map((b) => [b.id, b.sort_order]);
+  response = await fetch(`${base}/api/admin/blocks`, { method: 'POST', headers: { cookie, 'content-type': 'application/json' }, body: JSON.stringify({ ...freeA, body: 'Free A content edit', sort_order: downMove.sortOrder }) });
+  assert.equal(response.status, 200);
+  assert.deepEqual(orderBlocks().map((b) => [b.id, b.sort_order]), beforeContentSaveOrders, 'plain content save must not renumber sibling blocks');
+  const upMove = movedBlockOrder(orderEntries(), 2, 'up');
+  assert.equal(upMove.moved.id, 71);
+  assert.equal(upMove.sortOrder, 20);
+  response = await fetch(`${base}/api/admin/blocks`, { method: 'POST', headers: { cookie, 'content-type': 'application/json' }, body: JSON.stringify({ ...state.blocks.find((b) => b.id === 71), sort_order: upMove.sortOrder }) });
+  assert.equal(response.status, 200);
+  assert.deepEqual(orderTitles(), ['fixed A', 'free A', 'free B', 'fixed B']);
+  assert.throws(() => movedBlockOrder(orderEntries(), 1, 'up'), /Nincs elegendő sorrendi hely/);
+  const beforeGapFailure = JSON.stringify(orderBlocks());
+  assert.throws(() => movedBlockOrder([{ id: 1, fixed: true, sortOrder: 10 }, { id: 2, fixed: false, sortOrder: 11 }, { id: 3, fixed: false, sortOrder: 12 }, { id: 4, fixed: true, sortOrder: 13 }], 1, 'down'), /Nincs elegendő sorrendi hely/);
+  assert.equal(JSON.stringify(orderBlocks()), beforeGapFailure, 'gap failure must not mutate mock DB');
 
   response = await fetch(`${base}/admin/pages`, { headers: { cookie } });
   assert.equal(response.status, 200);
@@ -325,33 +403,29 @@ try {
   assert.equal(response.status, 200);
   assert.match(await response.text(), /Oldal szerkesztése/);
   const fixedPageEditorHtml = await (await fetch(`${base}/admin/pages/1`, { headers: { cookie } })).text();
-  assert.match(fixedPageEditorHtml, /nem ebből a blokklistából szerkeszthető/);
+  assert.doesNotMatch(fixedPageEditorHtml, /nem ebből a blokklistából szerkeszthető|nem aktív szerkesztőfelület|csak a publicban ténylegesen renderelt/);
   for (const label of ['Hero kép megjelenítés', 'Hero magasság', 'Kép illesztése', 'Vízszintes pozíció', 'Függőleges pozíció', 'Mobil vízszintes pozíció', 'Mobil függőleges pozíció', 'Sötét overlay erősség', 'Kép mérete / nagyítás', '100 = alapértelmezett', 'A magasság a hero blokk vizuális magasságát állítja']) assert.match(fixedPageEditorHtml, new RegExp(label));
-  assert.doesNotMatch(fixedPageEditorHtml, /Blokk típusa/);
+  assert.match(fixedPageEditorHtml, /Blokk típusa/);
   if (!state.pages.find((p) => p.id === 20)) state.pages.push({ id: 20, route: '/megoldasaink/', slug: 'megoldasaink', type: 'solutions_index', title: 'Megoldásaink', status: 'published', sort_order: 10, seo_title: 'Megoldásaink', seo_description: 'Desc', hero_eyebrow: 'Megoldásaink', hero_title: 'Hero', hero_description: 'Hero desc', hero_asset: '/asset.webp' });
   if (!state.blocks.find((b) => b.id === 20)) state.blocks.push({ id: 20, page_id: 20, block_key: 'seed:/megoldasaink/:cards:0', type: 'cards', title: 'Megoldás lista', body: 'Body', items: '[{"title":"Pénzügy","text":"Szöveg","url":"/megoldasaink/penzugy-szamlazas/","linkLabel":"Részletek →","order":1}]', status: 'published', sort_order: 1 });
   const goldenPageEditorHtml = await (await fetch(`${base}/admin/pages/20`, { headers: { cookie } })).text();
-  assert.match(goldenPageEditorHtml, /csak a publicban ténylegesen renderelt Kártyasor komponens szerkeszthető/);
+  assert.doesNotMatch(goldenPageEditorHtml, /csak a publicban ténylegesen renderelt Kártyasor komponens szerkeszthető|nem aktív szerkesztőfelület/);
   assert.match(goldenPageEditorHtml, /Kártyasor/);
-  assert.doesNotMatch(goldenPageEditorHtml, /Nem renderelt/);
-  assert.doesNotMatch(goldenPageEditorHtml, /Szövegblokk<\/option>/);
+  assert.match(goldenPageEditorHtml, /Tartalmi blokkok/);
+  assert.match(goldenPageEditorHtml, /Rögzített megjelenési hely/);
+  assert.match(goldenPageEditorHtml, /data-move-block="up" class="secondary" disabled/);
+  assert.match(goldenPageEditorHtml, /Szövegblokk<\/option>/);
   if (!state.pages.find((p) => p.id === 22)) state.pages.push({ id: 22, route: '/megoldasaink-fallback/', slug: 'megoldasaink-fallback', type: 'solutions_index', title: 'Megoldásaink fallback', status: 'published', sort_order: 11, seo_title: 'Megoldásaink fallback', seo_description: 'Desc', hero_eyebrow: 'Megoldásaink', hero_title: 'Hero', hero_description: 'Hero desc', hero_asset: '/asset.webp' });
   if (!state.blocks.find((b) => b.id === 22)) state.blocks.push({ id: 22, page_id: 22, block_key: 'seed:/megoldasaink-fallback/:feature-list:0', type: 'feature-list', title: 'Régi nem renderelt feature', body: 'Body', items: '["Régi"]', status: 'published', sort_order: 1 });
   if (!state.pages.find((p) => p.id === 23)) state.pages.push({ id: 23, route: '/integraciok-fallback/', slug: 'integraciok-fallback', type: 'integrations', title: 'Integrációk fallback', status: 'published', sort_order: 12, seo_title: 'Integrációk fallback', seo_description: 'Desc', hero_eyebrow: 'Integrációk', hero_title: 'Hero', hero_description: 'Hero desc', hero_asset: '/asset.webp' });
   if (!state.blocks.find((b) => b.id === 23)) state.blocks.push({ id: 23, page_id: 23, block_key: 'seed:/integraciok-fallback/:text:0', type: 'text', title: 'Régi nem renderelt integráció szöveg', body: 'Body', items: '[]', status: 'published', sort_order: 1 });
   const fallbackSolutionsHtml = await (await fetch(`${base}/admin/pages/22`, { headers: { cookie } })).text();
-  assert.match(fallbackSolutionsHtml, /Megoldás lista/);
-  assert.match(fallbackSolutionsHtml, /Pénzügy és számlázás/);
-  assert.match(fallbackSolutionsHtml, /CRM és ügyfélkezelés/);
-  assert.match(fallbackSolutionsHtml, /value=""/);
-  assert.doesNotMatch(fallbackSolutionsHtml, /Régi nem renderelt feature/);
+  assert.doesNotMatch(fallbackSolutionsHtml, /Pénzügy és számlázás|CRM és ügyfélkezelés/);
+  assert.match(fallbackSolutionsHtml, /Régi nem renderelt feature/);
   assert.doesNotMatch(fallbackSolutionsHtml, /Új sor<\/button><\/div><input type="hidden" name="items" value="\[\]"/);
   const fallbackIntegrationsHtml = await (await fetch(`${base}/admin/pages/23`, { headers: { cookie } })).text();
-  assert.match(fallbackIntegrationsHtml, /Integrációs irányok/);
-  assert.match(fallbackIntegrationsHtml, /NAV Online Számla/);
-  assert.match(fallbackIntegrationsHtml, /Billingo/);
-  assert.match(fallbackIntegrationsHtml, /value=""/);
-  assert.doesNotMatch(fallbackIntegrationsHtml, /Régi nem renderelt integráció szöveg/);
+  assert.doesNotMatch(fallbackIntegrationsHtml, /NAV Online Számla|Billingo/);
+  assert.match(fallbackIntegrationsHtml, /Régi nem renderelt integráció szöveg/);
 
   response = await fetch(`${base}/api/admin/pages`, { method: 'POST', headers: { cookie, 'content-type': 'application/json' }, body: JSON.stringify({ title: 'Teszt szerkeszthető', route: '/teszt-szerkesztheto/', type: 'content_page', status: 'draft' }) });
   assert.equal(response.status, 200);
@@ -360,6 +434,22 @@ try {
   assert.equal(response.status, 200);
   response = await fetch(`${base}/api/admin/blocks`, { method: 'POST', headers: { cookie, 'content-type': 'application/json' }, body: JSON.stringify({ page_id: editablePageId, type: 'feature-list', title: 'Feature stale runtime', body: 'Body', items: '[{\"title\":\"Lista\",\"text\":\"Régi kártyaszöveg\",\"url\":\"/stale/\",\"linkLabel\":\"Régi\",\"order\":1}]', status: 'published', sort_order: 2 }) });
   assert.equal(response.status, 200);
+  const roundTripCases = [
+    { type: 'text', title: 'Text items roundtrip', items: '[{"title":"Text item","url":"/kept/","extra":"x"}]' },
+    { type: 'list', title: 'List object roundtrip', items: '[{"title":"List item","text":"body","href":"/href","badge":"A","extra":"x"}]' },
+    { type: 'card-grid', title: 'Card grid roundtrip', items: '[{"title":"Card","text":"Body","href":"/href","badge":"B","extra":"x"}]' },
+    { type: 'ai-preview', title: 'AI raw roundtrip', items: '[{"title":"AI","message":"Szia","extra":{"kept":true}}]' },
+    { type: 'future-widget', title: 'Unknown raw roundtrip', items: '[{"title":"Future","extra":"kept"}]' },
+  ];
+  for (const block of roundTripCases) {
+    response = await fetch(`${base}/api/admin/blocks`, { method: 'POST', headers: { cookie, 'content-type': 'application/json' }, body: JSON.stringify({ page_id: editablePageId, type: block.type, title: block.title, body: 'Body', items: block.items, status: 'published', sort_order: 50 }) });
+    assert.equal(response.status, 200);
+    const saved = state.blocks.find((b) => b.title === block.title);
+    assert.equal(saved.type, block.type);
+    assert.deepEqual(JSON.parse(saved.items), JSON.parse(block.items));
+  }
+  response = await fetch(`${base}/api/admin/blocks`, { method: 'POST', headers: { cookie, 'content-type': 'application/json' }, body: JSON.stringify({ page_id: editablePageId, type: 'ai-preview', title: 'Invalid raw API', body: 'Body', items: '{bad json', status: 'published', sort_order: 60 }) });
+  assert.equal(response.status, 400);
   const pageEditorHtml = await (await fetch(`${base}/admin/pages/${editablePageId}`, { headers: { cookie } })).text();
   const renderedBeforeScript = pageEditorHtml.split('<script>')[0];
   const formForTitle = (title) => {
@@ -378,6 +468,8 @@ try {
   assert.doesNotMatch(textBlockHtml, /data-panel="items"/);
   for (const label of ['Gomb felirat', 'Gomb link', 'Kép URL', 'Alt text', 'Kép pozíció']) assert.doesNotMatch(textBlockHtml, new RegExp(label));
   const featureBlockHtml = formForTitle('Feature stale runtime');
+  assert.doesNotMatch(featureBlockHtml, /Rögzített megjelenési hely/);
+  assert.match(featureBlockHtml, /data-move-block="up" class="secondary">Blokk fel/);
   assert.match(featureBlockHtml, /data-panel="items"/);
   assert.match(featureBlockHtml, /Listaelem/);
   for (const label of ['Kártya szövege', 'Cél URL \/ slug', 'Link felirat', 'Sorrend \/ badge']) assert.doesNotMatch(featureBlockHtml, new RegExp(label));
@@ -392,7 +484,7 @@ try {
   assert.match(pageEditorHtml, /Bevezető szöveg/);
   assert.match(pageEditorHtml, /Haladó beállítások/);
   assert.match(pageEditorHtml, /SEO cím/);
-  assert.doesNotMatch(pageEditorHtml, /items JSON/);
+  assert.match(pageEditorHtml, /data-raw-items/);
   assert.doesNotMatch(pageEditorHtml, /Kis címke \/ szekció címe/);
   assert.match(pageEditorHtml, /Blokk típusa/);
   assert.match(pageEditorHtml, /Szövegblokk/);
@@ -431,11 +523,11 @@ try {
   assert.match(pageEditorHtml, /data-field=\"item-label\"/);
   assert.match(pageEditorHtml, /data-field=\"item-badge\"/);
   assert.match(pageEditorHtml, /i.disabled=!show/);
-  assert.match(pageEditorHtml, /type==='feature-list'\)items=rows.map\(i=>i.title\)/);
-  assert.match(pageEditorHtml, /type==='cards'\)items=rows.map\(i=>\(\{title:i.title,text:i.text,url:i.url,linkLabel/);
-  assert.match(pageEditorHtml, /type==='cta'\)items=\[\{label:f.querySelector/);
-  assert.match(pageEditorHtml, /type==='image-text'\)items=\[\{image:f.querySelector/);
-  assert.match(pageEditorHtml, /type==='faq'\)items=rows.map\(i=>\(\{question:i.title,answer:i.text\}/);
+  assert.match(pageEditorHtml, /serializeEditorItems\(\{type,rows:type==='cta'\|\|type==='image-text'\?panelValues:rowData/);
+  assert.match(pageEditorHtml, /function firstItem\(f\)/);
+  assert.match(pageEditorHtml, /first:firstItem\(f\)/);
+  assert.match(pageEditorHtml, /data-raw-item="\{\}"/);
+  assert.match(pageEditorHtml, /raw=parseItemRowRaw\(r\.dataset\.rawItem/);
   assert.match(pageEditorHtml, /const idInput=f.querySelector\('input\[name=\"id\"\]'\)/);
   assert.match(pageEditorHtml, /idInput\.value=String\(j.data.id\)/);
   assert.match(pageEditorHtml, /st.markSaved\(\)/);
@@ -474,7 +566,8 @@ for (const file of ['src/pages/index.astro','src/pages/arak/index.astro','src/pa
   assert.match(source, /getPublicPageState/);
   assert.match(source, /hiddenByDb/);
   assert.match(source, /Astro.response.status = 404/);
-  assert.doesNotMatch(source, /<ContentBlocks\b/);
+  if (file === 'src/pages/index.astro') assert.doesNotMatch(source, /<ContentBlocks\b/);
+  else assert.match(source, /ContentBlocks|remainingBlocks/);
 }
 const staleKeys = staleSeedKeys([
   { block_key: '/arak/:text:0' },
