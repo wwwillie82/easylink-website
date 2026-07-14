@@ -17,13 +17,26 @@ function processErrorSummary(result, fallback = 'FFmpeg hiba.') {
   return shortText(result?.stderr || result?.stdout || fallback);
 }
 function cleanProcessingError(message) { return shortText(message || 'Videó feldolgozási hiba.'); }
-export function runProcess(command, args, { timeoutMs = 120000 } = {}) {
+function parseFfmpegTimeSeconds(text) {
+  let match;
+  let latest = null;
+  const pattern = /time=(\d+):(\d+):(\d+(?:\.\d+)?)/g;
+  while ((match = pattern.exec(String(text || '')))) {
+    latest = Number(match[1]) * 3600 + Number(match[2]) * 60 + Number(match[3]);
+  }
+  return Number.isFinite(latest) ? latest : null;
+}
+function progressPercent(seconds, duration) {
+  if (!Number.isFinite(seconds) || !Number.isFinite(duration) || duration <= 0) return null;
+  return Math.max(1, Math.min(99, Math.floor((seconds / duration) * 100)));
+}
+export function runProcess(command, args, { timeoutMs = 120000, onStderr } = {}) {
   return new Promise((resolve) => {
     const child = spawn(command, args, { shell: false });
     let stdout = ''; let stderr = ''; let timedOut = false;
     const timer = setTimeout(() => { timedOut = true; child.kill('SIGKILL'); }, timeoutMs);
     child.stdout?.on('data', (d) => { stdout = appendOutput(stdout, d); });
-    child.stderr?.on('data', (d) => { stderr = appendOutput(stderr, d); });
+    child.stderr?.on('data', (d) => { stderr = appendOutput(stderr, d); onStderr?.(String(d)); });
     child.on('error', (error) => { clearTimeout(timer); resolve({ ok: false, code: -1, stdout, stderr: error.message, timedOut, timeoutMs }); });
     child.on('close', (code) => { clearTimeout(timer); resolve({ ok: code === 0 && !timedOut, code, stdout, stderr, timedOut, timeoutMs }); });
   });
@@ -45,9 +58,10 @@ export function ffmpegArgs(input, output, crf) {
 }
 export function chooseBestOutput({ originalSize, attempts }) { const valid = attempts.filter((a) => a.ok && a.size > 0).sort((a, b) => a.size - b.size || a.crf - b.crf); return valid[0] || null; }
 export function shouldTryCrf25({ originalSize, crf23Size }) { return crf23Size > originalSize * 0.25; }
-export async function transcodeVideo({ inputPath, outputPath, env = process.env, runner = runProcess, probe = probeVideo } = {}) {
+export async function transcodeVideo({ inputPath, outputPath, env = process.env, runner = runProcess, probe = probeVideo, onProgress } = {}) {
   const cfg = mediaConfig(env);
-  await probe(inputPath, { env, runner });
+  const inputMeta = await probe(inputPath, { env, runner });
+  onProgress?.({ processing_progress_percent: 0, processing_progress_message: 'Feldolgozás indult', duration_seconds: inputMeta.duration });
   const dir = path.dirname(outputPath); await mkdir(dir, { recursive: true });
   const tempDir = path.join(cfg.stagingRoot, 'worker-tmp'); await mkdir(tempDir, { recursive: true });
   const attempts = [];
@@ -58,7 +72,17 @@ export async function transcodeVideo({ inputPath, outputPath, env = process.env,
       const tmp = path.join(tempDir, `${path.basename(outputPath)}.${process.pid}.${Date.now()}.crf${crf}.tmp.mp4`);
       tempPaths.push(tmp);
       await removeFileQuietly(tmp);
-      const converted = await runner(cfg.ffmpegPath, ffmpegArgs(inputPath, tmp, crf), { timeoutMs });
+      const converted = await runner(cfg.ffmpegPath, ffmpegArgs(inputPath, tmp, crf), {
+        timeoutMs,
+        onStderr: (chunk) => {
+          const seconds = parseFfmpegTimeSeconds(chunk);
+          const percent = progressPercent(seconds, inputMeta.duration);
+          if (percent == null) return;
+          const minute = Math.floor(seconds / 60);
+          const totalMinute = Math.max(minute, Math.ceil(inputMeta.duration / 60));
+          onProgress?.({ processing_progress_percent: percent, processing_progress_message: `Konvertálás: ${percent}% (${minute}/${totalMinute} perc)`, duration_seconds: inputMeta.duration });
+        },
+      });
       if (!converted.ok) { if (converted.code === -1) throw ffmpegDiagnostic(cfg.ffmpegPath, 'ffmpeg'); attempts.push({ crf, ok: false, error: processErrorSummary(converted) }); await removeFileQuietly(tmp); }
       else {
         try { const meta = await probe(tmp, { env, runner }); const s = await stat(tmp); attempts.push({ crf, ok: true, path: tmp, size: s.size, meta }); }
@@ -69,6 +93,7 @@ export async function transcodeVideo({ inputPath, outputPath, env = process.env,
     const originalSize = (await stat(inputPath)).size;
     const best = chooseBestOutput({ originalSize, attempts });
     if (!best) throw new Error(attempts.find((a) => a.error)?.error || 'A videó feldolgozása sikertelen.');
+    onProgress?.({ processing_progress_percent: 99, processing_progress_message: 'Véglegesítés', duration_seconds: inputMeta.duration });
     await removeFileQuietly(outputPath);
     await rename(best.path, outputPath);
     return { originalSize, finalSize: best.size, crf: best.crf, duration: best.meta.duration, width: best.meta.width, height: best.meta.height, attempts };
@@ -78,19 +103,32 @@ export async function processOneMediaJob({ repo, env = process.env, runner = run
   const job = await repo.claimNextMediaProcessingJob();
   if (!job) return { ok: true, processed: false };
   const failJob = async (message, { keepOutput = false } = {}) => {
-    const cleanMessage = cleanProcessingError(message || 'Videó feldolgozási hiba.');
     if (!keepOutput) await removeFileQuietly(storagePathForPublicPath(job.path, env));
     try {
-      await repo.markMediaFailed(job.id, { processing_error: cleanMessage });
+      await repo.markMediaFailed(job.id, { processing_error: cleanProcessingError(message || 'Videó feldolgozási hiba.') });
       await removeFileQuietly(job.staging_path);
     } catch (dbError) {
-      return { ok: false, processed: true, id: job.id, error: dbError.message || cleanMessage, terminalStateSaved: false };
+      return { ok: false, processed: true, id: job.id, error: dbError.message || message, terminalStateSaved: false };
     }
-    return { ok: false, processed: true, id: job.id, error: cleanMessage, terminalStateSaved: true };
+    return { ok: false, processed: true, id: job.id, error: cleanProcessingError(message), terminalStateSaved: true };
   };
   const outputPath = storagePathForPublicPath(job.path, env);
+  let progressChain = Promise.resolve();
+  let lastPercent = -1;
+  let lastProgressAt = 0;
+  const saveProgress = (progress = {}) => {
+    const percent = Number(progress.processing_progress_percent);
+    const now = Date.now();
+    if (Number.isFinite(percent)) {
+      if (percent < lastPercent + 2 && now - lastProgressAt < 5000) return;
+      lastPercent = Math.max(lastPercent, percent);
+    } else if (now - lastProgressAt < 5000) return;
+    lastProgressAt = now;
+    progressChain = progressChain.then(() => repo.markMediaProgress(job.id, progress)).catch(() => {});
+  };
   try {
-    const result = await transcodeVideo({ inputPath: job.staging_path, outputPath, env, runner, probe });
+    const result = await transcodeVideo({ inputPath: job.staging_path, outputPath, env, runner, probe, onProgress: saveProgress });
+    await progressChain;
     try {
       await repo.markMediaReady(job.id, { original_size_bytes: result.originalSize, final_size_bytes: result.finalSize, duration_seconds: result.duration, width: result.width, height: result.height, processing_error: null });
       await removeFileQuietly(job.staging_path);
@@ -100,6 +138,7 @@ export async function processOneMediaJob({ repo, env = process.env, runner = run
       return await failJob(readyError.message || 'Videó ready állapot mentési hiba.', { keepOutput: true });
     }
   } catch (error) {
+    await progressChain;
     await removeFileQuietly(outputPath);
     return await failJob(error.message || 'Videó feldolgozási hiba.', { keepOutput: true });
   }
