@@ -46,6 +46,9 @@ td,th{border-bottom:1px solid #e2e8e2;padding:9px;text-align:left}
 .media-item img,.media-placeholder{display:block;width:100%;height:150px;object-fit:cover;border-radius:12px;background:#eef3ee}
 .media-item video{display:block;width:100%;height:150px;object-fit:contain;border-radius:12px;background:#000;max-width:100%;outline:0}
 .media-placeholder{display:grid;place-items:center;color:#59605f;font-weight:700;text-align:center}
+.media-progress{display:grid;gap:6px;border:1px solid #dfe6df;background:#f6f8f5;border-radius:12px;padding:8px;font-size:.86rem;color:#343b3a}
+.media-progress progress{width:100%;height:12px;accent-color:#0f1159}
+.media-progress span{overflow-wrap:anywhere}
 .media-item video:fullscreen{width:100vw!important;height:100vh!important;max-width:none!important;max-height:none!important;object-fit:contain!important;background:#000!important;border-radius:0!important}
 .media-item video:-webkit-full-screen{width:100vw!important;height:100vh!important;max-width:none!important;max-height:none!important;object-fit:contain!important;background:#000!important;border-radius:0!important}
 .media-item strong,.media-item span,.media-item label{min-width:0}
