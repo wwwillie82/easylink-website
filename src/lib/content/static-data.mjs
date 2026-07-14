@@ -15,8 +15,8 @@ export const staticPagesData = [
     { type: 'feature-list', title: 'Integrációs irányok', items: ['NAV Online Számla', 'Magyar bankok / PSD2 / Aggreg8', 'Hostware', 'Számlázz.hu', 'Billingo', 'Cégjelző'] },
     { type: 'cta', title: 'Kérj demót, és nézzük meg, hogyan illeszkedhet a működésedhez.', body: 'A pontos irány a moduloktól, integrációktól és a jelenlegi folyamataidtól függ.', items: [{ label: 'Demót kérek', url: '/kapcsolat/' }] },
   ] },
-  { route: '/megoldasaink/', slug: 'megoldasaink', type: 'solutions_index', title: 'Megoldásaink', seoTitle: 'Megoldásaink | Easylink', seoDescription: 'Easylink ügyviteli megoldások.', heroEyebrow: 'Megoldásaink', heroTitle: 'Egy rendszer a napi működés kulcspontjaira.', heroDescription: 'Moduláris ügyviteli irányok pénzügyre, CRM-re, dokumentumokra, kontrollingra és AI-ra.', heroAsset: '/assets/nati/hero-bg-flow-01.webp', status: 'published', sortOrder: 10, blocks: [
-    { type: 'cards', title: 'Megoldás lista', body: 'Valódi többoldalas struktúrában bemutatott, site admin szerkesztésre előkészített megoldások.', items: [
+  { route: '/megoldasaink/', slug: 'megoldasaink', type: 'solutions_index', title: 'Megoldásaink', seoTitle: 'Megoldásaink | Easylink', seoDescription: 'Easylink ügyviteli megoldások.', heroEyebrow: 'Megoldásaink', heroTitle: 'Egy rendszer a napi működés kulcspontjaira.', heroDescription: 'Válaszd ki, melyik működési területet szeretnéd átláthatóbbá tenni: pénzügy, HR, CRM, dokumentumkezelés, kontrolling vagy AI támogatás.', heroAsset: '/assets/nati/hero-bg-flow-01.webp', status: 'published', sortOrder: 10, blocks: [
+    { type: 'cards', title: 'Megoldás lista', body: 'Válaszd ki, melyik működési területet szeretnéd átláthatóbbá tenni: pénzügy, HR, CRM, dokumentumkezelés, kontrolling vagy AI támogatás.', items: [
       { title: 'Pénzügy és számlázás', text: 'Pénzügyi és számlázási folyamatok vezetői áttekintése.', url: '/megoldasaink/penzugy-szamlazas/' },
       { title: 'HR és Munkaügy', text: 'Munkaügyi feladatok és státuszok követhető rendszerezése.', url: '/megoldasaink/hr-munkaugy/' },
       { title: 'CRM és ügyfélkezelés', text: 'Ügyfélkapcsolati adatok és következő teendők rendezése.', url: '/megoldasaink/crm-ugyfelkezeles/' },
@@ -31,8 +31,8 @@ export const staticPagesData = [
   detail('megoldasaink', 'dokumentumkezeles-adminisztracio', 'solution_detail', 'Dokumentumkezelés és adminisztráció', 14),
   detail('megoldasaink', 'kontrolling', 'solution_detail', 'Kontrolling', 15),
   detail('megoldasaink', 'ai-asszisztens', 'solution_detail', 'EasyLink AI Asszisztens', 16),
-  { route: '/kinek-szol/', slug: 'kinek-szol', type: 'audiences_index', title: 'Kinek szól?', seoTitle: 'Kinek szól? | Easylink', seoDescription: 'Easylink célcsoportok.', heroEyebrow: 'Kinek szól?', heroTitle: 'Iparági fókusz, admin-kompatibilis tartalommal.', heroDescription: 'Iparági fókuszú ügyviteli struktúrák.', heroAsset: '/assets/nati/hero-bg-flow-02.webp', status: 'published', sortOrder: 20, blocks: [
-    { type: 'cards', title: 'Célcsoportok', body: 'A public site külön route-okon mutatja be, mely vállalkozásoknak ad könnyebb cégvezetést az Easylink.', items: [
+  { route: '/kinek-szol/', slug: 'kinek-szol', type: 'audiences_index', title: 'Kinek szól?', seoTitle: 'Kinek szól? | Easylink', seoDescription: 'Easylink célcsoportok.', heroEyebrow: 'Kinek szól?', heroTitle: 'Ügyvitel a vállalkozásod működéséhez igazítva.', heroDescription: 'Az Easylink különböző működési modellekhez igazítható: szálláshelyeknek, vendéglátóhelyeknek és szolgáltató vállalkozásoknak.', heroAsset: '/assets/nati/hero-bg-flow-02.webp', status: 'published', sortOrder: 20, blocks: [
+    { type: 'cards', title: 'Célcsoportok', body: 'Az Easylink különböző működési modellekhez igazítható: szálláshelyeknek, vendéglátóhelyeknek és szolgáltató vállalkozásoknak.', items: [
       { title: 'Hoteleknek és szálláshelyeknek', text: 'Vendég-, pénzügyi és adminisztrációs folyamatok átláthatóbb működéséhez.', url: '/kinek-szol/hotelek-szallashelyek/' },
       { title: 'Vendéglátóhelyeknek', text: 'Egyszerűbb háttéradminisztráció és vezetői kontroll vendéglátásban.', url: '/kinek-szol/vendeglatohelyek/' },
       { title: 'Szolgáltató vállalkozásoknak', text: 'Ügyfélkezelés, dokumentumok és pénzügyi státuszok összehangolása.', url: '/kinek-szol/szolgaltato-vallalkozasok/' },
@@ -57,7 +57,7 @@ export const staticPagesData = [
     { type: 'cta', title: 'Demó alapján pontosítunk', body: 'A public oldalon nem közlünk csomagárat. Demó során a modulokat, a cégméretet és az integrációs előkészítést együtt mérjük fel.', items: [{ label: 'Demót kérek', url: '/kapcsolat/' }] },
   ] },
   { route: '/kapcsolat/', slug: 'kapcsolat', type: 'contact', title: 'Kapcsolat', seoTitle: 'Kapcsolat | Easylink', seoDescription: 'Kapcsolatfelvétel Easylink bevezetéshez.', heroEyebrow: 'Kapcsolat', heroTitle: 'Kapcsolódjunk össze.', heroDescription: 'Kérj bemutatót vagy egyeztetést az Easylink bevezetési lehetőségeiről.', heroAsset: '/assets/nati/hero-bg-flow-03.webp', status: 'published', sortOrder: 50, blocks: [
-    { type: 'cta', title: 'Kapcsolat', body: 'Email: hello@easylink.hu', items: [{ label: 'Demót kérek', url: 'https://deploy.easylink.hu' }] },
+    { type: 'cta', title: 'Kapcsolat', body: 'Email: hello@easylink.hu', items: [{ label: 'Írj nekünk', url: 'mailto:hello@easylink.hu' }] },
     { type: 'feature-list', title: 'Miben tudunk segíteni?', items: ['Megnézzük, mely modulok illenek a jelenlegi működésedhez.', 'Átbeszéljük a hotel/szálláshely, vendéglátó vagy szolgáltatói fókuszt.', 'Összegyűjtjük, milyen integrációs irányokat érdemes előkészíteni.'] },
   ] },
 ];

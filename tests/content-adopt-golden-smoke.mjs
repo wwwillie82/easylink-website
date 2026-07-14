@@ -14,6 +14,14 @@ assert.ok(routes.includes('/arak/'));
 assert.ok(routes.includes('/kapcsolat/'));
 assert.ok(routes.includes('/'));
 
+const forbiddenPublicCopy = /src\/content|golden forrás|admin-kompatibilis/i;
+for (const entry of manifest) {
+  for (const block of entry.blocks) {
+    assert.doesNotMatch(`${block.title ?? ''} ${block.body ?? ''}`, forbiddenPublicCopy, `${entry.route} block copy must be public-facing`);
+  }
+  assert.doesNotMatch(`${entry.page.heroTitle ?? ''} ${entry.page.heroDescription ?? ''}`, forbiddenPublicCopy, `${entry.route} hero copy must be public-facing`);
+}
+
 const penzugy = manifest.find((e) => e.route === '/megoldasaink/penzugy-szamlazas/');
 assert.equal(penzugy.blocks.length, 4);
 assert.equal(penzugy.blocks[0].title, 'Mire jó?');
@@ -28,6 +36,8 @@ assert.equal(solutionsIndex.blocks[0].type, 'cards');
 assert.equal(solutionsIndex.blocks[0].items.length, 6);
 assert.deepEqual(solutionsIndex.blocks[0].items.map((i) => i.url), manifest.filter((e) => e.group === 'solutions' && e.route !== '/megoldasaink/').map((e) => e.route));
 assert.match(JSON.stringify(solutionsIndex.blocks[0]), /Pénzügy és számlázás/);
+assert.match(solutionsIndex.page.heroDescription, /Válaszd ki, melyik működési területet/);
+assert.match(solutionsIndex.blocks[0].body, /Válaszd ki, melyik működési területet/);
 
 const audiencesIndex = manifest.find((e) => e.route === '/kinek-szol/');
 assert.equal(audiencesIndex.applyAllowed, true);
@@ -35,6 +45,8 @@ assert.equal(audiencesIndex.blocks[0].type, 'cards');
 assert.equal(audiencesIndex.blocks[0].items.length, 3);
 assert.deepEqual(audiencesIndex.blocks[0].items.map((i) => i.url), manifest.filter((e) => e.group === 'audiences' && e.route !== '/kinek-szol/').map((e) => e.route));
 assert.match(JSON.stringify(audiencesIndex.blocks[0]), /Hoteleknek és szálláshelyeknek/);
+assert.match(audiencesIndex.page.heroTitle, /Ügyvitel a vállalkozásod működéséhez/);
+assert.match(audiencesIndex.blocks[0].body, /különböző működési modellekhez igazítható/);
 
 const integrationsIndex = manifest.find((e) => e.route === '/integraciok/');
 assert.equal(integrationsIndex.applyAllowed, true);

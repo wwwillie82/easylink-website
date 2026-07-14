@@ -85,9 +85,9 @@ function indexCards(items, section) {
 function solutionsIndexManifest(solutions) {
   return {
     group: 'solutions', route: '/megoldasaink/', applyAllowed: true, requiresApproval: true,
-    page: { title: 'Megoldásaink', slug: 'megoldasaink', type: 'solutions_index', seoTitle: 'Megoldásaink | Easylink', seoDescription: 'Easylink ügyviteli megoldások.', heroEyebrow: 'Megoldásaink', heroTitle: 'Egy rendszer a napi működés kulcspontjaira.', heroDescription: 'Moduláris ügyviteli irányok pénzügyre, CRM-re, dokumentumokra, kontrollingra és AI-ra.', heroAsset: '/assets/nati/hero-bg-flow-01.webp' },
+    page: { title: 'Megoldásaink', slug: 'megoldasaink', type: 'solutions_index', seoTitle: 'Megoldásaink | Easylink', seoDescription: 'Easylink ügyviteli megoldások.', heroEyebrow: 'Megoldásaink', heroTitle: 'Egy rendszer a napi működés kulcspontjaira.', heroDescription: 'Válaszd ki, melyik működési területet szeretnéd átláthatóbbá tenni: pénzügy, HR, CRM, dokumentumkezelés, kontrolling vagy AI támogatás.', heroAsset: '/assets/nati/hero-bg-flow-01.webp' },
     blocks: [
-      { type: 'cards', title: 'Megoldásaink', body: 'Publikált megoldáskártyák a src/content/solutions.ts golden forrásból.', items: indexCards(solutions, 'megoldasaink'), sort_order: 10, status: 'published' },
+      { type: 'cards', title: 'Megoldásaink', body: 'Válaszd ki, melyik működési területet szeretnéd átláthatóbbá tenni: pénzügy, HR, CRM, dokumentumkezelés, kontrolling vagy AI támogatás.', items: indexCards(solutions, 'megoldasaink'), sort_order: 10, status: 'published' },
     ],
   };
 }
@@ -95,9 +95,9 @@ function solutionsIndexManifest(solutions) {
 function audiencesIndexManifest(audiences) {
   return {
     group: 'audiences', route: '/kinek-szol/', applyAllowed: true, requiresApproval: true,
-    page: { title: 'Kinek szól?', slug: 'kinek-szol', type: 'audiences_index', seoTitle: 'Kinek szól? | Easylink', seoDescription: 'Easylink célcsoportok.', heroEyebrow: 'Kinek szól?', heroTitle: 'Iparági fókusz, admin-kompatibilis tartalommal.', heroDescription: 'Iparági fókuszú ügyviteli struktúrák.', heroAsset: '/assets/nati/hero-bg-flow-02.webp' },
+    page: { title: 'Kinek szól?', slug: 'kinek-szol', type: 'audiences_index', seoTitle: 'Kinek szól? | Easylink', seoDescription: 'Easylink célcsoportok.', heroEyebrow: 'Kinek szól?', heroTitle: 'Ügyvitel a vállalkozásod működéséhez igazítva.', heroDescription: 'Az Easylink különböző működési modellekhez igazítható: szálláshelyeknek, vendéglátóhelyeknek és szolgáltató vállalkozásoknak.', heroAsset: '/assets/nati/hero-bg-flow-02.webp' },
     blocks: [
-      { type: 'cards', title: 'Kinek szól?', body: 'Publikált célcsoportkártyák a src/content/audiences.ts golden forrásból.', items: indexCards(audiences, 'kinek-szol'), sort_order: 10, status: 'published' },
+      { type: 'cards', title: 'Kinek szól?', body: 'Az Easylink különböző működési modellekhez igazítható: szálláshelyeknek, vendéglátóhelyeknek és szolgáltató vállalkozásoknak.', items: indexCards(audiences, 'kinek-szol'), sort_order: 10, status: 'published' },
     ],
   };
 }

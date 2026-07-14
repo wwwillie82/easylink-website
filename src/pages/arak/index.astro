@@ -7,6 +7,11 @@ import Footer from '@/components/Footer.astro';
 import { getPublicPageState } from '@/lib/content/provider';
 const pageState = await getPublicPageState('/arak/');
 const page = pageState.page;
+const featureBlock = page?.blocks?.find((block) => block.type === 'feature-list');
+const textBlock = page?.blocks?.find((block) => block.type === 'text');
+const ctaBlock = page?.blocks?.find((block) => block.type === 'cta');
+const priceFeatures = featureBlock?.items?.length ? featureBlock.items : ['Választott moduloktól: pénzügy, CRM, dokumentumkezelés, kontrolling vagy AI irány.', 'Cégmérettől, felhasználói köröktől és adminisztrációs összetettségtől.', 'Előkészített vagy később bizonyított integrációktól.', 'Bevezetési, adat-előkészítési és támogatási igényektől.'];
+const ctaItem = ctaBlock?.items?.[0];
 if (pageState.hiddenByDb) Astro.response.status = 404;
 ---
 
@@ -31,25 +36,19 @@ if (pageState.hiddenByDb) Astro.response.status = 404;
     <section class="section light">
       <div class="container price-grid">
         <article class="card polished">
-          <h2>Mitől függhet az ár?</h2>
+          <h2>{featureBlock?.title ?? 'Mitől függhet az ár?'}</h2>
           <ul>
-            <li>Választott moduloktól: pénzügy, CRM, dokumentumkezelés, kontrolling vagy AI irány.</li>
-            <li>Cégmérettől, felhasználói köröktől és adminisztrációs összetettségtől.</li>
-            <li>Előkészített vagy később bizonyított integrációktól.</li>
-            <li>Bevezetési, adat-előkészítési és támogatási igényektől.</li>
+            {priceFeatures.map((item) => <li>{item}</li>)}
           </ul>
         </article>
         <article class="card polished placeholder">
           <span class="eyebrow">Ajánlatkérés</span>
-          <h2>Demó alapján pontosítunk</h2>
-          <p>
-            A public oldalon nem közlünk csomagárat. Demó során a modulokat, a cégméretet
-            és az integrációs előkészítést együtt mérjük fel.
-          </p>
+          <h2>{textBlock?.title ?? 'Demó alapján pontosítunk'}</h2>
+          <p>{textBlock?.body ?? 'A public oldalon nem közlünk csomagárat. Demó során a modulokat, a cégméretet és az integrációs előkészítést együtt mérjük fel.'}</p>
         </article>
       </div>
     </section>
-    <CTASection title="Kérj demót, és beszéljük át a modulokat." description="A pontos ajánlat a választott funkcióktól, cégmérettől és integrációs igényektől függ." />
+    <CTASection title={ctaBlock?.title ?? "Kérj demót, és beszéljük át a modulokat."} description={ctaBlock?.body ?? "A pontos ajánlat a választott funkcióktól, cégmérettől és integrációs igényektől függ."} primaryLabel={ctaItem?.label ?? "Demót kérek"} />
     </>}
   </main>
   <Footer />
