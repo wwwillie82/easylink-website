@@ -27,7 +27,15 @@ const repo = {
 };
 
 function reqFromChunks(chunks, boundary) { const r = Readable.from(chunks); r.headers = { 'content-type': `multipart/form-data; boundary=${boundary}` }; return r; }
-function multipartBody(boundary, { secondFile = false } = {}) { return Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="alt"\r\n\r\nAlt\r\n--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="video.mp4"\r\nContent-Type: video/mp4\r\n\r\n${mp4.toString('binary')}\r\n${secondFile ? `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="x.mp4"\r\nContent-Type: video/mp4\r\n\r\nx\r\n` : ''}--${boundary}--\r\n`, 'binary'); }
+function multipartPart(boundary, headers, content) { return `--${boundary}\r\n${headers}\r\n\r\n${content}\r\n`; }
+function multipartBody(boundary, { includeAlt = true, secondFile = false, extraRawPart = false } = {}) {
+  let payload = '';
+  if (includeAlt) payload += multipartPart(boundary, 'Content-Disposition: form-data; name="alt"', 'Alt');
+  payload += multipartPart(boundary, 'Content-Disposition: form-data; name="file"; filename="video.mp4"\r\nContent-Type: video/mp4', mp4.toString('binary'));
+  if (secondFile) payload += multipartPart(boundary, 'Content-Disposition: form-data; name="file"; filename="x.mp4"\r\nContent-Type: video/mp4', 'x');
+  if (extraRawPart) payload += multipartPart(boundary, 'Content-Type: application/octet-stream', 'extra');
+  return Buffer.from(`${payload}--${boundary}--\r\n`, 'binary');
+}
 const boundary = 'AaB03x';
 const body = multipartBody(boundary);
 const chunked = await parseMediaMultipart(reqFromChunks(Array.from({ length: Math.ceil(body.length / 2) }, (_, i) => body.subarray(i * 2, i * 2 + 2)), boundary), { env, maxBytes: 4096 });
@@ -45,6 +53,15 @@ const abortPromise = parseMediaMultipart(abortReq, { env, maxBytes: 4096 });
 abortReq.emit('aborted');
 await assert.rejects(() => withTimeout(abortPromise), /Megszakadt|aborted|Médiafájl/);
 await rm(env.SITE_MEDIA_STAGING_DIR, { recursive: true, force: true });
+const fileOnlyBody = multipartBody(boundary, { includeAlt: false });
+const fileOnly = await parseMediaMultipart(reqFromChunks([fileOnlyBody], boundary), { env, maxBytes: 4096 });
+assert.deepEqual(fileOnly.fields, {});
+assert.equal(fileOnly.file.contentType, 'video/mp4');
+assert.equal(existsSync(fileOnly.file.stagingPath), true);
+await rm(env.SITE_MEDIA_STAGING_DIR, { recursive: true, force: true });
+const extraPartBody = multipartBody(boundary, { extraRawPart: true });
+await assert.rejects(() => parseMediaMultipart(reqFromChunks([extraPartBody], boundary), { env, maxBytes: 4096 }), (error) => error.code === 'MEDIA_TOO_MANY_PARTS');
+assert.equal(await fileCount(env.SITE_MEDIA_STAGING_DIR), 0);
 const delayedFactory = async (name, e) => { await new Promise((r) => setTimeout(r, 25)); return join(e.SITE_MEDIA_STAGING_DIR, `delayed-${name}`); };
 const abortInitReq = reqFromChunks([body], boundary);
 const abortInit = parseMediaMultipart(abortInitReq, { env, maxBytes: 4096, stagingPathFactory: delayedFactory });
