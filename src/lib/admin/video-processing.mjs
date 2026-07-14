@@ -4,20 +4,34 @@ import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { mediaConfig, removeFileQuietly, storagePathForPublicPath } from './media-storage.mjs';
 
+const PROCESS_OUTPUT_LIMIT = 250_000;
+const PROCESS_ERROR_PREVIEW_LIMIT = 600;
+const DEFAULT_FFMPEG_TIMEOUT_MS = 900_000;
+
 export function ffmpegDiagnostic(binary, label) { const e = new Error(`${label} nem érhető el vagy nem futtatható: ${binary}. Telepítsd az FFmpeg 6.1.1 csomagot, vagy állítsd be a megfelelő env útvonalat.`); e.code = `${label.toUpperCase()}_MISSING`; return e; }
+export function processTimeoutMs(env = process.env) { const n = Number(env.SITE_MEDIA_FFMPEG_TIMEOUT_MS || DEFAULT_FFMPEG_TIMEOUT_MS); return Number.isFinite(n) && n > 0 ? n : DEFAULT_FFMPEG_TIMEOUT_MS; }
+function appendOutput(current, chunk) { const next = `${current}${chunk}`; return next.length > PROCESS_OUTPUT_LIMIT ? next.slice(-PROCESS_OUTPUT_LIMIT) : next; }
+function shortText(value, max = PROCESS_ERROR_PREVIEW_LIMIT) { const text = String(value || '').replace(/\s+/g, ' ').trim(); return text.length > max ? `${text.slice(0, max)}…` : text; }
+function processErrorSummary(result, fallback = 'FFmpeg hiba.') {
+  if (result?.timedOut) return `A videó feldolgozása túllépte az időkorlátot (${Math.round((result.timeoutMs || 0) / 60000)} perc). A fájl feltölthető volt, de a transzkódolás nem fejeződött be időben.`;
+  return shortText(result?.stderr || result?.stdout || fallback);
+}
+function cleanProcessingError(message) { return shortText(message || 'Videó feldolgozási hiba.'); }
 export function runProcess(command, args, { timeoutMs = 120000 } = {}) {
   return new Promise((resolve) => {
     const child = spawn(command, args, { shell: false });
-    let stdout = ''; let stderr = ''; const timer = setTimeout(() => child.kill('SIGKILL'), timeoutMs);
-    child.stdout?.on('data', (d) => { stdout += d; }); child.stderr?.on('data', (d) => { stderr += d; });
-    child.on('error', (error) => { clearTimeout(timer); resolve({ ok: false, code: -1, stdout, stderr: error.message }); });
-    child.on('close', (code) => { clearTimeout(timer); resolve({ ok: code === 0, code, stdout, stderr }); });
+    let stdout = ''; let stderr = ''; let timedOut = false;
+    const timer = setTimeout(() => { timedOut = true; child.kill('SIGKILL'); }, timeoutMs);
+    child.stdout?.on('data', (d) => { stdout = appendOutput(stdout, d); });
+    child.stderr?.on('data', (d) => { stderr = appendOutput(stderr, d); });
+    child.on('error', (error) => { clearTimeout(timer); resolve({ ok: false, code: -1, stdout, stderr: error.message, timedOut, timeoutMs }); });
+    child.on('close', (code) => { clearTimeout(timer); resolve({ ok: code === 0 && !timedOut, code, stdout, stderr, timedOut, timeoutMs }); });
   });
 }
 export async function probeVideo(filePath, { env = process.env, runner = runProcess } = {}) {
   const cfg = mediaConfig(env);
   const result = await runner(cfg.ffprobePath, ['-v', 'error', '-print_format', 'json', '-show_format', '-show_streams', filePath]);
-  if (!result.ok) { if (result.code === -1) throw ffmpegDiagnostic(cfg.ffprobePath, 'ffprobe'); throw new Error(`Az ffprobe nem tudta olvasni a videót: ${result.stderr || result.stdout || 'ismeretlen hiba'}`); }
+  if (!result.ok) { if (result.code === -1) throw ffmpegDiagnostic(cfg.ffprobePath, 'ffprobe'); throw new Error(`Az ffprobe nem tudta olvasni a videót: ${processErrorSummary(result, 'ismeretlen hiba')}`); }
   let data; try { data = JSON.parse(result.stdout || '{}'); } catch { throw new Error('Az ffprobe érvénytelen JSON választ adott.'); }
   const video = (data.streams || []).find((s) => s.codec_type === 'video');
   if (!video) throw new Error('A feltöltött MP4 nem tartalmaz videó streamet.');
@@ -38,16 +52,17 @@ export async function transcodeVideo({ inputPath, outputPath, env = process.env,
   const tempDir = path.join(cfg.stagingRoot, 'worker-tmp'); await mkdir(tempDir, { recursive: true });
   const attempts = [];
   const tempPaths = [];
+  const timeoutMs = processTimeoutMs(env);
   try {
     for (const crf of [23, 25]) {
       const tmp = path.join(tempDir, `${path.basename(outputPath)}.${process.pid}.${Date.now()}.crf${crf}.tmp.mp4`);
       tempPaths.push(tmp);
       await removeFileQuietly(tmp);
-      const converted = await runner(cfg.ffmpegPath, ffmpegArgs(inputPath, tmp, crf));
-      if (!converted.ok) { if (converted.code === -1) throw ffmpegDiagnostic(cfg.ffmpegPath, 'ffmpeg'); attempts.push({ crf, ok: false, error: converted.stderr || converted.stdout || 'FFmpeg hiba.' }); await removeFileQuietly(tmp); }
+      const converted = await runner(cfg.ffmpegPath, ffmpegArgs(inputPath, tmp, crf), { timeoutMs });
+      if (!converted.ok) { if (converted.code === -1) throw ffmpegDiagnostic(cfg.ffmpegPath, 'ffmpeg'); attempts.push({ crf, ok: false, error: processErrorSummary(converted) }); await removeFileQuietly(tmp); }
       else {
         try { const meta = await probe(tmp, { env, runner }); const s = await stat(tmp); attempts.push({ crf, ok: true, path: tmp, size: s.size, meta }); }
-        catch (error) { attempts.push({ crf, ok: false, error: error.message }); await removeFileQuietly(tmp); }
+        catch (error) { attempts.push({ crf, ok: false, error: cleanProcessingError(error.message) }); await removeFileQuietly(tmp); }
       }
       if (crf === 23) { const first = attempts.at(-1); if (!first?.ok || !shouldTryCrf25({ originalSize: (await stat(inputPath)).size, crf23Size: first.size })) break; }
     }
@@ -63,14 +78,15 @@ export async function processOneMediaJob({ repo, env = process.env, runner = run
   const job = await repo.claimNextMediaProcessingJob();
   if (!job) return { ok: true, processed: false };
   const failJob = async (message, { keepOutput = false } = {}) => {
+    const cleanMessage = cleanProcessingError(message || 'Videó feldolgozási hiba.');
     if (!keepOutput) await removeFileQuietly(storagePathForPublicPath(job.path, env));
     try {
-      await repo.markMediaFailed(job.id, { processing_error: message || 'Videó feldolgozási hiba.' });
+      await repo.markMediaFailed(job.id, { processing_error: cleanMessage });
       await removeFileQuietly(job.staging_path);
     } catch (dbError) {
-      return { ok: false, processed: true, id: job.id, error: dbError.message || message, terminalStateSaved: false };
+      return { ok: false, processed: true, id: job.id, error: dbError.message || cleanMessage, terminalStateSaved: false };
     }
-    return { ok: false, processed: true, id: job.id, error: message, terminalStateSaved: true };
+    return { ok: false, processed: true, id: job.id, error: cleanMessage, terminalStateSaved: true };
   };
   const outputPath = storagePathForPublicPath(job.path, env);
   try {
