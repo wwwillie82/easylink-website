@@ -9,6 +9,9 @@ import { publishedIntegrations } from '@/content/integrations';
 import { getPublicPageState } from '@/lib/content/provider';
 const pageState = await getPublicPageState('/integraciok/');
 const page = pageState.page;
+const textBlocks = page?.blocks?.filter((block) => block.type === 'text') ?? [];
+const introBlock = textBlocks.find((block) => block.title === 'Csomópontok') ?? textBlocks[0];
+const importantBlock = textBlocks.find((block) => block.title === 'Fontos keret') ?? textBlocks.find((block) => block !== introBlock);
 const cardsBlock = page?.blocks?.find((block) => ['cards', 'card-grid'].includes(block.type));
 const integrationCards = cardsBlock?.items?.length ? cardsBlock.items : publishedIntegrations.map((item) => ({ title: item.title, text: item.shortDescription, order: item.order, status: item.status }));
 if (pageState.hiddenByDb) Astro.response.status = 404;
@@ -34,11 +37,17 @@ if (pageState.hiddenByDb) Astro.response.status = 404;
     />
     <section class="section light network-section">
       <div class="container intro">
-        <span class="eyebrow">Csomópontok</span>
-        <h2>Nem késznek állított ígéretek, hanem tisztán tagolt integrációs irányok.</h2>
+        <span class="eyebrow">{introBlock?.title ?? 'Csomópontok'}</span>
+        <h2>{introBlock?.body ?? 'Nem késznek állított ígéretek, hanem tisztán tagolt integrációs irányok.'}</h2>
       </div>
       <div class="container">
         <ListingCards items={integrationCards} />
+      </div>
+      <div class="container">
+        <article class="important card">
+          <span class="eyebrow">{importantBlock?.title ?? 'Fontos keret'}</span>
+          <p>{importantBlock?.body ?? 'A public tartalom integrációs irányokat és előkészített kapcsolódásokat mutat be; kész éles kapcsolatot csak bizonyított implementáció után kommunikálunk.'}</p>
+        </article>
       </div>
     </section>
     <CTASection />
@@ -52,4 +61,6 @@ if (pageState.hiddenByDb) Astro.response.status = 404;
   .network-section { background: linear-gradient(180deg, #f6f8f5, #fff); }
   .intro { margin-bottom: 28px; }
   .intro h2 { max-width: 920px; color: var(--color-navy); font-size: clamp(1.65rem, 2.5vw, 2.4rem); }
+  .important { margin-top: 28px; padding: 28px; border-radius: 24px; background: #fff; box-shadow: 0 20px 60px rgba(15,17,89,.09); }
+  .important p { max-width: 920px; color: var(--color-navy); font-weight: 700; }
 </style>

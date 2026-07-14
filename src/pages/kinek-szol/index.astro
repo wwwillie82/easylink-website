@@ -9,6 +9,8 @@ import { publishedAudiences } from '@/content/audiences';
 import { getPublicPageState } from '@/lib/content/provider';
 const pageState = await getPublicPageState('/kinek-szol/');
 const page = pageState.page;
+const cardsBlock = page?.blocks?.find((block) => ['cards', 'card-grid'].includes(block.type));
+const audienceCards = cardsBlock?.items?.length ? cardsBlock.items : publishedAudiences;
 if (pageState.hiddenByDb) Astro.response.status = 404;
 ---
 
@@ -32,7 +34,7 @@ if (pageState.hiddenByDb) Astro.response.status = 404;
     />
     <section class="section light">
       <div class="container">
-        <ListingCards items={publishedAudiences} basePath="/kinek-szol/" />
+        <ListingCards items={audienceCards} basePath="/kinek-szol/" />
       </div>
     </section>
     <CTASection />
