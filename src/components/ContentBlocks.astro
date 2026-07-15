@@ -3,6 +3,7 @@ import { normalizePublicHref, publicHrefRel, publicHrefTarget } from '@/lib/cont
 import ListingCards from '@/components/ListingCards.astro';
 import VideoMedia from '@/components/VideoMedia.astro';
 import AiPreviewBlock from '@/components/AiPreviewBlock.astro';
+import NetworkVisualBlock from '@/components/NetworkVisualBlock.astro';
 const { blocks = [] } = Astro.props;
 const blockLabels = {
   text: 'Tartalom',
@@ -44,6 +45,9 @@ const linkAttrs = (value) => { const href = normalizePublicHref(value); return {
       }
       if (type === 'ai-preview') {
         return <AiPreviewBlock block={block} />;
+      }
+      if (type === 'network-visual') {
+        return <NetworkVisualBlock block={block} />;
       }
       if (type === 'video') {
         const video = items[0] ?? null;
