@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS site_pages (
   hero_title VARCHAR(255) NULL,
   hero_description TEXT NULL,
   hero_asset VARCHAR(512) NULL,
+  hero_video JSON NULL,
   hero_height VARCHAR(32) NULL,
   hero_image_fit VARCHAR(32) NULL,
   hero_image_position_x TINYINT UNSIGNED NULL,
@@ -112,3 +113,5 @@ ALTER TABLE site_pages ADD COLUMN IF NOT EXISTS hero_image_position_mobile_x TIN
 ALTER TABLE site_pages ADD COLUMN IF NOT EXISTS hero_image_position_mobile_y TINYINT UNSIGNED NULL;
 ALTER TABLE site_pages ADD COLUMN IF NOT EXISTS hero_overlay_strength VARCHAR(32) NULL;
 ALTER TABLE site_pages ADD COLUMN IF NOT EXISTS hero_image_scale TINYINT UNSIGNED NULL;
+
+ALTER TABLE site_pages ADD COLUMN IF NOT EXISTS hero_video JSON NULL;

@@ -3,6 +3,7 @@ import { integrations } from '@/content/integrations';
 import { publishedSolutions, solutions } from '@/content/solutions';
 import { siteNavigation } from '@/content/siteNavigation';
 import type { ContentBlock, ContentStatus, PublicContentItem } from '@/content/types';
+import type { VideoConfig } from '@/content/types';
 
 export type SitePageType = 'home' | 'solutions_index' | 'solution_detail' | 'audiences_index' | 'audience_detail' | 'integrations' | 'pricing' | 'contact';
 
@@ -18,6 +19,7 @@ export type SitePage = {
   heroTitle: string;
   heroDescription: string;
   heroAsset: string;
+  heroVideo?: VideoConfig | null;
   heroHeight?: string;
   heroImageFit?: string;
   heroImagePositionX?: number;

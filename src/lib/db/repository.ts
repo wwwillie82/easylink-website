@@ -1,5 +1,6 @@
 import type { ContentBlock } from '@/content/types';
 import type { SitePage } from '@/lib/content/static';
+import { safeParseVideoConfig } from '@/lib/content/video.mjs';
 
 type Pool = { query(sql: string, params?: unknown[]): Promise<[any[], unknown]>; execute(sql: string, params?: unknown[]): Promise<[any, unknown]>; end?: () => Promise<void> };
 
@@ -22,6 +23,7 @@ export function mapPageRow(row: any, blocks: any[] = []): SitePage {
     heroTitle: row.hero_title ?? row.title,
     heroDescription: row.hero_description ?? '',
     heroAsset: row.hero_asset ?? '',
+    heroVideo: safeParseVideoConfig(row.hero_video, { context: 'hero' }) ?? undefined,
     heroHeight: row.hero_height ?? undefined,
     heroImageFit: row.hero_image_fit ?? undefined,
     heroImagePositionX: row.hero_image_position_x ?? undefined,
