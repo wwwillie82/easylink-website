@@ -24,7 +24,8 @@
     "smoke:media-video": "node tests/media-video-smoke.mjs",
     "smoke:video-content": "node tests/video-content-smoke.mjs",
     "smoke:video-regressions": "node tests/video-regressions-smoke.mjs",
-    "smoke:video-admin-runtime": "node tests/video-admin-runtime-smoke.mjs"
+    "smoke:video-admin-runtime": "node tests/video-admin-runtime-smoke.mjs && node tests/video-draft-guard-smoke.mjs",
+    "smoke:video-final": "node tests/video-final-smoke.mjs"
   },
   "dependencies": {
     "astro": "7.0.5",
