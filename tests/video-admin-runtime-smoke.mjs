@@ -6,6 +6,7 @@ import {
   serializeVideoEditorValues,
   setVideoEditorVisible,
   syncVideoSource,
+  syncVideoUiState,
   writeVideoItemsInput,
 } from '../src/lib/admin/render/blocks.mjs';
 
@@ -90,10 +91,20 @@ function activateType(form, type) {
 }
 function changeSource(form, source) {
   form.querySelector('[data-video-source]').value = source;
-  syncVideoSource(form, setVideoEditorVisible);
+  syncVideoUiState(form, setVideoEditorVisible);
   form.dataset.itemsTouched = 'true';
   writeVideoItemsInput(form);
 }
+
+
+const legacyForm = new FakeForm();
+legacyForm.addVideoPanel();
+hydrateVideoPanel(legacyForm, { sourceType: 'media', mediaPath: '/assets/site-media/2026/07/ready.mp4', autoplay: false, controls: false, muted: false }, setVideoEditorVisible);
+assert.equal(legacyForm.querySelector('[data-video-autoplay]').checked, false);
+assert.equal(legacyForm.querySelector('[data-video-controls]').checked, true);
+const legacyValues = readVideoEditorValues(legacyForm);
+assert.equal(legacyValues.controls, true);
+assert.equal(serializeVideoEditorValues(legacyValues).controls, true);
 
 const form = new FakeForm();
 assert.equal(form.videoPanels.length, 0);

@@ -8,7 +8,7 @@ const MEDIA_PATH = /^\/assets\/site-media\/[A-Za-z0-9/_-]+\.[A-Za-z0-9]+$/;
 
 export const imageMimeTypes = new Set(['image/webp', 'image/jpeg', 'image/png']);
 export const videoMimeTypes = new Set(['video/mp4']);
-export const videoDefaults = Object.freeze({ sourceType: 'media', autoplay: false, muted: false, loop: false, controls: true, preload: 'metadata', objectFit: 'cover', aspectRatio: '16/9' });
+export const videoDefaults = Object.freeze({ sourceType: 'media', autoplay: false, muted: true, loop: false, controls: true, preload: 'metadata', objectFit: 'cover', aspectRatio: '16/9' });
 
 export function booleanValue(value, fallback = false) {
   if (value === true || value === 'true' || value === 'on' || value === '1' || value === 1) return true;
@@ -65,14 +65,13 @@ export function normalizeVideoConfig(input, { context = 'block', allowNull = fal
   const config = {
     sourceType,
     autoplay: booleanValue(src.autoplay, context === 'hero'),
-    muted: booleanValue(src.muted, context === 'hero'),
+    muted: booleanValue(src.muted, videoDefaults.muted),
     loop: booleanValue(src.loop, context === 'hero'),
     controls: booleanValue(src.controls, context === 'block'),
     preload: PRELOAD.has(src.preload) ? src.preload : videoDefaults.preload,
     objectFit: OBJECT_FIT.has(src.objectFit) ? src.objectFit : 'cover',
     aspectRatio: ASPECT.has(src.aspectRatio) ? src.aspectRatio : (context === 'hero' ? 'auto' : '16/9'),
   };
-  if (config.autoplay) config.muted = true;
   if (!config.autoplay && !config.controls) config.controls = true;
   if (sourceType === 'media') config.mediaPath = assertMediaPath(src.mediaPath, 'Saját videó');
   if (sourceType === 'youtube') {
