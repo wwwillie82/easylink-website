@@ -33,9 +33,9 @@ function realYouTubeSrc(src = '') {
   return /^https:\/\/www\.youtube-nocookie\.com\/embed\//.test(String(src || ''));
 }
 
-function updateYouTubeFrame(root) {
+export function updateYouTubeFrame(root) {
   const iframe = root?.querySelector?.('iframe[data-youtube-frame="true"]');
-  if (!iframe) return;
+  if (!iframe) return { width: 0, height: 0 };
   const fit = root.dataset.videoObjectFit || 'cover';
   const width = root.clientWidth || root.getBoundingClientRect?.().width || 0;
   const height = root.clientHeight || root.getBoundingClientRect?.().height || 0;
@@ -44,6 +44,7 @@ function updateYouTubeFrame(root) {
     iframe.style.width = `${size.width}px`;
     iframe.style.height = `${size.height}px`;
   }
+  return size;
 }
 
 export function initializeVideoMediaRoot(root, options = {}) {
@@ -81,12 +82,17 @@ export function initializeVideoMediaRoot(root, options = {}) {
   }
 
   let observer = null;
-  if (iframe && root.classList?.contains?.('video-media--background') && win?.ResizeObserver) {
+  let resizeHandler = null;
+  if (iframe && win?.ResizeObserver) {
     observer = new win.ResizeObserver(() => updateYouTubeFrame(root));
     observer.observe(root);
     root.__videoResizeObserver = observer;
+  } else if (iframe && win?.addEventListener) {
+    resizeHandler = () => updateYouTubeFrame(root);
+    win.addEventListener('resize', resizeHandler);
+    root.__videoResizeHandler = resizeHandler;
   }
-  return { initialized: true, canAutoplay, observer };
+  return { initialized: true, canAutoplay, observer, resizeHandler };
 }
 
 export function initializeVideoMedia(doc = globalThis.document, win = globalThis.window) {
