@@ -4,9 +4,15 @@ export function parseJsonItems(input) {
   catch { throw Object.assign(new Error('Az items mezőnek érvényes JSON-nak kell lennie.'), { code: 'INVALID_BLOCK_JSON' }); }
 }
 
+import { normalizeVideoItems } from '../content/video.mjs';
+
 export function normalizeBlockItems(type, items) {
   if (items === null) return [];
   if (!Array.isArray(items)) throw Object.assign(new Error('Az items mezőnek JSON tömbnek kell lennie.'), { code: 'INVALID_BLOCK_ITEMS' });
+  if (type === 'video') {
+    try { return normalizeVideoItems(items); }
+    catch (error) { throw Object.assign(new Error(error.message || 'Hibás videó blokk beállítás.'), { code: 'INVALID_VIDEO_BLOCK' }); }
+  }
   return items;
 }
 

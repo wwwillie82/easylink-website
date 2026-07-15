@@ -23,7 +23,7 @@ if (pageState.hiddenByDb) Astro.response.status = 404;
   <Header />
   <main>
     {pageState.hiddenByDb ? <section class="section"><div class="container"><h1>Az oldal nem található.</h1></div></section> : <>
-    <PageHero eyebrow={page?.heroEyebrow ?? "Kapcsolat"} title={page?.heroTitle ?? "Kapcsolódjunk össze."} description={page?.heroDescription ?? "Kérj bemutatót vagy egyeztetést az Easylink bevezetési lehetőségeiről."} asset={page?.heroAsset || undefined} height={page?.heroHeight} imageFit={page?.heroImageFit} imagePositionX={page?.heroImagePositionX} imagePositionY={page?.heroImagePositionY} imagePositionMobileX={page?.heroImagePositionMobileX} imagePositionMobileY={page?.heroImagePositionMobileY} overlayStrength={page?.heroOverlayStrength} imageScale={page?.heroImageScale} />
+    <PageHero eyebrow={page?.heroEyebrow ?? "Kapcsolat"} title={page?.heroTitle ?? "Kapcsolódjunk össze."} description={page?.heroDescription ?? "Kérj bemutatót vagy egyeztetést az Easylink bevezetési lehetőségeiről."} asset={page?.heroAsset || undefined} height={page?.heroHeight} imageFit={page?.heroImageFit} imagePositionX={page?.heroImagePositionX} imagePositionY={page?.heroImagePositionY} imagePositionMobileX={page?.heroImagePositionMobileX} imagePositionMobileY={page?.heroImagePositionMobileY} overlayStrength={page?.heroOverlayStrength} imageScale={page?.heroImageScale} video={page?.heroVideo} />
     <section class="section light">
       <div class="container contact-grid">
         <article class="card polished contact">

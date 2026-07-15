@@ -1,7 +1,9 @@
 export type ContentStatus = 'draft' | 'published' | 'archived';
 
+export type VideoConfig = { sourceType: 'media' | 'youtube'; mediaPath?: string; youtubeUrl?: string; poster?: string; autoplay: boolean; muted: boolean; loop: boolean; controls: boolean; preload: 'none' | 'metadata' | 'auto'; objectFit: 'cover' | 'contain'; aspectRatio: 'auto' | '16/9' | '4/3' | '1/1' | '9/16'; youtubeId?: string };
+
 export type ContentBlock = {
-  type: 'text' | 'feature-list' | 'list' | 'cards' | 'card-grid' | 'cta' | 'image-text' | 'faq' | 'ai-preview' | 'network-visual' | string;
+  type: 'text' | 'feature-list' | 'list' | 'cards' | 'card-grid' | 'cta' | 'image-text' | 'faq' | 'ai-preview' | 'network-visual' | 'video' | string;
   blockKey?: string;
   title: string;
   body?: string;
