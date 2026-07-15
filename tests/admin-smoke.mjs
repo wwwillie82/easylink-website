@@ -11,7 +11,7 @@ import { shouldTryDbContentForEnv, pageWithFallback } from '../src/lib/content/p
 import { staticPagesData } from '../src/lib/content/static-seed-data.mjs';
 import { createAdminServer } from '../src/lib/admin/server.mjs';
 import { staleSeedKeys } from '../scripts/db-seed.mjs';
-import { blockForm, pageEditorJs, movedBlockOrder, parseItemRowRaw, serializeEditorItems, sortOrderForMovedBlock } from '../src/lib/admin/render/blocks.mjs';
+import { blockForm, pageEditorJs, movedBlockOrder, parseItemRowRaw, serializeEditorItems, sortOrderForMovedBlock, duplicateItemRow } from '../src/lib/admin/render/blocks.mjs';
 
 
 const editedCard = serializeEditorItems({ type: 'cards', rows: [{ raw: { title: 'Old', text: 'Body', href: '/old', badge: 'Beta', extra: 'keep' }, title: 'New', text: 'Body', url: '/old', linkLabel: '', order: 'Beta' }] });
@@ -55,6 +55,8 @@ assert.match(textFeatureHtml, /value="Title alapú listaelem"/);
 const aiPreviewHtml = blockForm({ id: 504, page_id: 20, block_key: 'manual:ai-preview', type: 'ai-preview', title: 'AI', body: 'Intro', items: ['Legacy string', { text: 'Legacy text', kind: 'risk', detail: 'Risk detail', value: 'Magas', href: '/risk/' }], status: 'published', sort_order: 40 });
 assert.match(aiPreviewHtml, /data-panel="ai-preview"/);
 assert.match(aiPreviewHtml, /data-ai-preview-editor/);
+assert.match(aiPreviewHtml, /AI üzleti pillanatkép demo elemei/);
+assert.match(aiPreviewHtml, /nem élő AI-futtatás/);
 assert.match(aiPreviewHtml, /data-ai-kind/);
 assert.match(aiPreviewHtml, /data-ai-title value="Legacy string"/);
 assert.match(aiPreviewHtml, /data-ai-title value="Legacy text"/);
@@ -73,6 +75,9 @@ const editorRuntime = pageEditorJs(1);
 assert.match(editorRuntime, /rawType==='ai-preview'\?'ai-preview'/);
 assert.match(editorRuntime, /data-add-ai-item/);
 assert.match(editorRuntime, /data-duplicate-item/);
+assert.match(editorRuntime, /const duplicateItemRow=/);
+assert.match(editorRuntime, /duplicateItemRow\(row\);serializeItems\(f\)/);
+assert.doesNotMatch(editorRuntime, /row\.insertAdjacentHTML\('afterend',row\.outerHTML\)/);
 assert.match(editorRuntime, /data-ai-preview-json-export/);
 assert.match(editorRuntime, /if\(key==='raw-items'\)[^;]*data-raw-items disabled/);
 assert.doesNotMatch(editorRuntime, /data-panel="ai-preview-raw"[^']*data-raw-items/);
@@ -91,6 +96,32 @@ assert.doesNotMatch(freeRoleHtml, /data-fixed-presentation="true"/);
 assert.doesNotMatch(freeRoleHtml, /data-move-block="up" class="secondary" disabled/);
 assert.match(pageEditorJs(1), /!isFixedBlock\(sib\)/);
 assert.match(pageEditorJs(1), /if\(isFixedBlock\(f\)\)return/);
+const duplicateSource = {
+  fields: [],
+  cloneNode() {
+    const clone = { fields: this.fields.map((field) => ({ ...field, options: field.options?.map((option) => ({ ...option })) })), querySelectorAll() { return this.fields; } };
+    clone.after = () => {};
+    return clone;
+  },
+  querySelectorAll() { return this.fields; },
+  after(clone) { this.duplicated = clone; },
+};
+duplicateSource.fields = [
+  { tagName: 'SELECT', value: 'risk', options: [{ value: 'risk', selected: true }, { value: 'info', selected: false }] },
+  { tagName: 'INPUT', type: 'text', value: 'Aktuális cím' },
+  { tagName: 'INPUT', type: 'text', value: 'Aktuális részlet' },
+  { tagName: 'INPUT', type: 'text', value: '42%' },
+  { tagName: 'INPUT', type: 'text', value: '/risk/' },
+  { tagName: 'INPUT', type: 'text', value: '7' },
+];
+const duplicated = duplicateItemRow(duplicateSource);
+assert.equal(duplicated.fields[0].value, 'risk');
+assert.equal(duplicated.fields[0].options[0].selected, true);
+assert.equal(duplicated.fields[1].value, 'Aktuális cím');
+assert.equal(duplicated.fields[2].value, 'Aktuális részlet');
+assert.equal(duplicated.fields[3].value, '42%');
+assert.equal(duplicated.fields[4].value, '/risk/');
+assert.equal(duplicated.fields[5].value, '7');
 
 const sessionSecret = 'test-session-secret-long-enough';
 const state = {
