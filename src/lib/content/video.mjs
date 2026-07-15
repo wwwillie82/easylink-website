@@ -29,11 +29,21 @@ export function parseYouTubeUrl(input) {
   if (url.protocol !== 'https:') throw new Error('Csak https YouTube link fogadható el.');
   const host = url.hostname.toLowerCase();
   if (!YT_HOSTS.has(host)) throw new Error('Csak valódi YouTube link fogadható el.');
-  let id = '';
   const parts = url.pathname.split('/').filter(Boolean);
-  if (host === 'youtu.be') id = parts[0] || '';
-  else if (parts[0] === 'embed' || parts[0] === 'shorts') id = parts[1] || '';
-  else id = url.searchParams.get('v') || '';
+  let id = '';
+  if (host === 'youtu.be') {
+    if (parts.length !== 1) throw new Error('Nem támogatott YouTube link formátum.');
+    id = parts[0] || '';
+  } else if (host === 'youtube-nocookie.com' || host === 'www.youtube-nocookie.com') {
+    if (parts.length !== 2 || parts[0] !== 'embed') throw new Error('Nem támogatott YouTube link formátum.');
+    id = parts[1] || '';
+  } else if (parts.length === 1 && parts[0] === 'watch') {
+    id = url.searchParams.get('v') || '';
+  } else if (parts.length === 2 && (parts[0] === 'embed' || parts[0] === 'shorts')) {
+    id = parts[1] || '';
+  } else {
+    throw new Error('Nem támogatott YouTube link formátum.');
+  }
   if (!VIDEO_ID.test(id)) throw new Error('A YouTube videóazonosító hibás vagy hiányzik.');
   return { id, canonicalUrl: `https://www.youtube.com/watch?v=${id}` };
 }
@@ -63,7 +73,7 @@ export function normalizeVideoConfig(input, { context = 'block', allowNull = fal
     aspectRatio: ASPECT.has(src.aspectRatio) ? src.aspectRatio : (context === 'hero' ? 'auto' : '16/9'),
   };
   if (config.autoplay) config.muted = true;
-  if (context === 'block' && !config.autoplay && !config.controls) config.controls = true;
+  if (!config.autoplay && !config.controls) config.controls = true;
   if (sourceType === 'media') config.mediaPath = assertMediaPath(src.mediaPath, 'Saját videó');
   if (sourceType === 'youtube') {
     const parsed = parseYouTubeUrl(src.youtubeUrl);

@@ -1,8 +1,9 @@
 import { esc } from './utils.mjs';
+import { videoDraftGuardJs } from './video-draft.mjs';
 const adminStyles = `
 body{font-family:Arial,sans-serif;margin:0;background:#f6f8f5;color:#0f1159}
 .wrap{max-width:1100px;margin:0 auto;padding:28px}
-.admin-header{position:sticky;top:0;z-index:30;background:#fff;border-bottom:1px solid #dfe6df;box-shadow:0 8px 24px #0f11590d}
+.admin-header{position:sticky;top:0;z-index:30;background:#fff;border-bottom:1px solid #dfe6df;box-shadow:0 8px 24px#0f11590d}
 .admin-bar{max-width:1100px;margin:0 auto;padding:18px 28px}
 .admin-title{margin:0 0 14px}
 .admin-nav{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
@@ -62,5 +63,5 @@ td,th{border-bottom:1px solid #e2e8e2;padding:9px;text-align:left}
 @media(max-width:680px){.wrap,.admin-bar{padding:14px 18px}.admin-title{font-size:1.35rem;margin-bottom:8px}#msg{top:96px}.admin-nav{align-items:stretch}.admin-nav__links,.admin-nav{flex-direction:column}.admin-nav a{justify-content:center}.admin-nav__spacer{display:none}table{display:block;overflow-x:auto;white-space:nowrap}.item-row{grid-template-columns:1fr}.media-grid{grid-template-columns:1fr}.media-item img,.media-item video,.media-placeholder{height:180px}}
 `;
 const navItems = [['/admin/pages', 'Oldalak'],['/admin/menu', 'Menü'],['/admin/media', 'Média'],['/admin/publish', 'Korábbi élesítések']];
-export const layout = (body, { nav = true, current = '' } = {}) => `<!doctype html><meta charset="utf-8"><title>Easylink site admin</title><style>${adminStyles}</style>${nav ? `<header class="admin-header"><div class="admin-bar"><h1 class="admin-title">Easylink site admin</h1><nav class="admin-nav" aria-label="Admin navigáció"><div class="admin-nav__links">${navItems.map(([href,label])=>`<a href="${href}"${current===href?' aria-current="page"':''}>${label}</a>`).join('')}</div><span class="admin-nav__spacer"></span><a class="admin-nav__logout" href="/api/admin/logout">Kilépés</a></nav></div></header>` : ''}<main class="wrap">${nav ? '' : '<h1>Easylink site admin</h1>'}${body}</main>`;
+export const layout = (body, { nav = true, current = '' } = {}) => `<!doctype html><meta charset="utf-8"><title>Easylink site admin</title><style>${adminStyles}</style>${nav ? `<header class="admin-header"><div class="admin-bar"><h1 class="admin-title">Easylink site admin</h1><nav class="admin-nav" aria-label="Admin navigáció"><div class="admin-nav__links">${navItems.map(([href,label])=>`<a href="${href}"${current===href?' aria-current="page"':''}>${label}</a>`).join('')}</div><span class="admin-nav__spacer"></span><a class="admin-nav__logout" href="/api/admin/logout">Kilépés</a></nav></div></header>` : ''}<main class="wrap">${nav ? '' : '<h1>Easylink site admin</h1>'}${current === '/admin/media' ? '<p class="hint">Csak kész média választható a médiaválasztókban.</p>' : ''}${body}</main><script>${videoDraftGuardJs()}</script>`;
 export function loginHtml(error = '') { return layout(`<div class="card"><h2>Belépés</h2>${error ? `<p class="msg err">${esc(error)}</p>` : ''}<form method="post" action="/api/admin/login"><label>Email<input name="email" type="email" required></label><label>Jelszó<input name="password" type="password" required></label><button>Belépés</button></form></div>`, { nav: false }); }
