@@ -2,6 +2,7 @@
 import { normalizePublicHref, publicHrefRel, publicHrefTarget } from '@/lib/content/links';
 import ListingCards from '@/components/ListingCards.astro';
 import VideoMedia from '@/components/VideoMedia.astro';
+import AiPreviewBlock from '@/components/AiPreviewBlock.astro';
 const { blocks = [] } = Astro.props;
 const blockLabels = {
   text: 'Tartalom',
@@ -41,6 +42,9 @@ const linkAttrs = (value) => { const href = normalizePublicHref(value); return {
         const media = items[0] ?? {};
         return <article class:list={['content-card', 'type-image-text', media.position === 'left' ? 'image-left' : 'image-right']}><div>{media.image && <img src={media.image} alt={media.alt || ""} loading="lazy" />}</div><div><span class="eyebrow">{eyebrow}</span><h2>{block.title}</h2>{block.body && <p>{block.body}</p>}</div></article>;
       }
+      if (type === 'ai-preview') {
+        return <AiPreviewBlock block={block} />;
+      }
       if (type === 'video') {
         const video = items[0] ?? null;
         return <article class="content-card type-video"><span class="eyebrow">{eyebrow}</span><h2>{block.title}</h2>{block.body && <p>{block.body}</p>}<VideoMedia config={video} mode="inline" title={block.title || 'Videó'} /></article>;
@@ -67,10 +71,11 @@ const linkAttrs = (value) => { const href = normalizePublicHref(value); return {
   .type-image-text { display: grid; grid-template-columns: .8fr 1.2fr; gap: 18px; align-items: center; }
   .type-image-text.image-right > div:first-child { order: 2; }
   .type-image-text img { width: 100%; border-radius: 18px; display: block; }
-  .type-ai-preview, .type-network-visual, .type-cta { background: linear-gradient(135deg, var(--color-navy), #080a34); color: white; }
-  .type-ai-preview p, .type-network-visual p, .type-cta p { color: rgba(255, 255, 255, 0.75); }
+  .type-network-visual, .type-cta { background: linear-gradient(135deg, var(--color-navy), #080a34); color: white; }
+  .type-network-visual h2, .type-cta h2 { color: white; }
+  .type-network-visual p, .type-cta p { color: rgba(255, 255, 255, 0.75); }
   li { margin: 10px 0; color: var(--color-navy); font-weight: 600; line-height: 1.58; }
-  .type-ai-preview li, .type-network-visual li { color: rgba(255, 255, 255, 0.92); }
+  .type-network-visual li { color: rgba(255, 255, 255, 0.92); }
   details { border-top: 1px solid rgba(15,17,89,.12); padding: 12px 0; }
   summary { cursor: pointer; font-weight: 800; color: var(--color-navy); }
   @media (max-width: 900px) { .blocks, .type-image-text { grid-template-columns: 1fr; } .type-image-text.image-right > div:first-child { order: 0; } }

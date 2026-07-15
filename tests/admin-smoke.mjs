@@ -23,6 +23,8 @@ assert.deepEqual(editedImageText, [{ image: '/new.webp', alt: 'Old alt', positio
 const editedFaq = serializeEditorItems({ type: 'faq', rows: [{ raw: { question: 'Old?', answer: 'Old answer', extra: 'keep' }, title: 'New?', text: 'Old answer' }] });
 assert.deepEqual(editedFaq, [{ question: 'New?', answer: 'Old answer', extra: 'keep' }]);
 assert.throws(() => serializeEditorItems({ type: 'raw', rawItemsText: '{bad' }), SyntaxError);
+assert.deepEqual(serializeEditorItems({ type: 'ai-preview', rows: [{ raw: { text: 'Régi AI', extra: 'keep' }, kind: 'metric', title: 'Új AI', detail: 'Részlet', value: '42%', href: '/belso/', order: '2' }] }), [{ text: 'Új AI', extra: 'keep', kind: 'metric', detail: 'Részlet', value: '42%', href: '/belso/', order: 2 }]);
+assert.deepEqual(serializeEditorItems({ type: 'ai-preview', rows: [{ raw: { label: 'Legacy címke' }, kind: 'bogus', title: 'Mentett cím', detail: '', value: '', href: '', order: '' }] }), [{ label: 'Mentett cím', kind: 'info' }]);
 
 const textFeature = serializeEditorItems({ type: 'feature-list', rows: [{ raw: { text: 'Régi text', href: '/valami/', extra: 'keep' }, title: 'Új text' }] });
 assert.deepEqual(textFeature, [{ text: 'Új text', href: '/valami/', extra: 'keep' }]);
@@ -50,6 +52,39 @@ assert.match(fixedBlockHtml, /data-raw-item="\{&quot;title&quot;:&quot;A&quot;,&
 const textFeatureHtml = blockForm({ id: 503, page_id: 20, block_key: 'manual:text-feature', type: 'feature-list', title: 'Feature', body: '', items: [{ text: 'Text alapú listaelem', href: '/x', extra: 'keep' }, { title: 'Title alapú listaelem', href: '/y', extra: 'keep' }], status: 'published', sort_order: 30 });
 assert.match(textFeatureHtml, /value="Text alapú listaelem"/);
 assert.match(textFeatureHtml, /value="Title alapú listaelem"/);
+const aiPreviewHtml = blockForm({ id: 504, page_id: 20, block_key: 'manual:ai-preview', type: 'ai-preview', title: 'AI', body: 'Intro', items: ['Legacy string', { text: 'Legacy text', kind: 'risk', detail: 'Risk detail', value: 'Magas', href: '/risk/' }], status: 'published', sort_order: 40 });
+assert.match(aiPreviewHtml, /data-panel="ai-preview"/);
+assert.match(aiPreviewHtml, /data-ai-preview-editor/);
+assert.match(aiPreviewHtml, /data-ai-kind/);
+assert.match(aiPreviewHtml, /data-ai-title value="Legacy string"/);
+assert.match(aiPreviewHtml, /data-ai-title value="Legacy text"/);
+assert.match(aiPreviewHtml, /data-ai-detail value="Risk detail"/);
+assert.match(aiPreviewHtml, /data-ai-value value="Magas"/);
+assert.match(aiPreviewHtml, /data-ai-href value="\/risk\/"/);
+assert.match(aiPreviewHtml, /Haladó JSON export/);
+assert.match(aiPreviewHtml, /data-ai-preview-json-export/);
+assert.doesNotMatch(aiPreviewHtml, /data-panel="raw-items">Items JSON/);
+assert.doesNotMatch(aiPreviewHtml, /data-raw-items/);
+const networkVisualRawHtml = blockForm({ id: 505, page_id: 20, block_key: 'manual:network-visual', type: 'network-visual', title: 'Network', body: '', items: [{ title: 'Legacy raw', extra: 'keep' }], status: 'published', sort_order: 50 });
+assert.match(networkVisualRawHtml, /data-panel="raw-items"/);
+assert.match(networkVisualRawHtml, /textarea data-raw-items/);
+assert.doesNotMatch(networkVisualRawHtml, /data-ai-preview-json-export/);
+const editorRuntime = pageEditorJs(1);
+assert.match(editorRuntime, /rawType==='ai-preview'\?'ai-preview'/);
+assert.match(editorRuntime, /data-add-ai-item/);
+assert.match(editorRuntime, /data-duplicate-item/);
+assert.match(editorRuntime, /data-ai-preview-json-export/);
+assert.match(editorRuntime, /if\(key==='raw-items'\)[^;]*data-raw-items disabled/);
+assert.doesNotMatch(editorRuntime, /data-panel="ai-preview-raw"[^']*data-raw-items/);
+assert.ok(editorRuntime.indexOf("if(e.target.dataset.removeItem") < editorRuntime.indexOf("if(e.target.dataset.addItem"));
+for (const marker of ["if(e.target.dataset.removeItem", "if(e.target.dataset.addItem", "if(e.target.dataset.addAiItem", "if(e.target.dataset.duplicateItem", "if(e.target.dataset.moveItem"]) {
+  const start = editorRuntime.indexOf(marker);
+  assert.ok(start >= 0, `${marker} branch missing`);
+  const branch = editorRuntime.slice(start, editorRuntime.indexOf("if(e.target.dataset.moveBlock)", start) > -1 ? editorRuntime.indexOf("if(e.target.dataset.moveBlock)", start) : start + 600);
+  assert.match(branch, /f\.dataset\.itemsTouched='true'/, `${marker} must mark itemsTouched before serializing`);
+  assert.match(branch, /serializeItems\(f\)/, `${marker} must refresh hidden items input`);
+  assert.match(branch, /dispatchEvent\(new Event\('input'\)\)/, `${marker} must notify dirty state`);
+}
 assert.match(fixedBlockHtml, /data-move-block="up" class="secondary" disabled/);
 const freeRoleHtml = blockForm({ id: 502, page_id: 20, block_key: 'manual:free', type: 'cta', title: 'Manual', body: '', items: [{ role: 'unknown-custom-role', label: 'A', extra: 'keep' }], status: 'published', sort_order: 20 });
 assert.doesNotMatch(freeRoleHtml, /data-fixed-presentation="true"/);

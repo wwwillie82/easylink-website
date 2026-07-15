@@ -1,0 +1,37 @@
+---
+import { publicHrefRel, publicHrefTarget } from '@/lib/content/links';
+import { normalizeAiPreviewItems } from '@/lib/content/ai-preview.mjs';
+const { block } = Astro.props;
+const items = normalizeAiPreviewItems(block?.items);
+const kindLabels = { risk: 'Kockázat', metric: 'Mérőszám', opportunity: 'Lehetőség', recommendation: 'Javaslat', success: 'Siker', info: 'Információ' };
+---
+<article class="content-card type-ai-preview ai-preview-card" data-ai-preview-block>
+  <span class="eyebrow ai-preview-eyebrow">AI előnézet</span>
+  <h2>{block?.title || 'AI előnézet'}</h2>
+  {block?.body && <p class="ai-preview-intro">{block.body}</p>}
+  {items.length > 0 && <div class="ai-preview-items" role="list">
+    {items.map((item) => <section class:list={['ai-preview-item', `is-${item.kind}`]} role="listitem" data-ai-preview-kind={item.kind}>
+      <div class="ai-preview-item-head"><span class="ai-preview-kind">{kindLabels[item.kind]}</span>{item.value && <strong class="ai-preview-value">{item.value}</strong>}</div>
+      <h3>{item.href ? <a href={item.href} target={publicHrefTarget(item.href)} rel={publicHrefRel(item.href)}>{item.title}</a> : item.title}</h3>
+      {item.detail && <p>{item.detail}</p>}
+    </section>)}
+  </div>}
+</article>
+<style>
+  .ai-preview-card { grid-column: 1 / -1; background: radial-gradient(circle at top right, rgba(46, 229, 255, .22), transparent 34%), linear-gradient(135deg, #07102f, #050826 58%, #020416); color: #fff; border-color: rgba(46, 229, 255, .34); box-shadow: 0 24px 70px rgba(3, 10, 34, .26); }
+  .ai-preview-card::before { background: linear-gradient(90deg, var(--color-neon), var(--color-cyan)); height: 5px; }
+  .ai-preview-card h2 { color: #fff; text-shadow: 0 1px 18px rgba(46, 229, 255, .2); }
+  .ai-preview-eyebrow { color: var(--color-neon); letter-spacing: .14em; }
+  .ai-preview-intro { color: rgba(255,255,255,.82); max-width: 72ch; }
+  .ai-preview-items { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 20px; }
+  .ai-preview-item { border: 1px solid rgba(255,255,255,.14); border-left: 5px solid var(--kind-accent, var(--color-cyan)); border-radius: 18px; background: rgba(255,255,255,.075); padding: 16px; min-width: 0; overflow-wrap: anywhere; }
+  .ai-preview-item.is-risk { --kind-accent: #ff8f8f; } .ai-preview-item.is-metric { --kind-accent: #7ee7ff; } .ai-preview-item.is-opportunity { --kind-accent: #8dffbf; } .ai-preview-item.is-recommendation { --kind-accent: #ffd36e; } .ai-preview-item.is-success { --kind-accent: #61f6a4; } .ai-preview-item.is-info { --kind-accent: var(--color-cyan); }
+  .ai-preview-item-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+  .ai-preview-kind { color: #d9fbff; font-size: .76rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
+  .ai-preview-value { color: #06102c; background: linear-gradient(90deg, var(--color-neon), var(--color-cyan)); border-radius: 999px; padding: 5px 10px; font-size: .88rem; white-space: nowrap; }
+  .ai-preview-item h3 { color: #fff; font-size: 1.05rem; line-height: 1.3; margin: 0; }
+  .ai-preview-item a { color: #fff; text-decoration-color: var(--kind-accent, var(--color-cyan)); text-decoration-thickness: 2px; text-underline-offset: 4px; }
+  .ai-preview-item a:focus-visible { outline: 3px solid var(--color-neon); outline-offset: 4px; border-radius: 6px; }
+  .ai-preview-item p { color: rgba(255,255,255,.78); margin: 8px 0 0; line-height: 1.58; }
+  @media (max-width: 700px) { .ai-preview-items { grid-template-columns: 1fr; } .ai-preview-item-head { align-items: flex-start; flex-direction: column; } .ai-preview-value { white-space: normal; } }
+</style>
