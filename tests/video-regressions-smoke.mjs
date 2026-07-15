@@ -123,6 +123,7 @@ const heroSource = await readFile('src/components/PageHero.astro', 'utf8');
 assert.match(heroSource, /\{video && <div class="page-hero-overlay"/);
 assert.match(heroSource, /\.page-hero-detail:not\(\.has-hero-video\)::before \{ opacity: var\(--page-hero-detail-overlay-opacity\); \}/);
 assert.match(heroSource, /\.page-hero-detail\.has-hero-video \.page-hero-overlay \{ opacity: var\(--page-hero-detail-overlay-opacity\); \}/);
+assert.match(heroSource, /\.has-hero-video::before \{[^}]*background-size: var\(--page-hero-bg-size\)/);
 console.log('Video regressions smoke passed: serializers, movement, media filters, repository validation, hero DB roundtrip, call sites, reduced motion, accessibility, fullscreen and YouTube fit contracts.');
 
 import { computeYouTubeFrameSize, initialYouTubePlaybackState, initializeVideoMediaRoot } from '../src/lib/content/video-client.mjs';
@@ -238,7 +239,16 @@ assert.deepEqual(initialYouTubePlaybackState({ isBackground: true, autoplay: tru
 
 assert.deepEqual(videoPanelVisibility('media'), { sourceType: 'media', mediaVisible: true, youtubeVisible: false });
 assert.deepEqual(videoPanelVisibility('youtube'), { sourceType: 'youtube', mediaVisible: false, youtubeVisible: true });
-assert.deepEqual(serializeVideoEditorValues({ sourceType: 'youtube', youtubeUrl: 'https://youtu.be/dQw4w9WgXcQ', mediaPath: '/assets/site-media/x.mp4', controls: false }), { sourceType: 'youtube', autoplay: false, muted: false, loop: false, controls: false, preload: 'metadata', objectFit: 'cover', aspectRatio: '16/9', youtubeUrl: 'https://youtu.be/dQw4w9WgXcQ' });
+assert.deepEqual(serializeVideoEditorValues({ sourceType: 'youtube', youtubeUrl: 'https://youtu.be/dQw4w9WgXcQ', mediaPath: '/assets/site-media/x.mp4', controls: false }), { sourceType: 'youtube', autoplay: false, muted: false, loop: false, controls: true, preload: 'metadata', objectFit: 'cover', aspectRatio: '16/9', youtubeUrl: 'https://youtu.be/dQw4w9WgXcQ' });
+assert.deepEqual(serializeVideoEditorValues({ sourceType: 'media', mediaPath: '/assets/site-media/2026/07/demo.mp4', autoplay: true, controls: false }), { sourceType: 'media', autoplay: true, muted: false, loop: false, controls: false, preload: 'metadata', objectFit: 'cover', aspectRatio: '16/9', mediaPath: '/assets/site-media/2026/07/demo.mp4' });
+assert.deepEqual(serializeVideoEditorValues({ controls: false }), { sourceType: 'media', autoplay: false, muted: false, loop: false, controls: true, preload: 'metadata', objectFit: 'cover', aspectRatio: '16/9', mediaPath: '' });
+
+
+const mediaPickerSource = await readFile('src/lib/admin/render/media.mjs', 'utf8');
+assert.match(mediaPickerSource, /<article class=\"media-item\" tabindex=\"0\" data-pick-media-path=/);
+assert.doesNotMatch(mediaPickerSource, /<article class=\"media-item\" role=\"button\"[\s\S]*<button/);
+assert.match(mediaPickerSource, /e\.target\.closest\('\[data-pick-media-path\]'\)/);
+assert.match(mediaPickerSource, /e\.target\.matches\('\[data-pick-media-path\]'\)/);
 
 const vmSource = await readFile('src/components/VideoMedia.astro', 'utf8');
 const helperSource = await readFile('src/lib/content/video-client.mjs', 'utf8');

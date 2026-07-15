@@ -88,7 +88,7 @@ const styleVars = [
   .page-hero-overlay { position: absolute; inset: 0; z-index: 0; background: linear-gradient(90deg, var(--page-hero-overlay-left) 0%, var(--page-hero-overlay-mid) 43%, var(--page-hero-overlay-right) 72%, var(--page-hero-overlay-end) 100%); opacity: var(--page-hero-overlay-opacity); pointer-events: none; }
   .page-hero-detail:not(.has-hero-video)::before { opacity: var(--page-hero-detail-overlay-opacity); }
   .page-hero-detail.has-hero-video .page-hero-overlay { opacity: var(--page-hero-detail-overlay-opacity); }
-  .has-hero-video::before { background-image: var(--page-hero-asset); background-position: var(--page-hero-bg-position); background-repeat: no-repeat; opacity: 1; }
+  .has-hero-video::before { background-image: var(--page-hero-asset); background-size: var(--page-hero-bg-size); background-position: var(--page-hero-bg-position); background-repeat: no-repeat; opacity: 1; }
   .has-hero-video .video-media { z-index: 0; }
   .page-hero-grid { position: relative; z-index: 1; display: grid; grid-template-columns: minmax(0, 1fr) minmax(200px, 0.45fr); gap: clamp(18px, 3vw, 34px); align-items: center; }
   .page-hero-copy { max-width: var(--container-narrow); }

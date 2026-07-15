@@ -102,6 +102,7 @@ legacyForm.addVideoPanel();
 hydrateVideoPanel(legacyForm, { sourceType: 'media', mediaPath: '/assets/site-media/2026/07/ready.mp4', autoplay: false, controls: false, muted: false }, setVideoEditorVisible);
 assert.equal(legacyForm.querySelector('[data-video-autoplay]').checked, false);
 assert.equal(legacyForm.querySelector('[data-video-controls]').checked, true);
+assert.equal(legacyForm.querySelector('[data-video-controls]').disabled, true);
 const legacyValues = readVideoEditorValues(legacyForm);
 assert.equal(legacyValues.controls, true);
 assert.equal(serializeVideoEditorValues(legacyValues).controls, true);
@@ -117,6 +118,18 @@ assert.equal(form.querySelector('[data-video-source]').value, 'media');
 assert.equal(form.querySelector('[data-video-youtube]').hidden, true);
 assert.equal(form.querySelector('[data-video-youtube-url]').disabled, true);
 assert.equal(form.querySelector('[data-video-controls]').checked, true);
+assert.equal(form.querySelector('[data-video-controls]').disabled, true);
+form.querySelector('[data-video-autoplay]').checked = true;
+syncVideoUiState(form, setVideoEditorVisible);
+assert.equal(form.querySelector('[data-video-controls]').disabled, false);
+form.querySelector('[data-video-muted]').checked = false;
+// The browser change handler auto-checks muted when autoplay is turned on, then allows manual unchecking.
+assert.match((await import('../src/lib/admin/render/blocks.mjs')).pageEditorJs(1), /data-video-autoplay.*muted\.checked=true/s);
+assert.equal(form.querySelector('[data-video-muted]').checked, false);
+form.querySelector('[data-video-autoplay]').checked = false;
+syncVideoUiState(form, setVideoEditorVisible);
+assert.equal(form.querySelector('[data-video-controls]').checked, true);
+assert.equal(form.querySelector('[data-video-controls]').disabled, true);
 assert.equal(form.querySelector('[data-video-preload]').value, 'metadata');
 assert.equal(form.querySelector('[data-video-object-fit]').value, 'cover');
 assert.equal(form.querySelector('[data-video-aspect-ratio]').value, '16/9');
@@ -163,5 +176,6 @@ const payload = new URLSearchParams([['type', form.typeSelect.value], ['items', 
 assert.equal(payload.get('type'), 'video');
 assert.doesNotThrow(() => JSON.parse(payload.get('items')));
 assert.equal(JSON.parse(payload.get('items')).length, 1);
+assert.equal(JSON.parse(payload.get('items'))[0].controls, true);
 
 console.log('Video admin runtime smoke passed: text/video switching, source switching, visibility, dirty state and payload.');
