@@ -51,7 +51,10 @@ assert.deepEqual(media.filter((m) => mediaMatchesKind(m, 'image')).map((m) => m.
 assert.deepEqual(media.filter((m) => mediaMatchesKind(m, 'any')).map((m) => m.path), ['/assets/site-media/ready.mp4', '/assets/site-media/image.webp']);
 
 assert.equal(parseYouTubeUrl('https://www.youtube.com/shorts/dQw4w9WgXcQ').id, 'dQw4w9WgXcQ');
-assert.match(buildYouTubeEmbedUrl({ youtubeUrl: 'https://youtu.be/dQw4w9WgXcQ', autoplay: true, muted: true, loop: true, controls: false }), /youtube-nocookie\.com\/embed\/dQw4w9WgXcQ\?.*playlist=dQw4w9WgXcQ/);
+const ytEmbed = buildYouTubeEmbedUrl({ youtubeUrl: 'https://youtu.be/dQw4w9WgXcQ', autoplay: true, muted: true, loop: true, controls: false });
+assert.match(ytEmbed, /youtube-nocookie\.com\/embed\/dQw4w9WgXcQ\?.*playlist=dQw4w9WgXcQ/);
+assert.doesNotMatch(ytEmbed, /cc_load_policy=1/);
+assert.match(ytEmbed, /[?&]cc_load_policy=0(?:&|$)/);
 assert.equal(normalizeVideoConfig({ sourceType: 'youtube', youtubeUrl: 'https://youtu.be/dQw4w9WgXcQ', autoplay: true, muted: false }, { context: 'block' }).muted, false);
 assert.equal(normalizeVideoConfig({ sourceType: 'media', mediaPath: '/assets/site-media/2026/07/demo.mp4', autoplay: false, controls: false }, { context: 'hero' }).controls, true);
 
@@ -124,6 +127,9 @@ assert.match(heroSource, /\{video && <div class="page-hero-overlay"/);
 assert.match(heroSource, /\.page-hero-detail:not\(\.has-hero-video\)::before \{ opacity: var\(--page-hero-detail-overlay-opacity\); \}/);
 assert.match(heroSource, /\.page-hero-detail\.has-hero-video \.page-hero-overlay \{ opacity: var\(--page-hero-detail-overlay-opacity\); \}/);
 assert.match(heroSource, /\.has-hero-video::before \{[^}]*background-size: var\(--page-hero-bg-size\)/);
+assert.match(heroSource, /--video-poster-fit: \$\{allowedFit === 'stretch' \? 'fill' : allowedFit\}/);
+assert.match(heroSource, /--video-poster-position: \$\{x\}% \$\{y\}%/);
+assert.match(heroSource, /--page-hero-bg-position-mobile: \$\{mx\}% \$\{my\}%/);
 console.log('Video regressions smoke passed: serializers, movement, media filters, repository validation, hero DB roundtrip, call sites, reduced motion, accessibility, fullscreen and YouTube fit contracts.');
 
 import { computeYouTubeFrameSize, initialYouTubePlaybackState, initializeVideoMediaRoot } from '../src/lib/content/video-client.mjs';
@@ -213,6 +219,21 @@ assert.equal(mp4WithBackdrop.classList.contains('is-media-loaded'), false);
 mp4WithBackdrop.mainVideo.dispatch('loadeddata');
 assert.equal(mp4WithBackdrop.classList.contains('is-media-loaded'), true);
 
+
+const mp4RejectRoot = new FakeEl({ dataset: { autoplay: 'true' }, classes: ['video-media--background', 'is-interactive'] });
+mp4RejectRoot.video = new FakeEl({ tag: 'video', attrs: { src: '/assets/site-media/2026/07/backdrop.mp4' } });
+mp4RejectRoot.mainVideo = new FakeEl({ tag: 'video', attrs: { src: '/assets/site-media/2026/07/main.mp4' } });
+mp4RejectRoot.mainVideo.muted = false;
+mp4RejectRoot.mainVideo.play = function play() { this.playCalls += 1; return this.playCalls === 1 ? Promise.reject(new Error('autoplay blocked')) : Promise.resolve(); };
+initializeVideoMediaRoot(mp4RejectRoot, { window: winMotion });
+await Promise.resolve();
+await Promise.resolve();
+assert.equal(mp4RejectRoot.video.playCalls, 0);
+assert.equal(mp4RejectRoot.mainVideo.playCalls, 2);
+assert.equal(mp4RejectRoot.mainVideo.muted, true);
+assert.equal(mp4RejectRoot.mainVideo.controls, undefined);
+assert.equal(normalizeVideoConfig({ sourceType: 'media', mediaPath: '/assets/site-media/2026/07/main.mp4', autoplay: true, muted: false, controls: false }, { context: 'hero' }).muted, false);
+
 const mp4Interactive = new FakeEl({ dataset: { autoplay: 'true' }, classes: ['video-media--background', 'is-interactive'] });
 mp4Interactive.video = new FakeEl({ tag: 'video', attrs: { src: '/assets/site-media/2026/07/ready.mp4', controls: '' } });
 initializeVideoMediaRoot(mp4Interactive, { window: winReduce });
@@ -253,11 +274,14 @@ assert.match(mediaPickerSource, /e\.target\.matches\('\[data-pick-media-path\]'\
 const vmSource = await readFile('src/components/VideoMedia.astro', 'utf8');
 const helperSource = await readFile('src/lib/content/video-client.mjs', 'utf8');
 assert.doesNotMatch(vmSource.replace(/:fullscreen[^}]+}|:-webkit-full-screen[^}]+}/g, ''), /100vw|100vh/);
+assert.match(vmSource, /\.video-media\{[^}]*background:#080a34/);
+assert.match(vmSource, /\.video-media--background\{[^}]*background:transparent/);
 assert.doesNotMatch(vmSource, /\.video-media--background\s+\.video-media__element\{[^}]*min-width:100%;[^}]*min-height:100%/);
 assert.match(vmSource, /\.video-media--background\.video-media--fit-cover \.video-media__element\{[^}]*min-width:100%;[^}]*min-height:100%/);
 assert.match(vmSource, /\.video-media--background\.video-media--fit-contain \.video-media__element\{[^}]*min-width:0;[^}]*min-height:0/);
-assert.match(vmSource, /\.video-media--background\.is-decorative\.has-poster \.video-media__poster/);
-assert.doesNotMatch(vmSource, /\.video-media--background\.has-poster \.video-media__poster/);
+assert.match(vmSource, /\.video-media--background\.has-poster \.video-media__poster\{opacity:0\}/);
+assert.match(vmSource, /\.video-media--background \.video-media__backdrop\{opacity:0\}/);
+assert.match(vmSource, /poster=\{isBg \? undefined : \(poster \|\| undefined\)\}/);
 assert.doesNotMatch(helperSource, /100vw|100vh/);
 const mediaSource = await readFile('src/lib/admin/render/media.mjs', 'utf8');
 assert.match(mediaSource, /mediaMatchesKind=\$\{mediaMatchesKind\.toString\(\)\}/);

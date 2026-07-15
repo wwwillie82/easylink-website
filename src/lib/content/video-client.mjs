@@ -76,8 +76,20 @@ export function initializeVideoMediaRoot(root, options = {}) {
     if (!autoplay) setLoaded(root, true);
     if (autoplay && canAutoplay) {
       video.autoplay = true;
+      const handleRejectedAutoplay = () => {
+        if (video.muted !== true) {
+          video.muted = true;
+          const retry = video.play?.();
+          if (retry?.then) retry.then(() => setLoaded(root, true)).catch?.(() => { video.controls = true; setLoaded(root, false); });
+          else if (retry?.catch) retry.catch(() => { video.controls = true; setLoaded(root, false); });
+          return;
+        }
+        video.controls = true;
+        setLoaded(root, false);
+      };
       const result = video.play?.();
-      if (result?.catch) result.catch(() => {});
+      if (result?.then) result.then(() => setLoaded(root, true)).catch?.(handleRejectedAutoplay);
+      else if (result?.catch) result.catch(handleRejectedAutoplay);
     }
   }
 

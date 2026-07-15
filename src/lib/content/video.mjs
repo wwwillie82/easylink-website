@@ -55,6 +55,7 @@ export function buildYouTubeEmbedUrl(config = {}) {
   params.set('controls', booleanValue(config.controls, true) ? '1' : '0');
   params.set('loop', booleanValue(config.loop) ? '1' : '0');
   params.set('playsinline', '1');
+  params.set('cc_load_policy', '0');
   if (booleanValue(config.loop)) params.set('playlist', id);
   return `https://www.youtube-nocookie.com/embed/${id}?${params.toString()}`;
 }
