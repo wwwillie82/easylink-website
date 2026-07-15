@@ -5,7 +5,7 @@ const { config: inputConfig, mode = 'inline', title = 'Videó', fallback = '' } 
 let config = null;
 try { config = normalizeVideoConfig(inputConfig, { context: mode === 'background' ? 'hero' : 'block', allowNull: true }); } catch { config = null; }
 const isBg = mode === 'background';
-const poster = config?.poster || fallback || '';
+const poster = fallback || config?.poster || '';
 const aspect = config?.aspectRatio && config.aspectRatio !== 'auto' ? config.aspectRatio : (isBg ? 'auto' : '16/9');
 const isDecorative = isBg && !config?.controls;
 const shouldDeferAutoplay = config?.sourceType === 'youtube' ? !!config.autoplay : (isBg && !!config?.autoplay);

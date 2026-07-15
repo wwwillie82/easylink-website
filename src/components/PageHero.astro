@@ -69,7 +69,7 @@ const styleVars = [
 ].join('; ');
 ---
 <section class:list={['page-hero', `page-hero-${variant}`, { light: !dark, 'has-hero-video': !!video }]} style={styleVars}>
-  {video && <VideoMedia config={video} mode="background" title={`${title || 'Hero'} háttérvideó`} fallback={video.poster || asset} />}
+  {video && <VideoMedia config={video} mode="background" title={`${title || 'Hero'} háttérvideó`} fallback={asset} />}
   {video && <div class="page-hero-overlay" aria-hidden="true"></div>}
   <div class="container page-hero-grid">
     <div class="page-hero-copy">
