@@ -54,7 +54,7 @@ export function initializeVideoMediaRoot(root, options = {}) {
   const autoplay = root.dataset?.autoplay === 'true';
   const decorative = root.classList?.contains?.('is-decorative') === true;
   const iframe = root.querySelector?.('iframe');
-  const video = root.querySelector?.('video');
+  const video = root.querySelector?.('[data-video-element]') || root.querySelector?.('video.video-media__element');
   const canAutoplay = shouldAutoplayVideo({ win, autoplay });
 
   if (iframe) {
@@ -76,7 +76,6 @@ export function initializeVideoMediaRoot(root, options = {}) {
     if (!autoplay) setLoaded(root, true);
     if (autoplay && canAutoplay) {
       video.autoplay = true;
-      video.muted = true;
       const result = video.play?.();
       if (result?.catch) result.catch(() => {});
     }

@@ -117,7 +117,7 @@ class FakeVideoRoot {
     this.video = new FakeVideo();
   }
   querySelector(selector) {
-    if (selector === 'video') return this.video;
+    if (selector === '[data-video-element]' || selector === 'video.video-media__element' || selector === 'video') return this.video;
     if (selector.startsWith('iframe')) return null;
     return null;
   }
@@ -126,7 +126,7 @@ const videoMotionOk = new FakeVideoRoot({ autoplay: true });
 const videoMotionOkResult = initializeVideoMediaRoot(videoMotionOk, { window: { matchMedia: () => ({ matches: false }) } });
 assert.equal(videoMotionOkResult.canAutoplay, true);
 assert.equal(videoMotionOk.video.playCount, 1);
-assert.equal(videoMotionOk.video.muted, true);
+assert.equal(videoMotionOk.video.muted, false);
 assert.equal(videoMotionOk.video.autoplay, true);
 
 const videoReduced = new FakeVideoRoot({ autoplay: true });

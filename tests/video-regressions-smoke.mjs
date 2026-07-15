@@ -25,6 +25,7 @@ assert.equal(videoMedia.mediaPath, '/assets/site-media/2026/07/demo.mp4');
 assert.equal(videoMedia.youtubeUrl, undefined);
 assert.equal(videoMedia.poster, undefined);
 assert.equal(typeof videoMedia.controls, 'boolean');
+assert.equal(videoMedia.controls, true);
 const videoYoutube = serializeEditorItems({ type: 'video', rows: { sourceType: 'youtube', mediaPath: '/assets/site-media/2026/07/demo.mp4', youtubeUrl: 'https://youtu.be/dQw4w9WgXcQ', poster: '/assets/site-media/2026/07/poster.webp', autoplay: true, muted: false, loop: false, controls: false, preload: 'none', objectFit: 'contain', aspectRatio: '9/16' } })[0];
 assert.equal(videoYoutube.mediaPath, undefined);
 assert.equal(videoYoutube.youtubeUrl, 'https://youtu.be/dQw4w9WgXcQ');
@@ -51,7 +52,8 @@ assert.deepEqual(media.filter((m) => mediaMatchesKind(m, 'any')).map((m) => m.pa
 
 assert.equal(parseYouTubeUrl('https://www.youtube.com/shorts/dQw4w9WgXcQ').id, 'dQw4w9WgXcQ');
 assert.match(buildYouTubeEmbedUrl({ youtubeUrl: 'https://youtu.be/dQw4w9WgXcQ', autoplay: true, muted: true, loop: true, controls: false }), /youtube-nocookie\.com\/embed\/dQw4w9WgXcQ\?.*playlist=dQw4w9WgXcQ/);
-assert.equal(normalizeVideoConfig({ sourceType: 'youtube', youtubeUrl: 'https://youtu.be/dQw4w9WgXcQ', autoplay: true, muted: false }, { context: 'block' }).muted, true);
+assert.equal(normalizeVideoConfig({ sourceType: 'youtube', youtubeUrl: 'https://youtu.be/dQw4w9WgXcQ', autoplay: true, muted: false }, { context: 'block' }).muted, false);
+assert.equal(normalizeVideoConfig({ sourceType: 'media', mediaPath: '/assets/site-media/2026/07/demo.mp4', autoplay: false, controls: false }, { context: 'hero' }).controls, true);
 
 function makePool() {
   const state = {
@@ -133,7 +135,7 @@ class FakeClassList {
 }
 class FakeEl {
   constructor({ tag = 'div', attrs = {}, dataset = {}, classes = [], width = 800, height = 450, log = null } = {}) { this.tag = tag; this.attrs = { ...attrs }; this.dataset = { ...dataset }; this.classList = new FakeClassList(classes); this.listeners = {}; this.style = {}; this.clientWidth = width; this.clientHeight = height; this.playCalls = 0; this.log = log; }
-  querySelector(sel) { if (sel.startsWith('iframe')) return this.iframe || null; if (sel.startsWith('video')) return this.video || null; return null; }
+  querySelector(sel) { if (sel.startsWith('iframe')) return this.iframe || null; if (sel === '[data-video-element]' || sel === 'video.video-media__element') return this.mainVideo || this.video || null; if (sel.startsWith('video')) return this.video || null; return null; }
   addEventListener(type, fn) { this.log?.push('listen:'+type); (this.listeners[type] ||= []).push(fn); }
   dispatch(type) { for (const fn of this.listeners[type] || []) fn({ type }); }
   setAttribute(name, value) { this.log?.push('set:'+name+':'+String(value)); this.attrs[name] = String(value); }
@@ -198,6 +200,18 @@ const mp4Decorative = new FakeEl({ dataset: { autoplay: 'true' }, classes: ['vid
 mp4Decorative.video = new FakeEl({ tag: 'video' });
 initializeVideoMediaRoot(mp4Decorative, { window: winReduce });
 assert.equal(mp4Decorative.video.playCalls, 0);
+
+const mp4WithBackdrop = new FakeEl({ dataset: { autoplay: 'true' }, classes: ['video-media--background', 'is-interactive'] });
+mp4WithBackdrop.video = new FakeEl({ tag: 'video', log: [] });
+mp4WithBackdrop.mainVideo = new FakeEl({ tag: 'video', attrs: { src: '/assets/site-media/2026/07/main.mp4' } });
+initializeVideoMediaRoot(mp4WithBackdrop, { window: winMotion });
+assert.equal(mp4WithBackdrop.video.playCalls, 0);
+assert.equal(mp4WithBackdrop.mainVideo.playCalls, 1);
+mp4WithBackdrop.video.dispatch('loadeddata');
+assert.equal(mp4WithBackdrop.classList.contains('is-media-loaded'), false);
+mp4WithBackdrop.mainVideo.dispatch('loadeddata');
+assert.equal(mp4WithBackdrop.classList.contains('is-media-loaded'), true);
+
 const mp4Interactive = new FakeEl({ dataset: { autoplay: 'true' }, classes: ['video-media--background', 'is-interactive'] });
 mp4Interactive.video = new FakeEl({ tag: 'video', attrs: { src: '/assets/site-media/2026/07/ready.mp4', controls: '' } });
 initializeVideoMediaRoot(mp4Interactive, { window: winReduce });

@@ -10,7 +10,7 @@ const aspect = config?.aspectRatio && config.aspectRatio !== 'auto' ? config.asp
 const isDecorative = isBg && !config?.controls;
 const shouldDeferAutoplay = config?.sourceType === 'youtube' ? !!config.autoplay : (isBg && !!config?.autoplay);
 const manualConfig = config ? { ...config, autoplay: false } : null;
-const autoplayConfig = config ? { ...config, autoplay: true, muted: true } : null;
+const autoplayConfig = config ? { ...config, autoplay: true } : null;
 const manualYouTubeSrc = config?.sourceType === 'youtube' ? buildYouTubeEmbedUrl(manualConfig) : '';
 const autoplayYouTubeSrc = config?.sourceType === 'youtube' ? buildYouTubeEmbedUrl(autoplayConfig) : '';
 const youtubeState = config?.sourceType === 'youtube' ? initialYouTubePlaybackState({ isBackground: isBg, autoplay: config.autoplay, controls: config.controls, hasPoster: !!poster, manualSrc: manualYouTubeSrc, autoplaySrc: autoplayYouTubeSrc }) : null;
@@ -18,9 +18,11 @@ const videoAutoplay = config?.sourceType === 'media' && config.autoplay && !isBg
 const style = `--video-object-fit:${config?.objectFit || 'cover'};--video-aspect-ratio:${aspect.replace('/', ' / ')};${poster ? `--video-poster:url('${poster}');` : ''}`;
 ---
 {config && <div class:list={['video-media', `video-media--${mode}`, `video-media--fit-${config.objectFit}`, { 'has-poster': !!poster, 'is-decorative': isDecorative, 'is-interactive': !isDecorative }]} style={style} data-video-media-root data-autoplay={shouldDeferAutoplay ? 'true' : undefined} data-video-object-fit={config.objectFit}>
+  {config.objectFit === 'contain' && config.sourceType === 'media' && <video class="video-media__backdrop" src={config.mediaPath} autoplay={config.autoplay} muted loop playsinline aria-hidden="true" tabindex="-1"></video>}
+  {config.objectFit === 'contain' && config.sourceType !== 'media' && poster && <img class="video-media__backdrop" src={poster} alt="" loading="lazy" aria-hidden="true" />}
   {poster && <img class="video-media__poster" src={poster} alt="" loading="lazy" aria-hidden="true" />}
   {config.sourceType === 'media' ? (
-    <video class="video-media__element" src={config.mediaPath} poster={poster || undefined} autoplay={videoAutoplay} data-autoplay={shouldDeferAutoplay ? 'true' : undefined} muted={config.muted} loop={config.loop} controls={config.controls} preload={config.preload} playsinline title={title} aria-hidden={isDecorative ? 'true' : undefined} aria-label={isDecorative ? undefined : title} tabindex={isDecorative ? '-1' : undefined}></video>
+    <video class="video-media__element" data-video-element src={config.mediaPath} poster={poster || undefined} autoplay={videoAutoplay} data-autoplay={shouldDeferAutoplay ? 'true' : undefined} muted={config.muted} loop={config.loop} controls={config.controls} preload={config.preload} playsinline title={title} aria-hidden={isDecorative ? 'true' : undefined} aria-label={isDecorative ? undefined : title} tabindex={isDecorative ? '-1' : undefined}></video>
   ) : (
     <iframe class="video-media__element" src={youtubeState.initialSrc} data-manual-src={youtubeState.manualSrc || manualYouTubeSrc} data-autoplay-src={youtubeState.autoplaySrc || undefined} data-youtube-frame="true" title={title} loading="lazy" referrerpolicy="strict-origin-when-cross-origin" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen aria-hidden={isDecorative ? 'true' : undefined} tabindex={isDecorative ? '-1' : undefined}></iframe>
   )}
@@ -32,7 +34,7 @@ const style = `--video-object-fit:${config?.objectFit || 'cover'};--video-aspect
 <style>
 .video-media{position:relative;overflow:hidden;width:100%;background:#080a34;border-radius:18px;aspect-ratio:var(--video-aspect-ratio)}
 .video-media--background{position:absolute;inset:0;border-radius:0;aspect-ratio:auto;min-height:100%;z-index:0;pointer-events:auto}.video-media--background.is-decorative{pointer-events:none}.video-media--background.is-interactive{pointer-events:auto}
-.video-media__poster,.video-media__element{position:absolute;inset:0;width:100%;height:100%;display:block}.video-media__poster{object-fit:cover;z-index:2;opacity:1;pointer-events:none;transition:opacity .2s ease}.video-media.is-media-loaded .video-media__poster{opacity:0}.video-media__element{object-fit:var(--video-object-fit);z-index:1;border:0;background:#000}.video-media--background.video-media--fit-cover .video-media__element{min-width:100%;min-height:100%}.video-media--background.video-media--fit-contain .video-media__element{min-width:0;min-height:0}
+.video-media__poster,.video-media__element,.video-media__backdrop{position:absolute;inset:0;width:100%;height:100%;display:block}.video-media__backdrop{z-index:0;object-fit:cover;filter:blur(18px);transform:scale(1.08);opacity:.55;background:var(--color-navy-deep)}.video-media__poster{object-fit:var(--video-poster-fit, cover);object-position:var(--video-poster-position, 50% 50%);z-index:2;opacity:1;pointer-events:none;transition:opacity .2s ease}.video-media.is-media-loaded .video-media__poster{opacity:0}.video-media__element{object-fit:var(--video-object-fit);z-index:1;border:0;background:transparent}.video-media--background.video-media--fit-cover .video-media__element{min-width:100%;min-height:100%}.video-media--background.video-media--fit-contain .video-media__element{min-width:0;min-height:0}
 .video-media iframe.video-media__element{left:50%;top:50%;transform:translate(-50%,-50%)}
 .video-media__element:fullscreen,.video-media__element:-webkit-full-screen{width:100vw;height:100vh;max-width:none;max-height:none;object-fit:contain;background:#000;border-radius:0}.video-media--inline{grid-column:1 / -1;box-shadow:var(--shadow-card)}
 @media (prefers-reduced-motion: reduce){.video-media--background.is-decorative.has-poster .video-media__poster{opacity:1;z-index:2}}
