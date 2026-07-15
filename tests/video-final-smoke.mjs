@@ -104,6 +104,6 @@ assert.match(componentSource, /\.video-media iframe\.video-media__element\{left:
 assert.doesNotMatch(componentSource, /\.video-media--background iframe\.video-media__element/);
 const layoutSource = await readFile('src/lib/admin/render/layout.mjs', 'utf8');
 assert.match(layoutSource, /videoDraftGuardJs/);
-assert.match(layoutSource, /csak kész média választható/);
+assert.match(layoutSource, /kész média választható/i);
 
 console.log('Video final smoke passed: strict YouTube URLs, usable hero controls, inline resize and centering.');
