@@ -19,6 +19,12 @@ jobs:
       PUBLIC_DEPLOY_URL: https://deploy.easylink.hu
       SITE_DEV_DOMAIN: site-dev.easylink.hu
       SITE_DEV_WEBROOT: /var/www/clients/client1/web172/web
+      SITE_DEV_SOURCE_ROOT: /var/www/clients/client1/web172/private/easylink-website-src
+      SITE_DEV_PRIVATE: /var/www/clients/client1/web172/private
+      SITE_DEV_NODE_DIR: /var/www/clients/client1/web172/private/tools/node-v22.12.0-linux-x64/bin
+      SITE_DEV_WEB_USER: web172
+      SITE_DEV_ADMIN_SUPERVISOR: easylink_site_dev_admin
+      SITE_DEV_REPO_URL: https://github.com/wwwillie82/easylink-website.git
 
     steps:
       - name: Checkout
@@ -71,6 +77,59 @@ jobs:
             -o IdentitiesOnly=yes \
             "${{ secrets.SITE_DEV_SSH_USER }}@${{ secrets.SITE_DEV_SSH_HOST }}" \
             "chown -R web172:client1 '${SITE_DEV_WEBROOT}'"
+
+      - name: Sync admin source checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/site_dev_deploy_key \
+            -p "${{ secrets.SITE_DEV_SSH_PORT }}" \
+            -o IdentitiesOnly=yes \
+            "${{ secrets.SITE_DEV_SSH_USER }}@${{ secrets.SITE_DEV_SSH_HOST }}" \
+            "SITE_DEV_SOURCE_ROOT='${SITE_DEV_SOURCE_ROOT}' SITE_DEV_PRIVATE='${SITE_DEV_PRIVATE}' SITE_DEV_NODE_DIR='${SITE_DEV_NODE_DIR}' SITE_DEV_WEB_USER='${SITE_DEV_WEB_USER}' SITE_DEV_REPO_URL='${SITE_DEV_REPO_URL}' SITE_DEV_DEPLOY_SHA='${GITHUB_SHA}' SITE_DEV_ADMIN_SUPERVISOR='${SITE_DEV_ADMIN_SUPERVISOR}' bash -s" <<'REMOTE'
+          set -euo pipefail
+
+          sudo -u "$SITE_DEV_WEB_USER" env \
+            HOME="$SITE_DEV_PRIVATE" \
+            XDG_CONFIG_HOME="$SITE_DEV_PRIVATE/.config" \
+            PATH="$SITE_DEV_NODE_DIR:/usr/local/bin:/usr/bin:/bin" \
+            npm_config_cache="$SITE_DEV_PRIVATE/.npm-cache" \
+            SITE_DEV_SOURCE_ROOT="$SITE_DEV_SOURCE_ROOT" \
+            SITE_DEV_REPO_URL="$SITE_DEV_REPO_URL" \
+            SITE_DEV_DEPLOY_SHA="$SITE_DEV_DEPLOY_SHA" \
+            bash -lc '
+              set -euo pipefail
+              cd "$SITE_DEV_SOURCE_ROOT"
+
+              echo "--- admin source before"
+              git rev-parse HEAD
+              git log -1 --oneline
+              git status --short
+
+              if [ -n "$(git status --porcelain)" ]; then
+                echo "Admin source checkout is dirty; refusing to deploy."
+                exit 1
+              fi
+
+              git checkout main
+              git fetch "$SITE_DEV_REPO_URL" main
+              git merge --ff-only FETCH_HEAD
+
+              echo "--- admin source after"
+              git rev-parse HEAD
+              git log -1 --oneline
+
+              actual_sha="$(git rev-parse HEAD)"
+              if [ "$actual_sha" != "$SITE_DEV_DEPLOY_SHA" ]; then
+                echo "Admin source HEAD mismatch: expected $SITE_DEV_DEPLOY_SHA, got $actual_sha"
+                exit 1
+              fi
+            '
+
+          supervisorctl restart "$SITE_DEV_ADMIN_SUPERVISOR"
+          sleep 3
+          supervisorctl status "$SITE_DEV_ADMIN_SUPERVISOR"
+          REMOTE
 
       - name: Smoke test
         run: npm run smoke:live -- "https://${SITE_DEV_DOMAIN}"
