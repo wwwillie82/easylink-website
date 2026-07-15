@@ -73,6 +73,7 @@ export function initializeVideoMediaRoot(root, options = {}) {
     video.addEventListener?.('loadeddata', () => setLoaded(root, true));
     video.addEventListener?.('canplay', () => setLoaded(root, true));
     video.addEventListener?.('error', () => setLoaded(root, false));
+    if (!autoplay) setLoaded(root, true);
     if (autoplay && canAutoplay) {
       video.autoplay = true;
       video.muted = true;
