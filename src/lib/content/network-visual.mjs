@@ -1,6 +1,8 @@
 export const networkNodeKinds = ['core','module','external','data-source','ai','user'];
 export const networkEdgeDirections = ['none','forward','backward','both'];
 export const networkLayouts = ['hub','flow'];
+export const networkVisualNodeLabelMaxLength = 30;
+export const networkVisualEdgeLabelMaxLength = 30;
 const clean = (v) => String(v ?? '').trim();
 const obj = (v) => v && typeof v === 'object' && !Array.isArray(v);
 
@@ -52,6 +54,7 @@ export function validateNetworkVisualConfig(value = {}) {
     const id = clean(node?.id);
     const label = clean(node?.label);
     if (!label) errors.push(`A(z) ${index + 1}. csomópont neve kötelező.`);
+    if (label.length > networkVisualNodeLabelMaxLength) errors.push('A csomópont neve legfeljebb 30 karakter lehet.');
     if (!id) errors.push(`A(z) ${index + 1}. csomópont ID kötelező.`);
     if (id && ids.has(id)) errors.push(`Duplikált csomópont ID: ${id}`);
     ids.add(id);
@@ -65,6 +68,7 @@ export function validateNetworkVisualConfig(value = {}) {
     if (!ids.has(from)) errors.push(`A(z) ${index + 1}. kapcsolat forrása hiányzik: ${from}`);
     if (!ids.has(to)) errors.push(`A(z) ${index + 1}. kapcsolat célja hiányzik: ${to}`);
     if (from && to && from === to) errors.push(`Self-edge nem engedélyezett: ${from}`);
+    if (clean(edge?.label).length > networkVisualEdgeLabelMaxLength) errors.push('A kapcsolat felirata legfeljebb 30 karakter lehet.');
     if (edge?.direction && !networkEdgeDirections.includes(edge.direction)) warnings.push(`Ismeretlen kapcsolat irány: ${edge.direction}`);
     const sig = `${from}->${to}:${edge?.direction || 'forward'}:${clean(edge?.label)}`;
     if (edgeSigs.has(sig)) warnings.push(`Duplikált kapcsolat: ${sig}`);
