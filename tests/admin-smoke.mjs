@@ -11,6 +11,8 @@ import { shouldTryDbContentForEnv, pageWithFallback } from '../src/lib/content/p
 import { staticPagesData } from '../src/lib/content/static-seed-data.mjs';
 import { createAdminServer } from '../src/lib/admin/server.mjs';
 import { staleSeedKeys } from '../scripts/db-seed.mjs';
+import { settingsSaveOutcome } from '../src/lib/admin/render/settings.mjs';
+import { normalizeSiteSettings } from '../src/lib/admin/settings.mjs';
 import { blockForm, pageEditorJs, movedBlockOrder, parseItemRowRaw, serializeEditorItems, sortOrderForMovedBlock, duplicateItemRow } from '../src/lib/admin/render/blocks.mjs';
 
 
@@ -148,6 +150,7 @@ const state = {
   publishCalls: 0,
   media: [],
   nextMediaId: 1,
+  settings: normalizeSiteSettings({}),
   nav: [
     { id: 1, title: 'Árak', href: '/arak/', sort_order: 1, status: 'published' },
     { id: 2, title: 'Kapcsolat', href: '/kapcsolat/', sort_order: 2, status: 'published' },
@@ -174,21 +177,24 @@ const repo = {
   async listMedia({ includeArchived = false } = {}) { return state.media.filter((m) => includeArchived || m.status !== 'archived').sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at))||b.id-a.id); },
   async getMedia(id) { return state.media.find((m) => String(m.id) === String(id)) || null; },
   async createMedia(payload) { const media = { id: state.nextMediaId++, processing_status: 'ready', ...payload, path: payload.path, alt: payload.alt || '', type: payload.type || '', status: payload.status || 'active', created_at: new Date().toISOString() }; state.media.push(media); return media; },
-  async updateMedia(id, payload) { const media = state.media.find((m) => String(m.id) === String(id)); if (!media) return null; if (payload.status && !['active','archived'].includes(payload.status)) throw validationError('Hibás média státusz.'); media.alt = payload.alt ?? media.alt; media.status = payload.status || media.status; return media; },
-  async archiveMedia(id) { const media = state.media.find((m) => String(m.id) === String(id)); if (!media) return null; media.status = 'archived'; return media; },
+  async updateMedia(id, payload) { const media = state.media.find((m) => String(m.id) === String(id)); if (!media) return null; if (payload.status && !['active','archived'].includes(payload.status)) throw validationError('Hibás média státusz.'); const nextStatus = payload.status || media.status; if (nextStatus === 'archived' && media.status !== 'archived' && media.type === 'application/pdf' && Object.values(state.settings.legalDocuments || {}).includes(media.path)) throw validationError('A dokumentum jelenleg jogi dokumentumként van használatban. Előbb távolítsd el az Alapadatok oldalon.'); media.alt = payload.alt ?? media.alt; media.status = nextStatus; return media; },
+  async archiveMedia(id) { const media = state.media.find((m) => String(m.id) === String(id)); if (!media) return null; if (media.type === 'application/pdf' && Object.values(state.settings.legalDocuments || {}).includes(media.path)) throw validationError('A dokumentum jelenleg jogi dokumentumként van használatban. Előbb távolítsd el az Alapadatok oldalon.'); media.status = 'archived'; return media; },
+  async getSiteSettings() { return state.settings; },
+  async updateSiteSettings(payload) { const settings = normalizeSiteSettings(payload); for (const path of Object.values(settings.legalDocuments)) { if (!path) continue; if (!String(path).startsWith('/assets/site-media/')) throw validationError('Csak feltöltött PDF dokumentum választható.'); const media = state.media.find((m) => m.path === path); if (!media || media.status === 'archived' || media.processing_status !== 'ready' || media.type !== 'application/pdf') throw validationError('Csak aktív, kész PDF dokumentum választható.'); } state.settings = settings; return settings; },
   async nav() { return state.nav; },
   async updateNav(items) { for (const item of items) { if (item.id) { const nav = state.nav.find((n) => String(n.id) === String(item.id)); if (!nav) throw new Error(`Navigation item not found: ${item.id}`); Object.assign(nav, { title: item.title, href: item.href, sort_order: Number(item.sort_order), status: item.status }); } else { state.nav.push({ id: Math.max(...state.nav.map((n) => n.id)) + 1, title: item.title, href: item.href, sort_order: Number(item.sort_order), status: item.status }); } } state.nav.sort((a,b)=>a.sort_order-b.sort_order||a.id-b.id); },
 
-  async exportContentSnapshot() { return { pages: structuredClone(state.pages), blocks: structuredClone(state.blocks), navigation: structuredClone(state.nav), settings: [], media: [] }; },
+  async exportContentSnapshot() { return { pages: structuredClone(state.pages), blocks: structuredClone(state.blocks), navigation: structuredClone(state.nav), settings: [{ key: 'analytics', value: JSON.stringify(state.settings.analytics) }, { key: 'legalDocuments', value: JSON.stringify(state.settings.legalDocuments) }], media: structuredClone(state.media) }; },
   async importContentSnapshot(content) { state.imported = content; state.pages = structuredClone(content.pages || []); state.blocks = structuredClone(content.blocks || []); state.nav = structuredClone(content.navigation || []); },
   async publishSnapshots(limit = 20) { return state.snapshots.filter((s) => s.status === 'success').slice(0, limit); },
   async publishStatus() { return { lastSuccess: state.snapshots.find((s) => s.status === 'success') || null, lastError: state.snapshots.find((s) => s.status === 'failed') || null }; },
   async publishSnapshot(id) { return state.snapshots.find((s) => String(s.id) === String(id) && s.status === 'success') || null; },
 };
 
-const publishService = { isRunning: () => false, async publish() { state.publishCalls += 1; return { ok: true, status: 'success', contentSaved: true, published: true }; } };
+let publishMode = 'success';
+const publishService = { isRunning: () => publishMode === 'running', async publish() { state.publishCalls += 1; if (publishMode === 'running') return { ok: false, status: 'publish_in_progress', contentSaved: true, published: false }; if (publishMode === 'failed') return { ok: false, status: 'failed', contentSaved: true, liveUnchanged: true, error: 'publish failed' }; return { ok: true, status: 'success', contentSaved: true, published: true }; } };
 const mediaStorageDir = await mkdtemp(join(tmpdir(), 'easylink-admin-media-'));
-const server = createAdminServer({ repo, publishService, env: { SITE_ADMIN_SESSION_SECRET: sessionSecret, NODE_ENV: 'test', SITE_MEDIA_STORAGE_DIR: mediaStorageDir, SITE_MEDIA_MAX_BYTES: '80' } });
+const server = createAdminServer({ repo, publishService, env: { SITE_ADMIN_SESSION_SECRET: sessionSecret, NODE_ENV: 'test', SITE_MEDIA_STORAGE_DIR: mediaStorageDir, SITE_MEDIA_MAX_BYTES: '80', SITE_MEDIA_DOCUMENT_MAX_BYTES: '10485760' } });
 server.listen(0);
 await once(server, 'listening');
 const base = `http://127.0.0.1:${server.address().port}`;
@@ -274,6 +280,23 @@ try {
   assert.equal(response.status, 200);
   assert.equal((await response.json()).data[0].route, '/arak/');
 
+  response = await fetch(`${base}/api/admin/settings`);
+  assert.equal(response.status, 401);
+  response = await fetch(`${base}/api/admin/settings`, { headers: { cookie } });
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).data.analytics.provider, 'none');
+  response = await fetch(`${base}/admin/settings`, { headers: { cookie } });
+  assert.equal(response.status, 200);
+  const settingsHtmlInitial = await response.text();
+  assert.match(settingsHtmlInitial, /Alapadatok/);
+  assert.match(settingsHtmlInitial, /Általános Szerződési Feltételek/);
+  assert.match(settingsHtmlInitial, /Adatkezelési Tájékoztató/);
+  assert.match(settingsHtmlInitial, /Cookie Tájékoztató/);
+  assert.match(settingsHtmlInitial, /settingsSaveOutcome/);
+  assert.equal(settingsSaveOutcome({ ok: true, publish: { ok: true } }).ok, true);
+  assert.equal(settingsSaveOutcome({ ok: true, publish: { status: 'publish_in_progress' } }).ok, false);
+  assert.equal(settingsSaveOutcome({ ok: true, publish: { ok: false, status: 'failed' } }).ok, false);
+
   response = await fetch(`${base}/admin/media`, { redirect: 'manual' });
   assert.equal(response.status, 303);
   response = await fetch(`${base}/api/admin/media`);
@@ -338,7 +361,7 @@ try {
   assert.equal(existsSync(videoQueued.data.staging_path), true);
   response = await fetch(`${base}/admin/media`, { headers: { cookie } });
   const videoHtml = await response.text();
-  assert.match(videoHtml, /accept="image\/webp,image\/jpeg,image\/png,video\/mp4"/);
+  assert.match(videoHtml, /accept="image\/webp,image\/jpeg,image\/png,video\/mp4,application\/pdf"/);
   assert.match(videoHtml, /Videó queued|processing_status/);
   assert.match(videoHtml, /Csak aktív, kész (MP4 videók|WebP\/JPG\/PNG képek) választhatók|Válassz egy aktív, kész média elemet/);
   const readyPath = '/assets/site-media/2026/07/ready-a1b2c3d4.mp4';
@@ -354,6 +377,83 @@ try {
   assert.equal(await response.text(), '2345');
   response = await fetch(`${base}/api/admin/media/${state.nextMediaId - 1}/file`, { headers: { cookie, range: 'bytes=20-30' } });
   assert.equal(response.status, 416);
+
+  const pdf = Buffer.concat([Buffer.from('%PDF-1.7\n'), Buffer.alloc(6 * 1024 * 1024)]);
+  fd = new FormData();
+  fd.set('alt', 'ÁSZF PDF');
+  fd.set('file', new Blob([pdf], { type: 'application/pdf' }), 'aszf.pdf');
+  response = await fetch(`${base}/api/admin/media`, { method: 'POST', headers: { cookie }, body: fd });
+  assert.equal(response.status, 200);
+  const pdfSaved = await response.json();
+  assert.equal(pdfSaved.data.type, 'application/pdf');
+  assert.equal(pdfSaved.data.processing_status, 'ready');
+  response = await fetch(`${base}/admin/media`, { headers: { cookie } });
+  const pdfMediaHtml = await response.text();
+  assert.match(pdfMediaHtml, /PDF max: 10 MB/);
+  assert.match(pdfMediaHtml, /PDF dokumentum/);
+  assert.match(pdfMediaHtml, /documentMaxBytes=10485760/);
+  assert.match(pdfMediaHtml, /function isPdfFile/);
+  assert.match(pdfMediaHtml, /kind === 'document'|kind==='document'/);
+
+  const validSettings = { analytics: { enabled: true, provider: 'ga4', ga4MeasurementId: 'G-ABC1234', consentMode: 'basic', consentConfigurationVersion: 1 }, legalDocuments: { termsPdfPath: pdfSaved.data.path, privacyPdfPath: '', cookiePdfPath: '' } };
+  publishMode = 'success';
+  for (const field of ['termsPdfPath','privacyPdfPath','cookiePdfPath']) {
+    const payload = { ...validSettings, legalDocuments: { termsPdfPath: '', privacyPdfPath: '', cookiePdfPath: '', [field]: pdfSaved.data.path } };
+    response = await fetch(`${base}/api/admin/settings`, { method: 'PUT', headers: { cookie, 'content-type': 'application/json' }, body: JSON.stringify(payload) });
+    assert.equal(response.status, 200);
+    response = await fetch(`${base}/api/admin/media/${pdfSaved.data.id}`, { method: 'DELETE', headers: { cookie } });
+    assert.equal(response.status, 400);
+    assert.match((await response.json()).error.message, /A dokumentum jelenleg jogi dokumentumként van használatban\. Előbb távolítsd el az Alapadatok oldalon\./);
+    assert.equal(state.media.find((m) => m.id === pdfSaved.data.id).status, 'active');
+    response = await fetch(`${base}/api/admin/media/${pdfSaved.data.id}`, { method: 'PATCH', headers: { cookie, 'content-type': 'application/json' }, body: JSON.stringify({ status: 'archived' }) });
+    assert.equal(response.status, 400);
+    assert.match((await response.json()).error.message, /A dokumentum jelenleg jogi dokumentumként van használatban\. Előbb távolítsd el az Alapadatok oldalon\./);
+    assert.equal(state.media.find((m) => m.id === pdfSaved.data.id).status, 'active');
+    response = await fetch(`${base}/api/admin/media/${pdfSaved.data.id}`, { method: 'PUT', headers: { cookie, 'content-type': 'application/json' }, body: JSON.stringify({ status: 'archived' }) });
+    assert.equal(response.status, 400);
+    assert.match((await response.json()).error.message, /A dokumentum jelenleg jogi dokumentumként van használatban\. Előbb távolítsd el az Alapadatok oldalon\./);
+    assert.equal(state.media.find((m) => m.id === pdfSaved.data.id).status, 'active');
+    response = await fetch(`${base}/api/admin/media/${pdfSaved.data.id}`, { method: 'PATCH', headers: { cookie, 'content-type': 'application/json' }, body: JSON.stringify({ alt: 'Jogi PDF alt frissítve' }) });
+    assert.equal(response.status, 200);
+    assert.equal((await response.json()).data.alt, 'Jogi PDF alt frissítve');
+    response = await fetch(`${base}/api/admin/media/${pdfSaved.data.id}`, { method: 'PATCH', headers: { cookie, 'content-type': 'application/json' }, body: JSON.stringify({ status: 'active' }) });
+    assert.equal(response.status, 200);
+  }
+  response = await fetch(`${base}/api/admin/settings`, { method: 'PUT', headers: { cookie, 'content-type': 'application/json' }, body: JSON.stringify(validSettings) });
+  assert.equal(response.status, 200);
+  let settingsSaved = await response.json();
+  assert.equal(settingsSaved.ok, true);
+  assert.equal(settingsSaved.publish.ok, true);
+  assert.equal(state.settings.legalDocuments.termsPdfPath, pdfSaved.data.path);
+  response = await fetch(`${base}/api/admin/settings`, { method: 'PUT', headers: { cookie, 'content-type': 'application/json' }, body: JSON.stringify({ ...validSettings, analytics: { ...validSettings.analytics, ga4MeasurementId: 'UA-1' } }) });
+  assert.equal(response.status, 400);
+  response = await fetch(`${base}/api/admin/settings`, { method: 'PUT', headers: { cookie, 'content-type': 'application/json' }, body: JSON.stringify({ ...validSettings, analytics: { ...validSettings.analytics, consentMode: 'advanced' } }) });
+  assert.equal(response.status, 400);
+  publishMode = 'running';
+  response = await fetch(`${base}/api/admin/settings`, { method: 'PUT', headers: { cookie, 'content-type': 'application/json' }, body: JSON.stringify({ ...validSettings, legalDocuments: { ...validSettings.legalDocuments, privacyPdfPath: '' } }) });
+  settingsSaved = await response.json();
+  assert.equal(settingsSaved.ok, true);
+  assert.equal(settingsSaved.publish.status, 'publish_in_progress');
+  assert.equal(settingsSaveOutcome(settingsSaved).ok, false);
+  publishMode = 'failed';
+  response = await fetch(`${base}/api/admin/settings`, { method: 'PUT', headers: { cookie, 'content-type': 'application/json' }, body: JSON.stringify(validSettings) });
+  settingsSaved = await response.json();
+  assert.equal(settingsSaved.ok, true);
+  assert.equal(settingsSaved.publish.status, 'failed');
+  assert.equal(settingsSaveOutcome(settingsSaved).ok, false);
+  publishMode = 'success';
+  const freePdf = { id: state.nextMediaId++, path: '/assets/site-media/2026/07/free-a1b2c3d4.pdf', alt: 'Free PDF', type: 'application/pdf', status: 'active', processing_status: 'ready', created_at: new Date().toISOString() };
+  state.media.push(freePdf);
+  response = await fetch(`${base}/api/admin/media/${freePdf.id}`, { method: 'PATCH', headers: { cookie, 'content-type': 'application/json' }, body: JSON.stringify({ status: 'archived' }) });
+  assert.equal(response.status, 200);
+  assert.equal(freePdf.status, 'archived');
+  const freePdfDelete = { id: state.nextMediaId++, path: '/assets/site-media/2026/07/free-delete-a1b2c3d4.pdf', alt: 'Free PDF delete', type: 'application/pdf', status: 'active', processing_status: 'ready', created_at: new Date().toISOString() };
+  state.media.push(freePdfDelete);
+  response = await fetch(`${base}/api/admin/media/${freePdfDelete.id}`, { method: 'DELETE', headers: { cookie } });
+  assert.equal(response.status, 200);
+  assert.equal(freePdfDelete.status, 'archived');
+  response = await fetch(`${base}/api/admin/settings`, { method: 'PUT', headers: { cookie, 'content-type': 'application/json' }, body: JSON.stringify({ ...validSettings, legalDocuments: { termsPdfPath: '', privacyPdfPath: '', cookiePdfPath: '' } }) });
+  assert.equal(response.status, 200);
 
   for (const m of state.media.filter((x)=>String(x.id)!==String(mediaSaved.data.id))) m.status = 'archived';
   response = await fetch(`${base}/api/admin/media/${mediaSaved.data.id}`, { method: 'DELETE', headers: { cookie } });
