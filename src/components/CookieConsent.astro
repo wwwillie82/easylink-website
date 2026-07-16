@@ -87,7 +87,7 @@ const settingsJson = JSON.stringify(consent).replace(/</g, '\\u003c');
     if (!active) return hideAll();
     restoreModalIsolation();
     bannerShown = true; dialogOpen = false;
-    mount.innerHTML = `<section class="el-consent-banner" aria-labelledby="el-consent-title"><h2 id="el-consent-title">Süti-beállítások</h2><p>Az oldal működéséhez szükséges sütiket mindig használjuk. Engedélyeddel látogatottsági statisztikát készítünk, hogy fejleszthessük az Easylink weboldalát.</p><div class="el-consent-actions"><button type="button" class="primary" data-accept>Statisztika engedélyezése</button><button type="button" data-reject>Csak szükséges sütik</button><button type="button" data-settings>Beállítások</button></div></section>`;
+    mount.innerHTML = `<section class="el-consent-banner" aria-labelledby="el-consent-title"><span class="el-consent-kicker">Adatvédelem</span><h2 id="el-consent-title">Süti-beállítások</h2><p>Az oldal működéséhez szükséges sütiket mindig használjuk. Engedélyeddel látogatottsági statisztikát készítünk, hogy fejleszthessük az Easylink weboldalát.</p><div class="el-consent-actions"><button type="button" class="primary" data-accept>Statisztika engedélyezése</button><button type="button" data-reject>Csak szükséges sütik</button><button type="button" class="text" data-settings>Beállítások</button></div></section>`;
     mount.querySelector('[data-accept]').addEventListener('click', () => persist('granted'));
     mount.querySelector('[data-reject]').addEventListener('click', () => persist('denied'));
     mount.querySelector('[data-settings]').addEventListener('click', (e) => openSettings(e.currentTarget));
@@ -99,7 +99,7 @@ const settingsJson = JSON.stringify(consent).replace(/</g, '\\u003c');
     const checked = current?.analytics === 'granted' ? 'checked' : '';
     applyModalIsolation();
     dialogOpen = true; bannerShown = false;
-    mount.innerHTML = `<div class="el-consent-backdrop"><section class="el-consent-dialog" role="dialog" aria-modal="true" aria-labelledby="el-consent-dialog-title"><h2 id="el-consent-dialog-title">Süti-beállítások</h2><div class="el-consent-category"><div><h3>Szükséges</h3><p>Az oldal alapvető működéséhez szükséges sütik, mindig bekapcsolva.</p></div><span aria-label="Szükséges sütik állapota: mindig bekapcsolva">Mindig bekapcsolva</span><input type="checkbox" checked disabled aria-label="Szükséges sütik mindig bekapcsolva"></div><label class="el-consent-category"><div><h3>Statisztikai</h3><p>Segít megérteni a weboldal használatát, hogy fejleszthessük a szolgáltatást.</p></div><input data-analytics-toggle type="checkbox" ${checked} aria-label="Statisztikai sütik engedélyezése"></label><nav class="el-consent-legal" aria-label="Jogi dokumentumok" hidden></nav><div class="el-consent-actions"><button type="button" class="primary" data-save>Kiválasztás mentése</button><button type="button" data-accept>Minden elfogadása</button><button type="button" data-reject>Csak szükséges sütik</button></div><button type="button" class="el-consent-close" aria-label="Beállítások bezárása mentés nélkül" data-close>Vissza</button></section></div>`;
+    mount.innerHTML = `<div class="el-consent-backdrop"><section class="el-consent-dialog" role="dialog" aria-modal="true" aria-labelledby="el-consent-dialog-title"><span class="el-consent-kicker">Adatvédelem</span><h2 id="el-consent-dialog-title">Süti-beállítások</h2><p class="el-consent-intro">Te döntöd el, engedélyezed-e a névtelen látogatottsági statisztikát.</p><div class="el-consent-category"><div><h3>Szükséges</h3><p>Az oldal alapvető működéséhez szükséges sütik, mindig bekapcsolva.</p></div><span aria-label="Szükséges sütik állapota: mindig bekapcsolva">Mindig bekapcsolva</span><input type="checkbox" checked disabled aria-label="Szükséges sütik mindig bekapcsolva"></div><label class="el-consent-category"><div><h3>Statisztikai</h3><p>Segít megérteni a weboldal használatát, hogy fejleszthessük a szolgáltatást.</p></div><input data-analytics-toggle type="checkbox" ${checked} aria-label="Statisztikai sütik engedélyezése"></label><nav class="el-consent-legal" aria-label="Jogi dokumentumok" hidden></nav><div class="el-consent-actions"><button type="button" data-save>Kiválasztás mentése</button><button type="button" class="primary" data-accept>Minden elfogadása</button><button type="button" data-reject>Csak szükséges sütik</button></div><button type="button" class="el-consent-close text" aria-label="Beállítások bezárása mentés nélkül" data-close>Vissza</button></section></div>`;
     renderLegalLinks(mount.querySelector('.el-consent-legal'));
     analyticsInput = mount.querySelector('[data-analytics-toggle]');
     mount.querySelector('[data-save]').addEventListener('click', () => persist(analyticsInput.checked ? 'granted' : 'denied'));
@@ -150,23 +150,176 @@ const settingsJson = JSON.stringify(consent).replace(/</g, '\\u003c');
   if (active && !saved) showBanner();
 })();
 </script>
-<style>
-  #easylink-cookie-consent { position: relative; z-index: 50; }
-  .el-consent-banner, .el-consent-dialog { position: fixed; background: #fff; color: var(--color-navy); border: 1px solid var(--color-line); box-shadow: 0 18px 60px rgba(15, 36, 61, .18); border-radius: 18px; padding: 18px; }
-  .el-consent-banner { right: 18px; bottom: 18px; max-width: 430px; }
-  .el-consent-banner h2, .el-consent-dialog h2 { margin: 0 0 10px; font-size: 1.25rem; }
-  .el-consent-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
-  .el-consent-actions button, .el-consent-close { border: 1px solid var(--color-navy); border-radius: 999px; padding: 10px 14px; background: #fff; color: var(--color-navy); font-weight: 800; cursor: pointer; }
-  .el-consent-actions .primary { background: var(--color-navy); color: #fff; }
-  .el-consent-actions button:focus-visible, .el-consent-close:focus-visible, .el-consent-legal a:focus-visible { outline: 3px solid #ffbf47; outline-offset: 3px; }
-  .el-consent-backdrop { position: fixed; inset: 0; pointer-events: auto; background: rgba(15, 36, 61, .03); }
-  .el-consent-dialog { pointer-events: auto; right: 18px; bottom: 18px; width: min(560px, calc(100vw - 36px)); max-height: calc(100vh - 36px); overflow: auto; }
-  .el-consent-category { display: flex; justify-content: space-between; gap: 16px; align-items: center; border: 1px solid var(--color-line); border-radius: 14px; padding: 12px; margin: 10px 0; }
-  .el-consent-category h3, .el-consent-category p { margin: 0; }
-  .el-consent-category p { margin-top: 6px; }
-  .el-consent-category input { width: 24px; height: 24px; flex: 0 0 auto; }
-  .el-consent-legal { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 12px; }
-  .el-consent-close { margin-top: 12px; }
-  @media (max-width: 700px) { .el-consent-banner, .el-consent-dialog { left: 12px; right: 12px; bottom: 12px; width: auto; max-width: none; max-height: calc(100vh - 24px); } }
-  @media (prefers-reduced-motion: reduce) { .el-consent-banner, .el-consent-dialog { scroll-behavior: auto; } }
+<style is:global>
+  #easylink-cookie-consent {
+    position: relative;
+    z-index: 2147483000;
+    font-family: inherit;
+  }
+  #easylink-cookie-consent *,
+  #easylink-cookie-consent *::before,
+  #easylink-cookie-consent *::after { box-sizing: border-box; }
+  #easylink-cookie-consent .el-consent-banner,
+  #easylink-cookie-consent .el-consent-dialog {
+    position: fixed;
+    background: #fff;
+    color: var(--color-navy, #0b0d4f);
+    border: 1px solid rgba(11, 13, 79, .14);
+    box-shadow: 0 24px 70px rgba(7, 12, 50, .24);
+    border-radius: 22px;
+    padding: 22px;
+    line-height: 1.48;
+  }
+  #easylink-cookie-consent .el-consent-banner {
+    right: 20px;
+    bottom: 20px;
+    width: min(460px, calc(100vw - 40px));
+    z-index: 2147483001;
+  }
+  #easylink-cookie-consent .el-consent-kicker {
+    display: inline-block;
+    margin-bottom: 8px;
+    color: #4a4d78;
+    font-size: .75rem;
+    font-weight: 900;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+  #easylink-cookie-consent .el-consent-banner h2,
+  #easylink-cookie-consent .el-consent-dialog h2 {
+    margin: 0 0 10px;
+    color: var(--color-navy, #0b0d4f);
+    font-size: clamp(1.35rem, 3vw, 1.75rem);
+    line-height: 1.15;
+  }
+  #easylink-cookie-consent .el-consent-banner p,
+  #easylink-cookie-consent .el-consent-dialog p {
+    margin: 0;
+    color: #5e6385;
+  }
+  #easylink-cookie-consent .el-consent-intro { margin-bottom: 16px; }
+  #easylink-cookie-consent .el-consent-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 18px;
+  }
+  #easylink-cookie-consent .el-consent-actions button,
+  #easylink-cookie-consent .el-consent-close {
+    appearance: none;
+    min-height: 44px;
+    border: 1px solid var(--color-navy, #0b0d4f);
+    border-radius: 999px;
+    padding: 10px 16px;
+    background: #fff;
+    color: var(--color-navy, #0b0d4f);
+    font: inherit;
+    font-weight: 850;
+    cursor: pointer;
+    transition: transform .16s ease, box-shadow .16s ease, background .16s ease;
+  }
+  #easylink-cookie-consent .el-consent-actions button:hover,
+  #easylink-cookie-consent .el-consent-close:hover { transform: translateY(-1px); }
+  #easylink-cookie-consent .el-consent-actions .primary {
+    border-color: #98ef00;
+    background: #a6ff00;
+    color: #090b35;
+    box-shadow: 0 10px 26px rgba(166, 255, 0, .27);
+  }
+  #easylink-cookie-consent .el-consent-actions .text,
+  #easylink-cookie-consent .el-consent-close.text {
+    min-height: 40px;
+    border-color: transparent;
+    padding-inline: 8px;
+    background: transparent;
+    text-decoration: underline;
+    box-shadow: none;
+  }
+  #easylink-cookie-consent .el-consent-actions button:focus-visible,
+  #easylink-cookie-consent .el-consent-close:focus-visible,
+  #easylink-cookie-consent .el-consent-legal a:focus-visible,
+  #easylink-cookie-consent input:focus-visible {
+    outline: 3px solid #ffbf47;
+    outline-offset: 3px;
+  }
+  #easylink-cookie-consent .el-consent-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 2147483000;
+    display: grid;
+    place-items: end;
+    pointer-events: auto;
+    background: rgba(7, 12, 50, .08);
+  }
+  #easylink-cookie-consent .el-consent-dialog {
+    position: relative;
+    right: 20px;
+    bottom: 20px;
+    width: min(590px, calc(100vw - 40px));
+    max-height: calc(100vh - 40px);
+    overflow: auto;
+  }
+  #easylink-cookie-consent .el-consent-category {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 16px;
+    align-items: center;
+    border: 1px solid rgba(11, 13, 79, .13);
+    border-radius: 16px;
+    padding: 14px;
+    margin: 10px 0;
+    background: #f8f9fc;
+  }
+  #easylink-cookie-consent .el-consent-category h3,
+  #easylink-cookie-consent .el-consent-category p { margin: 0; }
+  #easylink-cookie-consent .el-consent-category p { margin-top: 5px; }
+  #easylink-cookie-consent .el-consent-category span {
+    color: #4a4d78;
+    font-size: .85rem;
+    font-weight: 800;
+  }
+  #easylink-cookie-consent .el-consent-category input {
+    width: 24px;
+    height: 24px;
+    margin: 0;
+    accent-color: var(--color-navy, #0b0d4f);
+  }
+  #easylink-cookie-consent .el-consent-legal {
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin-top: 14px;
+  }
+  #easylink-cookie-consent .el-consent-legal a {
+    color: var(--color-navy, #0b0d4f);
+    font-weight: 750;
+  }
+  #easylink-cookie-consent .el-consent-close { margin-top: 10px; }
+  @media (max-width: 700px) {
+    #easylink-cookie-consent .el-consent-banner {
+      left: 12px;
+      right: 12px;
+      bottom: 12px;
+      width: auto;
+      padding: 18px;
+      max-height: calc(100vh - 24px);
+      overflow: auto;
+    }
+    #easylink-cookie-consent .el-consent-backdrop { place-items: end center; }
+    #easylink-cookie-consent .el-consent-dialog {
+      left: 12px;
+      right: 12px;
+      bottom: 12px;
+      width: calc(100vw - 24px);
+      max-height: calc(100vh - 24px);
+      padding: 18px;
+    }
+    #easylink-cookie-consent .el-consent-actions { display: grid; }
+    #easylink-cookie-consent .el-consent-actions button { width: 100%; }
+    #easylink-cookie-consent .el-consent-category { grid-template-columns: 1fr auto; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #easylink-cookie-consent .el-consent-actions button,
+    #easylink-cookie-consent .el-consent-close { transition: none; }
+  }
 </style>
