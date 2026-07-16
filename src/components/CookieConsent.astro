@@ -44,7 +44,8 @@ const settingsJson = JSON.stringify(consent).replace(/</g, '\\u003c');
     if (!active) return;
     state = { version: VERSION, necessary: 'granted', analytics: analytics === 'granted' ? 'granted' : 'denied', updatedAt: new Date().toISOString() };
     document.cookie = cookieString(state);
-    const focusTarget = dialogOpen ? lastOpener : null;
+    const activeElement = document.activeElement;
+    const focusTarget = dialogOpen ? lastOpener : (activeElement && mount.contains(activeElement) ? activeElement : null);
     hideAll(focusTarget);
     window.dispatchEvent(new CustomEvent('easylink:consent-changed', { detail: clone(state) }));
   }
@@ -75,7 +76,11 @@ const settingsJson = JSON.stringify(consent).replace(/</g, '\\u003c');
   }
   function focusAfterRemovedDom(opener) {
     const target = fallbackFocusTarget(opener);
-    if (target?.focus) target.focus();
+    if (!target?.focus) return;
+    const addBodyTabindex = target === document.body && !target.hasAttribute?.('tabindex');
+    if (addBodyTabindex) target.setAttribute?.('tabindex', '-1');
+    target.focus();
+    if (addBodyTabindex) target.removeAttribute?.('tabindex');
   }
   function hideAll(focusTarget = null) { restoreModalIsolation(); mount.innerHTML = ''; bannerShown = false; dialogOpen = false; if (focusTarget) focusAfterRemovedDom(focusTarget); }
   function showBanner() {
