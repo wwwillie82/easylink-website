@@ -63,10 +63,13 @@ assert.equal(existsSync(join(deployedRelease, 'assets', 'site-media', '2026', '0
 assert.equal(existsSync(join(deployedRelease, 'assets', 'site-media', '2026', '07', 'orphan-a1b2c3d4.mp4')), false);
 
 let buildEnvSeen;
-const dbPublish = createPublishService({ repo, env: { SITE_CONTENT_SOURCE: 'db', SITE_PUBLISH_REPO_DIR: process.cwd(), SITE_MEDIA_STORAGE_DIR: mediaStorage }, build: async ({ releasePath, content: exportedContent, env }) => { buildEnvSeen = { source: env.SITE_CONTENT_SOURCE, title: exportedContent.pages[0].title }; await writeValidRelease(releasePath); return { ok: true, log: 'built-db-content' }; }, deploy: async () => ({ ok: true, log: 'deployed-db-content' }) });
+const missingReleasesRoot = join(tmpdir(), `easylink-missing-releases-${Date.now()}-${Math.random().toString(16).slice(2)}`, 'releases');
+const dbPublish = createPublishService({ repo, env: { SITE_CONTENT_SOURCE: 'db', SITE_PUBLISH_REPO_DIR: process.cwd(), SITE_PUBLISH_RELEASES_DIR: missingReleasesRoot, SITE_MEDIA_STORAGE_DIR: mediaStorage }, build: async ({ releasePath, content: exportedContent, env }) => { buildEnvSeen = { source: env.SITE_CONTENT_SOURCE, title: exportedContent.pages[0].title, releasePath }; await writeValidRelease(releasePath); return { ok: true, log: 'built-db-content' }; }, deploy: async () => ({ ok: true, log: 'deployed-db-content' }) });
 result = await dbPublish.publish({ label: 'deploy publish' });
 assert.equal(result.ok, true);
-assert.deepEqual(buildEnvSeen, { source: 'db', title: 'Home' });
+assert.equal((await stat(missingReleasesRoot)).isDirectory(), true);
+assert.equal(buildEnvSeen.releasePath.startsWith(`${missingReleasesRoot}/easylink-release-`), true);
+assert.deepEqual({ source: buildEnvSeen.source, title: buildEnvSeen.title }, { source: 'db', title: 'Home' });
 assert.equal(snapshots.at(-1).label, 'deploy publish');
 
 const webroot = await mkdtemp(join(tmpdir(), 'easylink-webroot-'));

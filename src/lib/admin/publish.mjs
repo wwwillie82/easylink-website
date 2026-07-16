@@ -16,6 +16,14 @@ export function contentHash(content) { return crypto.createHash('sha256').update
 
 async function exists(filePath) { try { await stat(filePath); return true; } catch { return false; } }
 
+async function ensureReleasesRoot(releasesRoot) {
+  try {
+    await mkdir(releasesRoot, { recursive: true });
+  } catch (error) {
+    throw new Error(`Release gyökérkönyvtár nem hozható létre: ${releasesRoot}. ${error.message}`);
+  }
+}
+
 export async function ensureWebrootPermissions(webroot) {
   const rootStat = await stat(webroot);
   if (!rootStat.isDirectory()) return;
@@ -83,7 +91,9 @@ export function createPublishService({ repo, env = process.env, build, deploy } 
       const hash = contentHash(content);
       snapshotId = await repo.createPublishSnapshot({ created_by_admin_id: adminId, label, content_json: content, content_hash: hash, status: 'failed' });
       await repo.markPublishStarted(snapshotId);
-      releasePath = await mkdtemp(path.join(env.SITE_PUBLISH_RELEASES_DIR || tmpdir(), 'easylink-release-'));
+      const releasesRoot = env.SITE_PUBLISH_RELEASES_DIR || tmpdir();
+      await ensureReleasesRoot(releasesRoot);
+      releasePath = await mkdtemp(path.join(releasesRoot, 'easylink-release-'));
       const built = await buildFn({ releasePath, content, env });
       if (!built.ok) { await repo.markPublishFinished(snapshotId, { status: 'failed', build_log_excerpt: built.log }); return { ok: false, status: 'failed', contentSaved: true, liveUnchanged: true, error: built.log || 'Build hiba.' }; }
       const release = await validateRelease(releasePath, content);
