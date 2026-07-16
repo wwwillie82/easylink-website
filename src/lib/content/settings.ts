@@ -1,9 +1,10 @@
-import { DEFAULT_SITE_SETTINGS, parseSiteSettingsRows, publicLegalDocuments } from '@/lib/admin/settings.mjs';
+import { DEFAULT_SITE_SETTINGS, parseSiteSettingsRows, publicLegalDocuments, publicContact } from '@/lib/admin/settings.mjs';
 
 export type PublicLegalDocuments = { termsPdfPath: string; privacyPdfPath: string; cookiePdfPath: string };
 export type PublicConsentSettings = { active: boolean; configurationVersion: number; privacyPdfPath: string; cookiePdfPath: string };
 export type PublicAnalyticsSettings = { active: boolean; provider: 'ga4' | 'none'; measurementId: string; consentMode: 'basic'; configurationVersion: number };
-export type PublicSiteSettings = { legalDocuments: PublicLegalDocuments; consent: PublicConsentSettings; analytics: PublicAnalyticsSettings };
+export type PublicContactSettings = { companyName: string; email: string; phone: string; postalCode: string; city: string; addressLine: string; country: string };
+export type PublicSiteSettings = { legalDocuments: PublicLegalDocuments; consent: PublicConsentSettings; analytics: PublicAnalyticsSettings; contact: PublicContactSettings };
 
 type DbPool = { query(sql: string, params?: unknown[]): Promise<[Array<Record<string, unknown>>, unknown]>; end?: () => Promise<void> };
 
@@ -49,11 +50,11 @@ function publicAnalyticsSettings(settings: typeof DEFAULT_SITE_SETTINGS): Public
 function publicFallback(): PublicSiteSettings {
   const legalDocuments = publicLegalDocuments(DEFAULT_SITE_SETTINGS);
   const analytics = publicAnalyticsSettings(DEFAULT_SITE_SETTINGS);
-  return { legalDocuments, analytics, consent: { active: false, configurationVersion: 1, privacyPdfPath: '', cookiePdfPath: '' } };
+  return { legalDocuments, analytics, contact: publicContact(DEFAULT_SITE_SETTINGS) as PublicContactSettings, consent: { active: false, configurationVersion: 1, privacyPdfPath: '', cookiePdfPath: '' } };
 }
 
 export async function readPublicSiteSettingsFromPool(pool: DbPool): Promise<PublicSiteSettings> {
-  const [rows] = await pool.query('SELECT `key`,`value` FROM site_settings WHERE `key` IN (?,?)', ['analytics','legalDocuments']);
+  const [rows] = await pool.query('SELECT `key`,`value` FROM site_settings WHERE `key` IN (?,?,?)', ['analytics','legalDocuments','contact']);
   const settings = parseSiteSettingsRows(rows as Array<{ key: string; value: unknown }>);
   const docs = publicLegalDocuments(settings);
   const candidates = Object.entries(docs).map(([key, path]) => [key, safeCandidate(path)] as const);
@@ -64,10 +65,12 @@ export async function readPublicSiteSettingsFromPool(pool: DbPool): Promise<Publ
     const allowed = new Set(mediaRows.filter((m) => m.status !== 'archived' && m.processing_status === 'ready' && m.type === 'application/pdf').map((m) => String(m.path)));
     legalDocuments = Object.fromEntries(candidates.map(([key, path]) => [key, path && allowed.has(path) ? path : ''])) as PublicLegalDocuments;
   }
-  const analytics = publicAnalyticsSettings(settings);
+  const analytics = publicAnalyticsSettings(settings as typeof DEFAULT_SITE_SETTINGS);
+  const contact = publicContact(settings as typeof DEFAULT_SITE_SETTINGS) as PublicContactSettings;
   return {
     legalDocuments,
     analytics,
+    contact,
     consent: {
       active: analytics.active,
       configurationVersion: analytics.configurationVersion,

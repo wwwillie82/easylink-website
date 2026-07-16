@@ -1,0 +1,22 @@
+<script is:inline>
+(() => {
+  if (window.__easylinkCtaTrackingMounted === true) return;
+  window.__easylinkCtaTrackingMounted = true;
+  const TYPES = new Set(['demo', 'trial', 'email']);
+  const safe = (value, max = 80) => String(value || '').trim().replace(/[^a-zA-Z0-9_.:-]/g, '-').slice(0, max);
+  document.addEventListener('click', (event) => {
+    const anchor = event.target?.closest?.('a[data-easylink-cta]');
+    if (!anchor || event.defaultPrevented) return;
+    const type = String(anchor.dataset.easylinkCta || '').trim();
+    if (!TYPES.has(type)) return;
+    const api = window.EasylinkAnalytics;
+    if (!api || typeof api.trackEvent !== 'function') return;
+    api.trackEvent('cta_click', {
+      cta_type: type,
+      cta_id: safe(anchor.dataset.easylinkCtaId),
+      cta_slot: safe(anchor.dataset.easylinkCtaSlot),
+      page_path: window.location.pathname,
+    });
+  }, true);
+})();
+</script>
