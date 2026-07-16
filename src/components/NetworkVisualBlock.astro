@@ -10,13 +10,13 @@ const descId = `network-${stableId}-desc`;
 const arrowId = `network-${stableId}-arrow`;
 const arrowStartId = `network-${stableId}-arrow-start`;
 const isFlow = config?.layout === 'flow';
-const width = isFlow ? 1360 : 1240;
-const height = isFlow ? 720 : 760;
+const width = isFlow ? 1560 : 1240;
+const height = isFlow ? 840 : 760;
 const nodeWidth = 176;
 const nodeHeight = 92;
 const coreWidth = 230;
 const coreHeight = 118;
-const edgeLabelBoxWidth = 126;
+const edgeLabelBoxWidth = 164;
 const edgeLabelPaddingY = 8;
 const edgeLabelLineHeight = 14;
 const nodes = config?.nodes || [];
@@ -48,14 +48,7 @@ const splitLabelLines = (label = '', maxChars = 15, maxLines = 2) => {
 };
 const safeSvgText = (value = '') => String(value || '').replace(/[\u0000-\u001f\u007f]/g, '').trim();
 
-const splitKindLines = (kind) => {
-  const value = kindText[kind] || kind || '';
-  const upper = value.toLocaleUpperCase('hu-HU');
-  if (upper === 'KÖZPONTI RENDSZER') return ['KÖZPONTI', 'RENDSZER'];
-  if (upper === 'KÜLSŐ RENDSZER') return ['KÜLSŐ', 'RENDSZER'];
-  if (upper === 'AI KOMPONENS') return ['AI', 'KOMPONENS'];
-  return splitLabelLines(upper, 14, 2);
-};
+const kindLabel = (kind) => safeSvgText(kindText[kind] || kind || '').toLocaleUpperCase('hu-HU');
 const splitEdgeLabelLines = (label = '', maxCharsPerLine = 15, maxLines = 2) => splitLabelLines(label, maxCharsPerLine, maxLines);
 
 const svgEdges = config?.edges || [];
@@ -63,17 +56,43 @@ const hasHiddenFlowEdges = false;
 const nodeSize = (node) => node?.kind === 'core' ? { width: coreWidth, height: coreHeight } : { width: nodeWidth, height: nodeHeight };
 const pos = new Map();
 if (isFlow) {
-  const flowColumns = [140, 380, 660, 940, 1220];
-  const flowLanes = [130, 300, 500, 620];
-  const flowRoleColumn = { user: 0, 'data-source': 0, core: 2, module: 1, external: 4, ai: 3 };
-  const columnCounts = new Map();
-  nodes.forEach((n, i) => {
-    const column = flowRoleColumn[n.kind] ?? Math.min(flowColumns.length - 1, i % flowColumns.length);
-    const laneIndex = columnCounts.get(column) || 0;
-    columnCounts.set(column, laneIndex + 1);
-    const lane = flowLanes[(laneIndex + Math.floor(column / 2)) % flowLanes.length];
-    const yNudge = laneIndex >= flowLanes.length ? (laneIndex - flowLanes.length + 1) * 20 : 0;
-    pos.set(n.id, { x: flowColumns[column], y: lane + yNudge });
+  const flowSlots = [
+    { name: 'left-middle', x: 300, y: 420, preferred: ['core', 'user', 'data-source'] },
+    { name: 'mid-top', x: 675, y: 160, preferred: ['module', 'data-source'] },
+    { name: 'mid-bottom', x: 675, y: 690, preferred: ['module', 'data-source'] },
+    { name: 'right-top', x: 1045, y: 190, preferred: ['module'] },
+    { name: 'right-middle', x: 1045, y: 455, preferred: ['module'] },
+    { name: 'right-bottom', x: 1045, y: 675, preferred: ['module'] },
+    { name: 'far-right-top', x: 1340, y: 225, preferred: ['ai', 'external'] },
+    { name: 'far-right-bottom', x: 1340, y: 595, preferred: ['external', 'ai'] },
+    { name: 'left-top', x: 270, y: 155, preferred: ['user', 'data-source'] },
+    { name: 'left-bottom', x: 270, y: 690, preferred: ['data-source', 'user'] },
+    { name: 'far-right-middle', x: 1355, y: 415, preferred: ['external', 'ai'] },
+    { name: 'mid-middle', x: 690, y: 425, preferred: ['module'] },
+  ];
+  const claimedSlots = new Set();
+  const claimSlot = (node, fallbackIndex) => {
+    const preferred = flowSlots.find((slot) => !claimedSlots.has(slot.name) && slot.preferred.includes(node.kind));
+    if (preferred) {
+      claimedSlots.add(preferred.name);
+      return preferred;
+    }
+    const remaining = flowSlots.filter((slot) => !claimedSlots.has(slot.name));
+    const slot = remaining[0] || flowSlots[fallbackIndex % flowSlots.length];
+    claimedSlots.add(slot.name);
+    return slot;
+  };
+  const orderedNodes = [
+    ...nodes.filter((n) => n.kind === 'core'),
+    ...nodes.filter((n) => n.kind === 'module'),
+    ...nodes.filter((n) => n.kind === 'ai'),
+    ...nodes.filter((n) => n.kind === 'external'),
+    ...nodes.filter((n) => !['core', 'module', 'ai', 'external'].includes(n.kind)),
+  ];
+  orderedNodes.forEach((n, i) => {
+    const slot = claimSlot(n, i);
+    const overflow = Math.floor(i / flowSlots.length);
+    pos.set(n.id, { x: slot.x + overflow * 28, y: slot.y + overflow * (i % 2 ? 32 : -32) });
   });
 } else {
   if (core) pos.set(core.id, { x: 620, y: 380 });
@@ -99,12 +118,17 @@ const edgePath = (edge, index) => {
   if (isFlow) {
     const direction = Math.sign(end.x - start.x) || 1;
     const distance = Math.abs(end.x - start.x);
-    const sweep = ((index % 5) - 2) * 30;
-    const c1x = start.x + direction * Math.max(84, distance * 0.38);
-    const c2x = end.x - direction * Math.max(84, distance * 0.38);
-    const midY = (start.y + end.y) / 2;
-    const labelLift = start.y <= end.y ? -48 : 52;
-    const label = { x: (start.x + end.x) / 2 + ((index % 2) ? 24 : -24), y: midY + labelLift + sweep * 0.35 };
+    const sweep = ((index % 7) - 3) * 42 + (distance > 520 ? (index % 2 ? 34 : -34) : 0);
+    const c1x = start.x + direction * Math.max(130, distance * 0.44);
+    const c2x = end.x - direction * Math.max(130, distance * 0.44);
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const normal = { x: -dy / len, y: dx / len };
+    const labelT = distance > 650 ? (index % 2 ? 0.35 : 0.65) : (index % 3 === 0 ? 0.42 : 0.58);
+    const labelBase = { x: start.x + dx * labelT, y: start.y + dy * labelT };
+    const labelOffset = (index % 2 ? 1 : -1) * (72 + Math.min(46, distance * 0.06));
+    const label = { x: labelBase.x + normal.x * labelOffset, y: labelBase.y + normal.y * labelOffset + sweep * 0.18 };
     return { d: `M ${start.x} ${start.y} C ${c1x} ${start.y + sweep}, ${c2x} ${end.y - sweep}, ${end.x} ${end.y}`, label };
   }
   const towardOuter = fromNode.id === core?.id ? 0.84 : toNode.id === core?.id ? 0.16 : 0.72;
@@ -129,7 +153,7 @@ const markerEnd = (d) => d === 'forward' || d === 'both' ? `url(#${arrowId})` : 
         <title id={`${descId}-title`}>{title}</title><desc id={descId}>{config.layout === 'flow' ? 'Balról jobbra rendezett adatáramlási ábra.' : 'Központi hub köré rendezett kapcsolati ábra.'}</desc>
         <defs><marker id={arrowId} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="context-stroke" /></marker><marker id={arrowStartId} viewBox="0 0 10 10" refX="1" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M 10 0 L 0 5 L 10 10 z" fill="context-stroke" /></marker></defs>
         {svgEdges.map((e, i) => { const edge = edgePath(e, e.originalIndex ?? i); if (!edge) return null; const labelLines = safeSvgText(e.label) ? splitEdgeLabelLines(safeSvgText(e.label), 15, 2) : []; const labelHeight = labelLines.length ? (edgeLabelPaddingY * 2 + labelLines.length * edgeLabelLineHeight) : 0; return <g class:list={['network-edge', `is-${e.direction}`]} data-edge-direction={e.direction}><path d={edge.d} marker-start={markerStart(e.direction)} marker-end={markerEnd(e.direction)} />{labelLines.length > 0 && <g class="edge-label" aria-hidden="true"><rect x={edge.label.x - edgeLabelBoxWidth / 2} y={edge.label.y - labelHeight / 2} width={edgeLabelBoxWidth} height={labelHeight} rx="14" /><text x={edge.label.x} y={edge.label.y - ((labelLines.length - 1) * edgeLabelLineHeight) / 2}>{labelLines.map((line, index) => <tspan x={edge.label.x} dy={index === 0 ? 0 : edgeLabelLineHeight}>{line}</tspan>)}</text></g>}</g>; })}
-        {nodes.map((n) => { const p = pos.get(n.id); if (!p) return null; const href = normalizePublicHref(n.href); const size = nodeSize(n); const lines = splitLabelLines(safeSvgText(n.label), n.kind === 'core' ? 20 : 17, 2); const kindLines = splitKindLines(n.kind); const content = <g class:list={['network-node', `is-${n.kind}`]} tabindex="0" data-node-kind={n.kind}><title>{n.label}</title><rect class="node-card" x={p.x - size.width / 2} y={p.y - size.height / 2} width={size.width} height={size.height} rx={n.kind === 'core' ? 26 : 22} /><text class="node-label" x={p.x} y={p.y - (lines.length > 1 ? 17 : 8)} text-anchor="middle">{lines.map((line, index) => <tspan x={p.x} dy={index === 0 ? 0 : 17}>{line}</tspan>)}</text><text x={p.x} y={p.y + size.height / 2 - (kindLines.length > 1 ? 24 : 18)} text-anchor="middle" class="kind">{kindLines.map((line, index) => <tspan x={p.x} dy={index === 0 ? 0 : 10}>{line}</tspan>)}</text></g>; return href ? <a href={href} target={publicHrefTarget(href)} rel={publicHrefRel(href)}>{content}</a> : content; })}
+        {nodes.map((n) => { const p = pos.get(n.id); if (!p) return null; const href = normalizePublicHref(n.href); const size = nodeSize(n); const lines = splitLabelLines(safeSvgText(n.label), n.kind === 'core' ? 20 : 17, 2); const kind = kindLabel(n.kind); const content = <g class:list={['network-node', `is-${n.kind}`]} tabindex="0" data-node-kind={n.kind}><title>{n.label}</title><rect class="node-card" x={p.x - size.width / 2} y={p.y - size.height / 2} width={size.width} height={size.height} rx={n.kind === 'core' ? 26 : 22} /><text class="node-label" x={p.x} y={p.y - (lines.length > 1 ? 17 : 8)} text-anchor="middle">{lines.map((line, index) => <tspan x={p.x} dy={index === 0 ? 0 : 17}>{line}</tspan>)}</text><text x={p.x} y={p.y + size.height / 2 - 18} text-anchor="middle" class="kind">{kind}</text></g>; return href ? <a href={href} target={publicHrefTarget(href)} rel={publicHrefRel(href)}>{content}</a> : content; })}
       </svg>
     </figure>
     {hasHiddenFlowEdges && <p class="network-flow-note" data-network-flow-note>A diagram a fő kapcsolatokat emeli ki; a teljes lista lent olvasható.</p>}
@@ -138,5 +162,5 @@ const markerEnd = (d) => d === 'forward' || d === 'both' ? `url(#${arrowId})` : 
   </>}
 </article>
 <style>
-.network-visual-card{grid-column:1/-1;padding:clamp(24px,4vw,42px);background:radial-gradient(circle at top right,rgba(46,229,255,.22),transparent 34%),linear-gradient(135deg,#07102f,#050826 58%,#020416);color:#fff;border-color:rgba(46,229,255,.34)}.network-header h2{color:#fff}.network-header p{color:rgba(255,255,255,.82)}.network-svg-wrap{margin:28px 0 0}.network-svg-wrap svg{width:100%;height:auto;display:block;overflow:visible}.network-edge path{fill:none;stroke:#83f2ff;stroke-width:3;stroke-dasharray:0;opacity:.72}.network-edge.is-none path{stroke-dasharray:7 8}.network-edge.is-backward path{stroke:#ffd36e}.network-edge.is-both path{stroke:#8dffbf;stroke-width:4}.network-edge .edge-label rect{fill:rgba(5,12,35,.86);stroke:rgba(126,231,255,.38);stroke-width:1}.network-edge .edge-label text{fill:#eaffff;font-size:12px;font-weight:800;text-anchor:middle;dominant-baseline:middle;stroke:none}.network-node .node-card{fill:#10235f;stroke:#7ee7ff;stroke-width:3;filter:drop-shadow(0 10px 18px rgba(0,0,0,.22))}.network-node.is-core .node-card{fill:#071a42;stroke:#b6ff3b;stroke-width:5}.network-node.is-external .node-card{stroke:#ffd36e}.network-node.is-data-source .node-card{stroke:#8dffbf}.network-node.is-ai .node-card{stroke:#e8a6ff}.network-node.is-user .node-card{stroke:#fff}.network-node text{fill:#fff;font-weight:900;font-size:14px}.network-node.is-core text{font-size:15px}.network-node .kind{fill:#d9fbff;font-size:8.8px;text-transform:uppercase;letter-spacing:.07em}.network-node:hover .node-card,.network-node:focus .node-card{filter:drop-shadow(0 0 8px rgba(46,229,255,.46));stroke-width:4}.network-flow-note{margin:12px 0 0;color:rgba(255,255,255,.74);font-size:.9rem}.network-legend{display:flex;flex-wrap:wrap;gap:14px 26px;margin:22px 0 0;padding:0;list-style:none}.network-legend li{display:flex;align-items:center;color:#fff;margin:0;font-size:.88rem;line-height:1.35}.dot{display:inline-block;flex:0 0 auto;width:11px;height:11px;border:2px solid #7ee7ff;border-radius:99px;margin-right:9px}.network-a11y-list{margin-top:20px;border-top:1px solid rgba(255,255,255,.16);padding-top:16px}.network-a11y-list h3{color:#fff;font-size:1rem}.network-a11y-list li,.network-legacy li{color:rgba(255,255,255,.92)}@media(max-width:900px){.network-svg-wrap{display:none}.network-legend{display:none}.network-a11y-list{display:block}.network-visual-card{padding:22px}.network-a11y-list ul{padding-left:18px}}
+.network-visual-card{grid-column:1/-1;padding:clamp(24px,4vw,42px);background:radial-gradient(circle at top right,rgba(46,229,255,.22),transparent 34%),linear-gradient(135deg,#07102f,#050826 58%,#020416);color:#fff;border-color:rgba(46,229,255,.34)}.network-header h2{color:#fff}.network-header p{color:rgba(255,255,255,.82)}.network-svg-wrap{margin:28px 0 0}.network-svg-wrap svg{width:100%;height:auto;display:block;overflow:visible}.network-edge path{fill:none;stroke:#83f2ff;stroke-width:3;stroke-dasharray:0;opacity:.72}.network-edge.is-none path{stroke-dasharray:7 8}.network-edge.is-backward path{stroke:#ffd36e}.network-edge.is-both path{stroke:#8dffbf;stroke-width:4}.network-edge .edge-label rect{fill:rgba(5,12,35,.86);stroke:rgba(126,231,255,.38);stroke-width:1}.network-edge .edge-label text{fill:#eaffff;font-size:12px;font-weight:800;text-anchor:middle;dominant-baseline:middle;stroke:none}.network-node .node-card{fill:#10235f;stroke:#7ee7ff;stroke-width:3;filter:drop-shadow(0 10px 18px rgba(0,0,0,.22))}.network-node.is-core .node-card{fill:#071a42;stroke:#b6ff3b;stroke-width:5}.network-node.is-external .node-card{stroke:#ffd36e}.network-node.is-data-source .node-card{stroke:#8dffbf}.network-node.is-ai .node-card{stroke:#e8a6ff}.network-node.is-user .node-card{stroke:#fff}.network-node text{fill:#fff;font-weight:900;font-size:14px}.network-node.is-core text{font-size:15px}.network-node .kind{fill:#d9fbff;font-size:7.8px;text-transform:uppercase;letter-spacing:.035em}.network-node:hover .node-card,.network-node:focus .node-card{filter:drop-shadow(0 0 8px rgba(46,229,255,.46));stroke-width:4}.network-flow-note{margin:12px 0 0;color:rgba(255,255,255,.74);font-size:.9rem}.network-legend{display:flex;flex-wrap:wrap;gap:14px 26px;margin:22px 0 0;padding:0;list-style:none}.network-legend li{display:flex;align-items:center;color:#fff;margin:0;font-size:.88rem;line-height:1.35}.dot{display:inline-block;flex:0 0 auto;width:11px;height:11px;border:2px solid #7ee7ff;border-radius:99px;margin-right:9px}.network-a11y-list{margin-top:20px;border-top:1px solid rgba(255,255,255,.16);padding-top:16px}.network-a11y-list h3{color:#fff;font-size:1rem}.network-a11y-list li,.network-legacy li{color:rgba(255,255,255,.92)}@media(max-width:900px){.network-svg-wrap{display:none}.network-legend{display:none}.network-a11y-list{display:block}.network-visual-card{padding:22px}.network-a11y-list ul{padding-left:18px}}
 </style>
