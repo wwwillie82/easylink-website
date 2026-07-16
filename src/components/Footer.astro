@@ -1,6 +1,7 @@
 ---
-import { getPublicLegalDocuments } from '@/lib/content/settings';
-const legalDocuments = await getPublicLegalDocuments();
+import { getPublicSiteSettings } from '@/lib/content/settings';
+const publicSettings = await getPublicSiteSettings();
+const legalDocuments = publicSettings.legalDocuments;
 const legalLinks = [
   ['Általános Szerződési Feltételek', legalDocuments.termsPdfPath],
   ['Adatkezelési Tájékoztató', legalDocuments.privacyPdfPath],
@@ -19,6 +20,7 @@ const legalLinks = [
       <b>Kapcsolat</b>
       <a href="mailto:hello@easylink.hu">hello@easylink.hu</a>
       <a href={import.meta.env.PUBLIC_DEPLOY_URL ?? 'https://deploy.easylink.hu'}>Belépés / demo</a>
+      {publicSettings.consent.active && <button type="button" class="cookie-settings-button" data-easylink-open-cookie-settings>Cookie-beállítások</button>}
       {legalLinks.length > 0 && <div class="legal-links" aria-label="Jogi dokumentumok">{legalLinks.map(([label, href]) => <a href={href} target="_blank" rel="noopener noreferrer">{label}</a>)}</div>}
     </div>
   </div>
@@ -30,6 +32,8 @@ const legalLinks = [
   .brand img { width: 180px; }
   .foot div:last-child { display: grid; gap: 10px; }
   .legal-links { display: grid; gap: 8px; margin-top: 8px; }
-  .foot a:not(.brand) { color: var(--color-navy); font-weight: 700; }
+  .foot a:not(.brand), .cookie-settings-button { color: var(--color-navy); font-weight: 700; }
+  .cookie-settings-button { appearance: none; border: 0; background: transparent; padding: 0; text-align: left; cursor: pointer; font: inherit; text-decoration: underline; }
+  .cookie-settings-button:focus-visible { outline: 3px solid #ffbf47; outline-offset: 3px; border-radius: 4px; }
   @media (max-width: 700px) { .foot { display: grid; } }
 </style>
