@@ -10,16 +10,15 @@ const descId = `network-${stableId}-desc`;
 const arrowId = `network-${stableId}-arrow`;
 const arrowStartId = `network-${stableId}-arrow-start`;
 const isFlow = config?.layout === 'flow';
-const width = isFlow ? 1200 : 1120;
-const height = isFlow ? 600 : 680;
-const nodeWidth = 152;
-const nodeHeight = 78;
-const coreWidth = 190;
-const coreHeight = 92;
-const denseEdgeLabelMax = 16;
-const denseEdgeLabelLimit = 3;
-const flowEdgeLimit = 4;
-const flowEdgeLabelLimit = 2;
+const width = isFlow ? 1360 : 1240;
+const height = isFlow ? 720 : 760;
+const nodeWidth = 176;
+const nodeHeight = 92;
+const coreWidth = 230;
+const coreHeight = 118;
+const edgeLabelBoxWidth = 126;
+const edgeLabelPaddingY = 8;
+const edgeLabelLineHeight = 14;
 const nodes = config?.nodes || [];
 const core = nodes.find((n) => n.kind === 'core') || nodes[0];
 const outer = nodes.filter((n) => n.id !== core?.id);
@@ -49,51 +48,24 @@ const splitLabelLines = (label = '', maxChars = 15, maxLines = 2) => {
 };
 const safeSvgText = (value = '') => String(value || '').replace(/[\u0000-\u001f\u007f]/g, '').trim();
 
-const flowEdgeScore = (edge, index, nodeById) => {
-  const fromKind = nodeById.get(edge.from)?.kind;
-  const toKind = nodeById.get(edge.to)?.kind;
-  let score = 0;
-  if ((fromKind === 'core' && toKind === 'module') || (fromKind === 'module' && toKind === 'module')) score += 400;
-  else if (fromKind === 'module' && toKind === 'external') score += 300;
-  else if ((fromKind === 'core' || fromKind === 'module') && toKind === 'ai') score += 220;
-  else if (fromKind === 'data-source' && (toKind === 'core' || toKind === 'module')) score += 180;
-  else if (fromKind === 'user' && (toKind === 'core' || toKind === 'module')) score += 150;
-  if (edge.direction === 'forward') score += 30;
-  else if (edge.direction === 'both') score += 20;
-  else if (edge.direction === 'backward') score += 8;
-  return score * 100 - index;
+const splitKindLines = (kind) => {
+  const value = kindText[kind] || kind || '';
+  const upper = value.toLocaleUpperCase('hu-HU');
+  if (upper === 'KÖZPONTI RENDSZER') return ['KÖZPONTI', 'RENDSZER'];
+  if (upper === 'KÜLSŐ RENDSZER') return ['KÜLSŐ', 'RENDSZER'];
+  if (upper === 'AI KOMPONENS') return ['AI', 'KOMPONENS'];
+  return splitLabelLines(upper, 14, 2);
 };
-const selectVisibleFlowEdges = (edges = [], nodes = [], coreNode = null, maxEdges = flowEdgeLimit) => {
-  const nodeById = new Map(nodes.map((node) => [node.id, node]));
-  const ranked = edges.map((edge, index) => ({ edge, index, score: flowEdgeScore(edge, index, nodeById) })).sort((a, b) => b.score - a.score || a.index - b.index);
-  const selected = [];
-  const nodeUse = new Map();
-  const pairUse = new Set();
-  const canAdd = ({ edge }) => {
-    const pairKey = [edge.from, edge.to].sort().join('::');
-    if (pairUse.has(pairKey)) return false;
-    const fromLimit = edge.from === coreNode?.id ? 3 : 2;
-    const toLimit = edge.to === coreNode?.id ? 3 : 2;
-    return (nodeUse.get(edge.from) || 0) < fromLimit && (nodeUse.get(edge.to) || 0) < toLimit;
-  };
-  const add = (item) => {
-    selected.push(item);
-    pairUse.add([item.edge.from, item.edge.to].sort().join('::'));
-    nodeUse.set(item.edge.from, (nodeUse.get(item.edge.from) || 0) + 1);
-    nodeUse.set(item.edge.to, (nodeUse.get(item.edge.to) || 0) + 1);
-  };
-  ranked.forEach((item) => { if (selected.length < maxEdges && canAdd(item)) add(item); });
-  ranked.forEach((item) => { if (selected.length < maxEdges && !selected.includes(item)) add(item); });
-  return selected.sort((a, b) => a.index - b.index).map((item) => ({ ...item.edge, originalIndex: item.index }));
-};
-const svgEdges = isFlow ? selectVisibleFlowEdges(config?.edges || [], nodes, core) : (config?.edges || []);
-const hasHiddenFlowEdges = isFlow && svgEdges.length < (config?.edges || []).length;
+const splitEdgeLabelLines = (label = '', maxCharsPerLine = 15, maxLines = 2) => splitLabelLines(label, maxCharsPerLine, maxLines);
+
+const svgEdges = config?.edges || [];
+const hasHiddenFlowEdges = false;
 const nodeSize = (node) => node?.kind === 'core' ? { width: coreWidth, height: coreHeight } : { width: nodeWidth, height: nodeHeight };
 const pos = new Map();
 if (isFlow) {
-  const flowColumns = [150, 370, 590, 810, 1030];
-  const flowLanes = [135, 300, 465];
-  const flowRoleColumn = { user: 0, 'data-source': 0, core: 1, module: 2, external: 3, ai: 4 };
+  const flowColumns = [140, 380, 660, 940, 1220];
+  const flowLanes = [130, 300, 500, 620];
+  const flowRoleColumn = { user: 0, 'data-source': 0, core: 2, module: 1, external: 4, ai: 3 };
   const columnCounts = new Map();
   nodes.forEach((n, i) => {
     const column = flowRoleColumn[n.kind] ?? Math.min(flowColumns.length - 1, i % flowColumns.length);
@@ -104,10 +76,10 @@ if (isFlow) {
     pos.set(n.id, { x: flowColumns[column], y: lane + yNudge });
   });
 } else {
-  if (core) pos.set(core.id, { x: 560, y: 340 });
+  if (core) pos.set(core.id, { x: 620, y: 380 });
   outer.forEach((n, i) => {
     const a = -Math.PI / 2 + (i * 2 * Math.PI / Math.max(outer.length, 1));
-    pos.set(n.id, { x: 560 + Math.cos(a) * 440, y: 340 + Math.sin(a) * 270 });
+    pos.set(n.id, { x: 620 + Math.cos(a) * 500, y: 380 + Math.sin(a) * 320 });
   });
 }
 const nodeEdgePoint = (from, to, node) => {
@@ -127,21 +99,21 @@ const edgePath = (edge, index) => {
   if (isFlow) {
     const direction = Math.sign(end.x - start.x) || 1;
     const distance = Math.abs(end.x - start.x);
-    const sweep = ((index % 3) - 1) * 24;
+    const sweep = ((index % 5) - 2) * 30;
     const c1x = start.x + direction * Math.max(84, distance * 0.38);
     const c2x = end.x - direction * Math.max(84, distance * 0.38);
     const midY = (start.y + end.y) / 2;
-    const labelLift = start.y <= end.y ? -36 : 40;
-    const label = { x: (start.x + end.x) / 2, y: midY + labelLift + sweep * 0.22 };
+    const labelLift = start.y <= end.y ? -48 : 52;
+    const label = { x: (start.x + end.x) / 2 + ((index % 2) ? 24 : -24), y: midY + labelLift + sweep * 0.35 };
     return { d: `M ${start.x} ${start.y} C ${c1x} ${start.y + sweep}, ${c2x} ${end.y - sweep}, ${end.x} ${end.y}`, label };
   }
-  const towardOuter = fromNode.id === core?.id ? 0.8 : toNode.id === core?.id ? 0.2 : 0.64;
+  const towardOuter = fromNode.id === core?.id ? 0.84 : toNode.id === core?.id ? 0.16 : 0.72;
   const lx = start.x + (end.x - start.x) * towardOuter;
   const ly = start.y + (end.y - start.y) * towardOuter;
   const dx = end.x - start.x;
   const dy = end.y - start.y;
   const len = Math.hypot(dx, dy) || 1;
-  const offset = (index % 2 ? 1 : -1) * 24;
+  const offset = (index % 2 ? 1 : -1) * 42;
   return { d: `M ${start.x} ${start.y} L ${end.x} ${end.y}`, label: { x: lx + (-dy / len) * offset, y: ly + (dx / len) * offset } };
 };
 const dirText = { none: 'irányjelölés nélkül', forward: 'egyirányú', backward: 'visszafelé irányuló', both: 'kétirányú' };
@@ -156,8 +128,8 @@ const markerEnd = (d) => d === 'forward' || d === 'both' ? `url(#${arrowId})` : 
       <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-labelledby={`${descId}-title ${descId}`} data-network-svg data-network-layout={config.layout}>
         <title id={`${descId}-title`}>{title}</title><desc id={descId}>{config.layout === 'flow' ? 'Balról jobbra rendezett adatáramlási ábra.' : 'Központi hub köré rendezett kapcsolati ábra.'}</desc>
         <defs><marker id={arrowId} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="context-stroke" /></marker><marker id={arrowStartId} viewBox="0 0 10 10" refX="1" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M 10 0 L 0 5 L 10 10 z" fill="context-stroke" /></marker></defs>
-        {svgEdges.map((e, i) => { const edge = edgePath(e, e.originalIndex ?? i); if (!edge) return null; const showSvgLabel = isFlow ? ((config.edges.length < 5) && i < flowEdgeLabelLimit) : (config.edges.length < 5 || i < denseEdgeLabelLimit); const label = showSvgLabel ? truncateLabel(safeSvgText(e.label), isFlow ? 15 : (config.edges.length >= 5 ? denseEdgeLabelMax : 22)) : ''; const labelWidth = Math.max(54, label.length * 6.4 + 18); return <g class:list={['network-edge', `is-${e.direction}`]} data-edge-direction={e.direction}><path d={edge.d} marker-start={markerStart(e.direction)} marker-end={markerEnd(e.direction)} />{label && <g class="edge-label" aria-hidden="true"><rect x={edge.label.x - labelWidth / 2} y={edge.label.y - 17} width={labelWidth} height="24" rx="12" /><text x={edge.label.x} y={edge.label.y}>{label}</text></g>}</g>; })}
-        {nodes.map((n) => { const p = pos.get(n.id); if (!p) return null; const href = normalizePublicHref(n.href); const size = nodeSize(n); const lines = splitLabelLines(safeSvgText(n.label), n.kind === 'core' ? 18 : 15, 2); const content = <g class:list={['network-node', `is-${n.kind}`]} tabindex="0" data-node-kind={n.kind}><title>{n.label}</title><rect class="node-card" x={p.x - size.width / 2} y={p.y - size.height / 2} width={size.width} height={size.height} rx={n.kind === 'core' ? 24 : 20} /><text class="node-label" x={p.x} y={p.y - (lines.length > 1 ? 12 : 3)} text-anchor="middle">{lines.map((line, index) => <tspan x={p.x} dy={index === 0 ? 0 : 17}>{line}</tspan>)}</text><text x={p.x} y={p.y + size.height / 2 - 16} text-anchor="middle" class="kind">{kindText[n.kind]}</text></g>; return href ? <a href={href} target={publicHrefTarget(href)} rel={publicHrefRel(href)}>{content}</a> : content; })}
+        {svgEdges.map((e, i) => { const edge = edgePath(e, e.originalIndex ?? i); if (!edge) return null; const labelLines = safeSvgText(e.label) ? splitEdgeLabelLines(safeSvgText(e.label), 15, 2) : []; const labelHeight = labelLines.length ? (edgeLabelPaddingY * 2 + labelLines.length * edgeLabelLineHeight) : 0; return <g class:list={['network-edge', `is-${e.direction}`]} data-edge-direction={e.direction}><path d={edge.d} marker-start={markerStart(e.direction)} marker-end={markerEnd(e.direction)} />{labelLines.length > 0 && <g class="edge-label" aria-hidden="true"><rect x={edge.label.x - edgeLabelBoxWidth / 2} y={edge.label.y - labelHeight / 2} width={edgeLabelBoxWidth} height={labelHeight} rx="14" /><text x={edge.label.x} y={edge.label.y - ((labelLines.length - 1) * edgeLabelLineHeight) / 2}>{labelLines.map((line, index) => <tspan x={edge.label.x} dy={index === 0 ? 0 : edgeLabelLineHeight}>{line}</tspan>)}</text></g>}</g>; })}
+        {nodes.map((n) => { const p = pos.get(n.id); if (!p) return null; const href = normalizePublicHref(n.href); const size = nodeSize(n); const lines = splitLabelLines(safeSvgText(n.label), n.kind === 'core' ? 20 : 17, 2); const kindLines = splitKindLines(n.kind); const content = <g class:list={['network-node', `is-${n.kind}`]} tabindex="0" data-node-kind={n.kind}><title>{n.label}</title><rect class="node-card" x={p.x - size.width / 2} y={p.y - size.height / 2} width={size.width} height={size.height} rx={n.kind === 'core' ? 26 : 22} /><text class="node-label" x={p.x} y={p.y - (lines.length > 1 ? 17 : 8)} text-anchor="middle">{lines.map((line, index) => <tspan x={p.x} dy={index === 0 ? 0 : 17}>{line}</tspan>)}</text><text x={p.x} y={p.y + size.height / 2 - (kindLines.length > 1 ? 24 : 18)} text-anchor="middle" class="kind">{kindLines.map((line, index) => <tspan x={p.x} dy={index === 0 ? 0 : 10}>{line}</tspan>)}</text></g>; return href ? <a href={href} target={publicHrefTarget(href)} rel={publicHrefRel(href)}>{content}</a> : content; })}
       </svg>
     </figure>
     {hasHiddenFlowEdges && <p class="network-flow-note" data-network-flow-note>A diagram a fő kapcsolatokat emeli ki; a teljes lista lent olvasható.</p>}
@@ -166,5 +138,5 @@ const markerEnd = (d) => d === 'forward' || d === 'both' ? `url(#${arrowId})` : 
   </>}
 </article>
 <style>
-.network-visual-card{grid-column:1/-1;padding:clamp(24px,4vw,42px);background:radial-gradient(circle at top right,rgba(46,229,255,.22),transparent 34%),linear-gradient(135deg,#07102f,#050826 58%,#020416);color:#fff;border-color:rgba(46,229,255,.34)}.network-header h2{color:#fff}.network-header p{color:rgba(255,255,255,.82)}.network-svg-wrap{margin:28px 0 0}.network-svg-wrap svg{width:100%;height:auto;display:block;overflow:visible}.network-edge path{fill:none;stroke:#83f2ff;stroke-width:3;stroke-dasharray:0;opacity:.72}.network-edge.is-none path{stroke-dasharray:7 8}.network-edge.is-backward path{stroke:#ffd36e}.network-edge.is-both path{stroke:#8dffbf;stroke-width:4}.network-edge .edge-label rect{fill:rgba(5,12,35,.86);stroke:rgba(126,231,255,.38);stroke-width:1}.network-edge .edge-label text{fill:#eaffff;font-size:12px;font-weight:800;text-anchor:middle;dominant-baseline:middle;stroke:none}.network-node .node-card{fill:#10235f;stroke:#7ee7ff;stroke-width:3;filter:drop-shadow(0 10px 18px rgba(0,0,0,.22))}.network-node.is-core .node-card{fill:#071a42;stroke:#b6ff3b;stroke-width:5}.network-node.is-external .node-card{stroke:#ffd36e}.network-node.is-data-source .node-card{stroke:#8dffbf}.network-node.is-ai .node-card{stroke:#e8a6ff}.network-node.is-user .node-card{stroke:#fff}.network-node text{fill:#fff;font-weight:900;font-size:14px}.network-node.is-core text{font-size:15px}.network-node .kind{fill:#d9fbff;font-size:9.5px;text-transform:uppercase;letter-spacing:.08em}.network-node:hover .node-card,.network-node:focus .node-card{filter:drop-shadow(0 0 8px rgba(46,229,255,.46));stroke-width:4}.network-flow-note{margin:12px 0 0;color:rgba(255,255,255,.74);font-size:.9rem}.network-legend{display:flex;flex-wrap:wrap;gap:14px 26px;margin:22px 0 0;padding:0;list-style:none}.network-legend li{display:flex;align-items:center;color:#fff;margin:0;font-size:.88rem;line-height:1.35}.dot{display:inline-block;flex:0 0 auto;width:11px;height:11px;border:2px solid #7ee7ff;border-radius:99px;margin-right:9px}.network-a11y-list{margin-top:20px;border-top:1px solid rgba(255,255,255,.16);padding-top:16px}.network-a11y-list h3{color:#fff;font-size:1rem}.network-a11y-list li,.network-legacy li{color:rgba(255,255,255,.92)}@media(max-width:900px){.network-svg-wrap{display:none}.network-legend{display:none}.network-a11y-list{display:block}.network-visual-card{padding:22px}.network-a11y-list ul{padding-left:18px}}
+.network-visual-card{grid-column:1/-1;padding:clamp(24px,4vw,42px);background:radial-gradient(circle at top right,rgba(46,229,255,.22),transparent 34%),linear-gradient(135deg,#07102f,#050826 58%,#020416);color:#fff;border-color:rgba(46,229,255,.34)}.network-header h2{color:#fff}.network-header p{color:rgba(255,255,255,.82)}.network-svg-wrap{margin:28px 0 0}.network-svg-wrap svg{width:100%;height:auto;display:block;overflow:visible}.network-edge path{fill:none;stroke:#83f2ff;stroke-width:3;stroke-dasharray:0;opacity:.72}.network-edge.is-none path{stroke-dasharray:7 8}.network-edge.is-backward path{stroke:#ffd36e}.network-edge.is-both path{stroke:#8dffbf;stroke-width:4}.network-edge .edge-label rect{fill:rgba(5,12,35,.86);stroke:rgba(126,231,255,.38);stroke-width:1}.network-edge .edge-label text{fill:#eaffff;font-size:12px;font-weight:800;text-anchor:middle;dominant-baseline:middle;stroke:none}.network-node .node-card{fill:#10235f;stroke:#7ee7ff;stroke-width:3;filter:drop-shadow(0 10px 18px rgba(0,0,0,.22))}.network-node.is-core .node-card{fill:#071a42;stroke:#b6ff3b;stroke-width:5}.network-node.is-external .node-card{stroke:#ffd36e}.network-node.is-data-source .node-card{stroke:#8dffbf}.network-node.is-ai .node-card{stroke:#e8a6ff}.network-node.is-user .node-card{stroke:#fff}.network-node text{fill:#fff;font-weight:900;font-size:14px}.network-node.is-core text{font-size:15px}.network-node .kind{fill:#d9fbff;font-size:8.8px;text-transform:uppercase;letter-spacing:.07em}.network-node:hover .node-card,.network-node:focus .node-card{filter:drop-shadow(0 0 8px rgba(46,229,255,.46));stroke-width:4}.network-flow-note{margin:12px 0 0;color:rgba(255,255,255,.74);font-size:.9rem}.network-legend{display:flex;flex-wrap:wrap;gap:14px 26px;margin:22px 0 0;padding:0;list-style:none}.network-legend li{display:flex;align-items:center;color:#fff;margin:0;font-size:.88rem;line-height:1.35}.dot{display:inline-block;flex:0 0 auto;width:11px;height:11px;border:2px solid #7ee7ff;border-radius:99px;margin-right:9px}.network-a11y-list{margin-top:20px;border-top:1px solid rgba(255,255,255,.16);padding-top:16px}.network-a11y-list h3{color:#fff;font-size:1rem}.network-a11y-list li,.network-legacy li{color:rgba(255,255,255,.92)}@media(max-width:900px){.network-svg-wrap{display:none}.network-legend{display:none}.network-a11y-list{display:block}.network-visual-card{padding:22px}.network-a11y-list ul{padding-left:18px}}
 </style>
