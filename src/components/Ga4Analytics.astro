@@ -1,0 +1,135 @@
+---
+import type { PublicAnalyticsSettings } from '@/lib/content/settings';
+const { analytics } = Astro.props as { analytics: PublicAnalyticsSettings };
+const analyticsJson = JSON.stringify(analytics).replace(/</g, '\\u003c');
+---
+<div id="easylink-ga4-runtime" data-analytics-settings={analyticsJson}></div>
+<script is:inline>
+(() => {
+  if (window.__easylinkGa4RuntimeMounted === true) return;
+  window.__easylinkGa4RuntimeMounted = true;
+
+  const mount = document.getElementById('easylink-ga4-runtime');
+  if (!mount) return;
+
+  const rawSettings = JSON.parse(mount.dataset.analyticsSettings || '{}');
+  const MEASUREMENT_ID_PATTERN = /^G-[A-Z0-9]{4,}$/;
+  const settings = {
+    active: rawSettings.active === true,
+    provider: rawSettings.provider === 'ga4' ? 'ga4' : 'none',
+    measurementId: MEASUREMENT_ID_PATTERN.test(String(rawSettings.measurementId || '')) ? String(rawSettings.measurementId) : '',
+    consentMode: rawSettings.consentMode === 'basic' ? 'basic' : '',
+    configurationVersion: Number.isInteger(Number(rawSettings.configurationVersion)) ? Number(rawSettings.configurationVersion) : 0,
+  };
+
+  if (!(settings.active && settings.provider === 'ga4' && settings.measurementId && settings.consentMode === 'basic' && settings.configurationVersion > 0)) return;
+
+  const runtime = window.__easylinkGa4RuntimeState || {
+    scriptRequested: false,
+    configured: false,
+    initialPageViewSent: false,
+    analyticsGranted: false,
+    listenerAttached: false,
+  };
+  window.__easylinkGa4RuntimeState = runtime;
+
+  function getConsentState() {
+    try {
+      const api = window.EasylinkConsent;
+      if (!api || typeof api.getState !== 'function') return null;
+      const state = api.getState();
+      if (!state || typeof state !== 'object') return null;
+      if (state.version !== settings.configurationVersion) return null;
+      return state.analytics === 'granted' ? 'granted' : 'denied';
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function ensureGtag() {
+    window.dataLayer = Array.isArray(window.dataLayer) ? window.dataLayer : [];
+    if (typeof window.gtag !== 'function') {
+      window.gtag = function gtag(){ window.dataLayer.push(arguments); };
+    }
+  }
+
+  function deniedConsentCommand() {
+    return {
+      analytics_storage: 'denied',
+      ad_storage: 'denied',
+      ad_user_data: 'denied',
+      ad_personalization: 'denied',
+    };
+  }
+
+  function grantedAnalyticsConsentCommand() {
+    return {
+      analytics_storage: 'granted',
+      ad_storage: 'denied',
+      ad_user_data: 'denied',
+      ad_personalization: 'denied',
+    };
+  }
+
+  function requestScript() {
+    if (runtime.scriptRequested) return;
+    runtime.scriptRequested = true;
+    const existing = document.querySelector('script[data-easylink-ga4="true"]');
+    if (existing) return;
+    const script = document.createElement('script');
+    script.async = true;
+    script.id = 'easylink-ga4-gtag-js';
+    script.dataset.easylinkGa4 = 'true';
+    script.src = 'https://www.googletagmanager.com/gtag/js?id=' + encodeURIComponent(settings.measurementId);
+    document.head.appendChild(script);
+  }
+
+  function sendInitialPageView() {
+    if (runtime.initialPageViewSent) return;
+    runtime.initialPageViewSent = true;
+    window.gtag('event', 'page_view', {
+      page_title: document.title || '',
+      page_location: window.location.href,
+      page_path: window.location.pathname + window.location.search,
+    });
+  }
+
+  function startGa4() {
+    if (runtime.configured && runtime.initialPageViewSent) return;
+    ensureGtag();
+    if (!runtime.configured) {
+      window.gtag('consent', 'default', deniedConsentCommand());
+      window.gtag('consent', 'update', grantedAnalyticsConsentCommand());
+      window.gtag('js', new Date());
+      window.gtag('config', settings.measurementId, { send_page_view: false });
+      runtime.configured = true;
+    }
+    sendInitialPageView();
+    requestScript();
+  }
+
+  function revokeGa4() {
+    runtime.analyticsGranted = false;
+    if (!runtime.configured && !runtime.scriptRequested) return;
+    ensureGtag();
+    window.gtag('consent', 'update', deniedConsentCommand());
+  }
+
+  function syncFromConsentApi() {
+    const analytics = getConsentState();
+    if (analytics === 'granted') {
+      runtime.analyticsGranted = true;
+      startGa4();
+      return;
+    }
+    revokeGa4();
+  }
+
+  if (!runtime.listenerAttached) {
+    window.addEventListener('easylink:consent-changed', syncFromConsentApi);
+    runtime.listenerAttached = true;
+  }
+
+  syncFromConsentApi();
+})();
+</script>

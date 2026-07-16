@@ -1,6 +1,7 @@
 ---
 import '../styles/global.css';
 import CookieConsent from '@/components/CookieConsent.astro';
+import Ga4Analytics from '@/components/Ga4Analytics.astro';
 import { getPublicSiteSettings } from '@/lib/content/settings';
 const publicSettings = await getPublicSiteSettings();
 const { title = 'Easylink — Cégvezetés, könnyedén.', description = 'Modern ügyviteli rendszer számlázáshoz, adminisztrációhoz, CRM-hez és AI támogatott döntésekhez.' } = Astro.props;
@@ -18,5 +19,6 @@ const { title = 'Easylink — Cégvezetés, könnyedén.', description = 'Modern
   <body>
     <slot />
     <CookieConsent consent={publicSettings.consent} />
+    <Ga4Analytics analytics={publicSettings.analytics} />
   </body>
 </html>

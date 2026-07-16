@@ -2,7 +2,8 @@ import { DEFAULT_SITE_SETTINGS, parseSiteSettingsRows, publicLegalDocuments } fr
 
 export type PublicLegalDocuments = { termsPdfPath: string; privacyPdfPath: string; cookiePdfPath: string };
 export type PublicConsentSettings = { active: boolean; configurationVersion: number; privacyPdfPath: string; cookiePdfPath: string };
-export type PublicSiteSettings = { legalDocuments: PublicLegalDocuments; consent: PublicConsentSettings };
+export type PublicAnalyticsSettings = { active: boolean; provider: 'ga4' | 'none'; measurementId: string; consentMode: 'basic'; configurationVersion: number };
+export type PublicSiteSettings = { legalDocuments: PublicLegalDocuments; consent: PublicConsentSettings; analytics: PublicAnalyticsSettings };
 
 type DbPool = { query(sql: string, params?: unknown[]): Promise<[Array<Record<string, unknown>>, unknown]>; end?: () => Promise<void> };
 
@@ -30,15 +31,25 @@ function safeCandidate(path: string, base = publicBase()) {
 }
 
 // Public activation contract fields: analytics.enabled, analytics.provider, analytics.ga4MeasurementId, analytics.consentMode, analytics.consentConfigurationVersion.
-function analyticsActive(settings: typeof DEFAULT_SITE_SETTINGS) {
+function publicAnalyticsSettings(settings: typeof DEFAULT_SITE_SETTINGS): PublicAnalyticsSettings {
   const a = settings.analytics;
-  return a.enabled === true && a.provider === 'ga4' // provider === 'ga4'
-     && /^G-[A-Z0-9]{4,}$/.test(a.ga4MeasurementId) && a.consentMode === 'basic' && Number.isInteger(a.consentConfigurationVersion) && a.consentConfigurationVersion > 0;
+  const validMeasurementId = /^G-[A-Z0-9]{4,}$/.test(a.ga4MeasurementId);
+  const validVersion = Number.isInteger(a.consentConfigurationVersion) && a.consentConfigurationVersion > 0;
+  const active = a.enabled === true && a.provider === 'ga4' // provider === 'ga4'
+     && validMeasurementId && a.consentMode === 'basic' && validVersion;
+  return {
+    active,
+    provider: active ? 'ga4' : 'none',
+    measurementId: active ? a.ga4MeasurementId : '',
+    consentMode: 'basic',
+    configurationVersion: validVersion ? a.consentConfigurationVersion : 1,
+  };
 }
 
 function publicFallback(): PublicSiteSettings {
   const legalDocuments = publicLegalDocuments(DEFAULT_SITE_SETTINGS);
-  return { legalDocuments, consent: { active: false, configurationVersion: 1, privacyPdfPath: '', cookiePdfPath: '' } };
+  const analytics = publicAnalyticsSettings(DEFAULT_SITE_SETTINGS);
+  return { legalDocuments, analytics, consent: { active: false, configurationVersion: 1, privacyPdfPath: '', cookiePdfPath: '' } };
 }
 
 export async function readPublicSiteSettingsFromPool(pool: DbPool): Promise<PublicSiteSettings> {
@@ -53,11 +64,13 @@ export async function readPublicSiteSettingsFromPool(pool: DbPool): Promise<Publ
     const allowed = new Set(mediaRows.filter((m) => m.status !== 'archived' && m.processing_status === 'ready' && m.type === 'application/pdf').map((m) => String(m.path)));
     legalDocuments = Object.fromEntries(candidates.map(([key, path]) => [key, path && allowed.has(path) ? path : ''])) as PublicLegalDocuments;
   }
+  const analytics = publicAnalyticsSettings(settings);
   return {
     legalDocuments,
+    analytics,
     consent: {
-      active: analyticsActive(settings),
-      configurationVersion: Number.isInteger(settings.analytics.consentConfigurationVersion) && settings.analytics.consentConfigurationVersion > 0 ? settings.analytics.consentConfigurationVersion : 1,
+      active: analytics.active,
+      configurationVersion: analytics.configurationVersion,
       privacyPdfPath: legalDocuments.privacyPdfPath,
       cookiePdfPath: legalDocuments.cookiePdfPath,
     },
