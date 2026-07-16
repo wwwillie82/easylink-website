@@ -48,6 +48,7 @@ assert.doesNotMatch(consent, /dispatchEvent[\s\S]*page load/i);
 assert.match(consent, /applyModalIsolation/);
 assert.match(consent, /restoreModalIsolation/);
 assert.match(consent, /el\.inert = true/);
+assert.match(consent, /mount\.contains\(activeElement\)/);
 assert.doesNotMatch(consent, /gtag|googletagmanager|google-analytics|GTM-/i);
 
 const script = consent.match(/<script is:inline>([\s\S]*?)<\/script>/)[1];
@@ -56,9 +57,10 @@ class FakeElement {
   constructor(name, document, selector = '') { this.name = name; this.document = document; this.selector = selector; this.listeners = {}; this.attrs = {}; this.children = []; this.disabled = false; this.hidden = false; this.checked = false; this.textContent = ''; this.inert = false; this.isConnected = true; document?.allElements?.add(this); }
   focus() { this.document.activeElement = this; }
   addEventListener(type, fn) { this.listeners[type] = fn; }
-  click() { if (this.inert) return; this.listeners.click?.({ currentTarget: this, target: this, preventDefault() {} }); }
+  click() { if (this.inert || !this.isConnected) return; this.focus(); this.listeners.click?.({ currentTarget: this, target: this, preventDefault() {} }); }
   setAttribute(name, value) { this.attrs[name] = String(value); }
-  getAttribute(name) { return Object.prototype.hasOwnProperty.call(this.attrs, name) ? this.attrs[name] : null; }
+  hasAttribute(name) { return Object.prototype.hasOwnProperty.call(this.attrs, name); }
+  getAttribute(name) { return this.hasAttribute(name) ? this.attrs[name] : null; }
   removeAttribute(name) { delete this.attrs[name]; if (name === 'inert') this.inert = false; }
   appendChild(child) { this.children.push(child); return child; }
   querySelector(selector) { return this.document.query(selector); }
@@ -70,10 +72,11 @@ class FakeMount extends FakeElement {
   constructor(document) { super('mount', document); this.dataset = {}; this._innerHTML = ''; }
   set innerHTML(value) { this._innerHTML = String(value); this.document.rebuild(this._innerHTML); }
   get innerHTML() { return this._innerHTML; }
+  contains(element) { return this.document.elementsHas(element); }
 }
 
 class FakeDocument {
-  constructor(cookie = '') { this.listeners = {}; this.cookieValue = cookie; this.cookieWrites = []; this.created = []; this.elements = new Map(); this.allElements = new Set(); this.activeElement = null; this.body = new FakeElement('body', this); this.background = new FakeElement('background', this); this.footerButton = new FakeElement('footer', this, '[data-easylink-open-cookie-settings]'); this.mount = new FakeMount(this); this.body.children = [this.background, this.mount]; this.activeElement = this.body; }
+  constructor(cookie = '', hasFooter = true) { this.listeners = {}; this.cookieValue = cookie; this.cookieWrites = []; this.created = []; this.elements = new Map(); this.allElements = new Set(); this.activeElement = null; this.body = new FakeElement('body', this); this.background = new FakeElement('background', this); this.footerButton = hasFooter ? new FakeElement('footer', this, '[data-easylink-open-cookie-settings]') : null; this.mount = new FakeMount(this); this.body.children = [this.background, this.mount]; this.activeElement = this.body; }
   get cookie() { return this.cookieValue; }
   set cookie(value) { this.cookieWrites.push(value); this.cookieValue = value; }
   getElementById() { return this.mount; }
@@ -82,6 +85,7 @@ class FakeDocument {
   querySelector(selector) { return selector === '[data-easylink-open-cookie-settings]' ? this.footerButton : this.query(selector); }
   query(selector) { return this.elements.get(selector) || null; }
   queryAll() { return this.focusables || []; }
+  elementsHas(element) { return [...this.elements.values()].includes(element) || (this.focusables || []).includes(element); }
   rebuild(html) {
     for (const el of this.elements.values()) el.isConnected = false;
     for (const el of this.focusables || []) el.isConnected = false;
@@ -112,8 +116,8 @@ class FakeDocument {
   }
 }
 
-function runtime({ active = true, version = 1, cookie = '', protocol = 'https:', privacyPdfPath = '/assets/site-media/2026/07/privacy.pdf', cookiePdfPath = '/assets/site-media/2026/07/cookie.pdf' } = {}) {
-  const document = new FakeDocument(cookie);
+function runtime({ active = true, version = 1, cookie = '', protocol = 'https:', privacyPdfPath = '/assets/site-media/2026/07/privacy.pdf', cookiePdfPath = '/assets/site-media/2026/07/cookie.pdf', hasFooter = true } = {}) {
+  const document = new FakeDocument(cookie, hasFooter);
   document.mount.dataset.consentSettings = JSON.stringify({ active, configurationVersion: version, privacyPdfPath, cookiePdfPath });
   const events = [];
   const window = { dispatchEvent(e) { events.push(e); }, CustomEvent: class { constructor(type, init) { this.type = type; this.detail = init.detail; } } };
@@ -156,6 +160,27 @@ assert.match(rt.mount.innerHTML, /el-consent-banner/);
 assert.equal(rt.api.getState().analytics, 'denied');
 const s1 = rt.api.getState(); s1.analytics = 'granted';
 assert.equal(rt.api.getState().analytics, 'denied');
+
+for (const [selector, expected] of [['[data-accept]', 'granted'], ['[data-reject]', 'denied']]) {
+  const flow = runtime({ active: true });
+  const clicked = flow.document.query(selector);
+  clicked.click();
+  assert.equal(flow.mount.innerHTML, '');
+  assert.match(flow.cookieWrites.at(-1), new RegExp(`analytics%22%3A%22${expected}`));
+  assert.equal(flow.events.length, 1);
+  assert.equal(flow.events[0].type, 'easylink:consent-changed');
+  assert.equal(flow.document.activeElement, flow.document.footerButton);
+  assert.equal(flow.document.activeElement.isConnected, true);
+  assert.equal(clicked.isConnected, false);
+}
+
+const withoutFooter = runtime({ active: true, hasFooter: false });
+const withoutFooterButton = withoutFooter.document.query('[data-reject]');
+withoutFooterButton.click();
+assert.equal(withoutFooter.document.activeElement, withoutFooter.document.body);
+assert.equal(withoutFooter.document.activeElement.isConnected, true);
+assert.equal(withoutFooterButton.isConnected, false);
+
 for (const action of ['[data-save]', '[data-accept]', '[data-reject]']) {
   const flow = runtime({ active: true });
   flow.document.query('[data-settings]').click();
