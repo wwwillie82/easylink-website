@@ -6,6 +6,7 @@ import path from 'node:path';
 export const DEFAULT_MEDIA_PUBLIC_BASE_URL = '/assets/site-media';
 export const DEFAULT_MEDIA_MAX_BYTES = 5_242_880;
 export const DEFAULT_MEDIA_VIDEO_MAX_BYTES = 209_715_200;
+export const DEFAULT_MEDIA_DOCUMENT_MAX_BYTES = 10_485_760;
 export const DEFAULT_FFMPEG_PATH = '/usr/bin/ffmpeg';
 export const DEFAULT_FFPROBE_PATH = '/usr/bin/ffprobe';
 const allowed = {
@@ -14,9 +15,11 @@ const allowed = {
   '.jpeg': 'image/jpeg',
   '.png': 'image/png',
   '.mp4': 'video/mp4',
+  '.pdf': 'application/pdf',
 };
 const imageTypes = new Set(['image/webp', 'image/jpeg', 'image/png']);
 const videoTypes = new Set(['video/mp4']);
+const documentTypes = new Set(['application/pdf']);
 
 export function mediaValidationError(message, code = 'INVALID_MEDIA_UPLOAD') { const error = new Error(message); error.code = code; error.status = 400; return error; }
 export function mediaConfig(env = process.env) {
@@ -25,17 +28,19 @@ export function mediaConfig(env = process.env) {
   const publicBase = normalizePublicBase(env.SITE_MEDIA_PUBLIC_BASE_URL || DEFAULT_MEDIA_PUBLIC_BASE_URL);
   const maxBytes = Number(env.SITE_MEDIA_MAX_BYTES || DEFAULT_MEDIA_MAX_BYTES);
   const videoMaxBytes = Number(env.SITE_MEDIA_VIDEO_MAX_BYTES || DEFAULT_MEDIA_VIDEO_MAX_BYTES);
+  const documentMaxBytes = Number(env.SITE_MEDIA_DOCUMENT_MAX_BYTES || DEFAULT_MEDIA_DOCUMENT_MAX_BYTES);
   return {
     storageRoot,
     stagingRoot,
     publicBase,
     maxBytes: Number.isFinite(maxBytes) && maxBytes > 0 ? maxBytes : DEFAULT_MEDIA_MAX_BYTES,
     videoMaxBytes: Number.isFinite(videoMaxBytes) && videoMaxBytes > 0 ? videoMaxBytes : DEFAULT_MEDIA_VIDEO_MAX_BYTES,
+    documentMaxBytes: Number.isFinite(documentMaxBytes) && documentMaxBytes > 0 ? documentMaxBytes : DEFAULT_MEDIA_DOCUMENT_MAX_BYTES,
     ffmpegPath: env.SITE_MEDIA_FFMPEG_PATH || DEFAULT_FFMPEG_PATH,
     ffprobePath: env.SITE_MEDIA_FFPROBE_PATH || DEFAULT_FFPROBE_PATH,
   };
 }
-export function maxRequestBytes(env = process.env) { const cfg = mediaConfig(env); return Math.max(cfg.maxBytes, cfg.videoMaxBytes); }
+export function maxRequestBytes(env = process.env) { const cfg = mediaConfig(env); return Math.max(cfg.maxBytes, cfg.videoMaxBytes, cfg.documentMaxBytes); }
 export function normalizePublicBase(value = DEFAULT_MEDIA_PUBLIC_BASE_URL) {
   const raw = String(value || DEFAULT_MEDIA_PUBLIC_BASE_URL).trim();
   if (!raw.startsWith('/') || raw.startsWith('//') || raw.includes('://') || raw.includes('\0')) throw mediaValidationError('Hibás média public útvonal.', 'INVALID_MEDIA_PUBLIC_BASE');
@@ -52,11 +57,12 @@ function guardInside(root, target) {
 }
 export function isVideoType(type = '') { return videoTypes.has(String(type).toLowerCase()); }
 export function isImageType(type = '') { return imageTypes.has(String(type).toLowerCase()); }
+export function isDocumentType(type = '') { return documentTypes.has(String(type).toLowerCase()); }
 export function safeMediaFilename(originalName, bytes = crypto.randomBytes(4)) {
   const base = path.basename(String(originalName || 'media'));
   if (base !== String(originalName || 'media') || base.includes('..') || base.includes('\\')) throw mediaValidationError('Hibás fájlnév.', 'INVALID_MEDIA_FILENAME');
   const ext = path.extname(base).toLowerCase();
-  if (!allowed[ext]) throw mediaValidationError('Csak WebP, JPG, PNG képek és MP4 videók tölthetők fel.', 'INVALID_MEDIA_TYPE');
+  if (!allowed[ext]) throw mediaValidationError('Csak WebP, JPG, PNG képek, MP4 videók és PDF dokumentumok tölthetők fel.', 'INVALID_MEDIA_TYPE');
   const stem = path.basename(base, path.extname(base)).normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9._-]+/g, '-').replace(/-+/g, '-').replace(/^[._-]+|[._-]+$/g, '') || 'media';
   return `${stem}-${Buffer.from(bytes).toString('hex').slice(0, 8)}${ext === '.jpeg' ? '.jpg' : ext}`;
 }
@@ -66,6 +72,7 @@ export function detectImageMime(buffer) {
   if (buffer.length >= 8 && buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47 && buffer[4] === 0x0d && buffer[5] === 0x0a && buffer[6] === 0x1a && buffer[7] === 0x0a) return 'image/png';
   return '';
 }
+export function detectPdfMime(buffer) { return buffer.length >= 5 && buffer.subarray(0,5).toString('ascii') === '%PDF-' ? 'application/pdf' : ''; }
 export function detectMp4Mime(buffer) {
   if (buffer.length < 12) return '';
   const box = buffer.subarray(4, 8).toString('ascii');
@@ -73,21 +80,21 @@ export function detectMp4Mime(buffer) {
   const brand = buffer.subarray(8, Math.min(buffer.length, 64)).toString('ascii');
   return /(isom|iso2|avc1|mp41|mp42|M4V |MSNV|dash)/.test(brand) ? 'video/mp4' : '';
 }
-export function validateMediaFile({ filename, contentType, buffer, size, maxBytes = DEFAULT_MEDIA_MAX_BYTES, videoMaxBytes = DEFAULT_MEDIA_VIDEO_MAX_BYTES }) {
+export function validateMediaFile({ filename, contentType, buffer, size, maxBytes = DEFAULT_MEDIA_MAX_BYTES, videoMaxBytes = DEFAULT_MEDIA_VIDEO_MAX_BYTES, documentMaxBytes = DEFAULT_MEDIA_DOCUMENT_MAX_BYTES }) {
   const actualSize = Number.isFinite(size) ? size : buffer?.length;
   if (!actualSize) throw mediaValidationError('Üres fájl nem tölthető fel.', 'EMPTY_MEDIA_FILE');
   const ext = path.extname(path.basename(String(filename || ''))).toLowerCase();
   const normalizedExt = ext === '.jpeg' ? '.jpg' : ext;
   const expected = allowed[ext];
-  if (!expected) throw mediaValidationError('Csak WebP, JPG, PNG képek és MP4 videók tölthetők fel.', 'INVALID_MEDIA_TYPE');
-  const limit = isVideoType(expected) ? videoMaxBytes : maxBytes;
+  if (!expected) throw mediaValidationError('Csak WebP, JPG, PNG képek, MP4 videók és PDF dokumentumok tölthetők fel.', 'INVALID_MEDIA_TYPE');
+  const limit = isVideoType(expected) ? videoMaxBytes : (isDocumentType(expected) ? documentMaxBytes : maxBytes);
   if (actualSize > limit) throw mediaValidationError('A fájl túl nagy.', 'MEDIA_FILE_TOO_LARGE');
   if (String(contentType || '').toLowerCase() !== expected) throw mediaValidationError('A MIME típus nem egyezik a fájlkiterjesztéssel.', 'MEDIA_MIME_MISMATCH');
   if (buffer?.length) {
-    const detected = isVideoType(expected) ? detectMp4Mime(buffer) : detectImageMime(buffer);
-    if (detected !== expected) throw mediaValidationError(isVideoType(expected) ? 'A fájl tartalma nem érvényes MP4 videó.' : 'A fájl tartalma nem egyezik a képtípussal.', 'MEDIA_MAGIC_MISMATCH');
+    const detected = isVideoType(expected) ? detectMp4Mime(buffer) : (isDocumentType(expected) ? detectPdfMime(buffer) : detectImageMime(buffer));
+    if (detected !== expected) throw mediaValidationError(isVideoType(expected) ? 'A fájl tartalma nem érvényes MP4 videó.' : (isDocumentType(expected) ? 'A fájl tartalma nem érvényes PDF dokumentum.' : 'A fájl tartalma nem egyezik a képtípussal.'), 'MEDIA_MAGIC_MISMATCH');
   }
-  return { type: expected, ext: normalizedExt, mediaKind: isVideoType(expected) ? 'video' : 'image', limit };
+  return { type: expected, ext: normalizedExt, mediaKind: isVideoType(expected) ? 'video' : (isDocumentType(expected) ? 'document' : 'image'), limit };
 }
 export function datedMediaTarget({ originalName, env = process.env, now = new Date() }) {
   const cfg = mediaConfig(env);
@@ -104,7 +111,7 @@ export async function storeMediaFile({ file, alt = '', env = process.env, now = 
   const arrayBuffer = await file.arrayBuffer();
   const buffer = Buffer.from(arrayBuffer);
   const originalName = file.name || 'media';
-  const { type } = validateMediaFile({ filename: originalName, contentType: file.type, buffer, maxBytes: cfg.maxBytes, videoMaxBytes: cfg.videoMaxBytes });
+  const { type } = validateMediaFile({ filename: originalName, contentType: file.type, buffer, maxBytes: cfg.maxBytes, videoMaxBytes: cfg.videoMaxBytes, documentMaxBytes: cfg.documentMaxBytes });
   const { dir, target, publicPath } = datedMediaTarget({ originalName, env, now });
   await mkdir(dir, { recursive: true });
   await writeFile(target, buffer, { flag: 'wx' });
@@ -115,7 +122,7 @@ export async function finalizeStagedMediaFile({ stagingPath, originalName, alt =
   const st = await stat(stagingPath);
   const fh = await open(stagingPath, 'r');
   const header = await (async () => { try { const b = Buffer.alloc(64); const { bytesRead } = await fh.read(b, 0, b.length, 0); return b.subarray(0, bytesRead); } finally { await fh.close(); } })();
-  const { type } = validateMediaFile({ filename: originalName, contentType, buffer: header, size: st.size, maxBytes: cfg.maxBytes, videoMaxBytes: cfg.videoMaxBytes });
+  const { type } = validateMediaFile({ filename: originalName, contentType, buffer: header, size: st.size, maxBytes: cfg.maxBytes, videoMaxBytes: cfg.videoMaxBytes, documentMaxBytes: cfg.documentMaxBytes });
   const { dir, target, publicPath } = datedMediaTarget({ originalName, env, now });
   await mkdir(dir, { recursive: true });
   await rename(stagingPath, target);

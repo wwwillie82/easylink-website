@@ -17,12 +17,14 @@ assert.match(adminPublishSource, /process\.env\.SITE_ADMIN_ENV_FILE/);
 assert.match(adminPublishSource, /required: true/);
 assert.match(adminPublishSource, /process\.env\[match\[1\]\] !== undefined/);
 
-const content = { navigation: [{ id: 1, title: 'A' }], pages: [{ id: 1, route: '/', title: 'Home' }, { id: 2, route: '/arak/', title: 'Árak' }], blocks: [], settings: [], media: [
+const content = { navigation: [{ id: 1, title: 'A' }], pages: [{ id: 1, route: '/', title: 'Home' }, { id: 2, route: '/arak/', title: 'Árak' }], blocks: [], settings: [{ key: 'legalDocuments', value: JSON.stringify({ termsPdfPath: '/assets/site-media/2026/07/terms-a1b2c3d4.pdf' }) }], media: [
   { path: '/assets/site-media/2026/07/kep-a1b2c3d4.png', status: 'active', type: 'image/png' },
   { path: '/assets/site-media/2026/07/video-a1b2c3d4.mp4', status: 'active', processing_status: 'ready', type: 'video/mp4' },
+  { path: '/assets/site-media/2026/07/terms-a1b2c3d4.pdf', status: 'active', processing_status: 'ready', type: 'application/pdf' },
   { path: '/assets/site-media/2026/07/processing-a1b2c3d4.mp4', status: 'active', processing_status: 'processing', type: 'video/mp4' },
   { path: '/assets/site-media/2026/07/failed-a1b2c3d4.mp4', status: 'active', processing_status: 'failed', type: 'video/mp4' },
   { path: '/assets/site-media/2026/07/archived-a1b2c3d4.mp4', status: 'archived', processing_status: 'ready', type: 'video/mp4' },
+  { path: '/assets/site-media/2026/07/archived-doc-a1b2c3d4.pdf', status: 'archived', processing_status: 'ready', type: 'application/pdf' },
 ] };
 assert.equal(stableJson({ b: 1, a: 2 }), stableJson({ a: 2, b: 1 }));
 assert.equal(contentHash(content), contentHash(structuredClone(content)));
@@ -34,9 +36,11 @@ const mediaStorage = await mkdtemp(join(tmpdir(), 'easylink-publish-media-'));
 await mkdir(join(mediaStorage, '2026', '07'), { recursive: true });
 await writeFile(join(mediaStorage, '2026', '07', 'kep-a1b2c3d4.png'), 'media');
 await writeFile(join(mediaStorage, '2026', '07', 'video-a1b2c3d4.mp4'), 'mp4');
+await writeFile(join(mediaStorage, '2026', '07', 'terms-a1b2c3d4.pdf'), '%PDF-1.7');
 await writeFile(join(mediaStorage, '2026', '07', 'processing-a1b2c3d4.mp4'), 'processing');
 await writeFile(join(mediaStorage, '2026', '07', 'failed-a1b2c3d4.mp4'), 'failed');
 await writeFile(join(mediaStorage, '2026', '07', 'archived-a1b2c3d4.mp4'), 'archived');
+await writeFile(join(mediaStorage, '2026', '07', 'archived-doc-a1b2c3d4.pdf'), '%PDF-1.7');
 await writeFile(join(mediaStorage, '2026', '07', 'orphan-a1b2c3d4.mp4'), 'orphan');
 const repo = {
   async exportContentSnapshot() { return structuredClone(content); },
@@ -57,9 +61,13 @@ assert.equal(result.ok, true);
 assert.equal(deployed, 1);
 assert.equal(existsSync(join(deployedRelease, 'assets', 'site-media', '2026', '07', 'kep-a1b2c3d4.png')), true);
 assert.equal(existsSync(join(deployedRelease, 'assets', 'site-media', '2026', '07', 'video-a1b2c3d4.mp4')), true);
+assert.equal(existsSync(join(deployedRelease, 'assets', 'site-media', '2026', '07', 'terms-a1b2c3d4.pdf')), true);
+assert.equal(snapshots.at(-1).content_json.settings.length, 1);
+assert.equal(snapshots.at(-1).content_json.media.some((m) => m.type === 'application/pdf'), true);
 assert.equal(existsSync(join(deployedRelease, 'assets', 'site-media', '2026', '07', 'processing-a1b2c3d4.mp4')), false);
 assert.equal(existsSync(join(deployedRelease, 'assets', 'site-media', '2026', '07', 'failed-a1b2c3d4.mp4')), false);
 assert.equal(existsSync(join(deployedRelease, 'assets', 'site-media', '2026', '07', 'archived-a1b2c3d4.mp4')), false);
+assert.equal(existsSync(join(deployedRelease, 'assets', 'site-media', '2026', '07', 'archived-doc-a1b2c3d4.pdf')), false);
 assert.equal(existsSync(join(deployedRelease, 'assets', 'site-media', '2026', '07', 'orphan-a1b2c3d4.mp4')), false);
 
 let buildEnvSeen;

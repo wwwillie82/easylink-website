@@ -1,6 +1,8 @@
 import crypto from 'node:crypto';
 import { normalizeBlockItems, parseJsonItems } from './validation.mjs';
 import { imageMimeTypes, normalizeVideoConfig, videoMimeTypes } from '../content/video.mjs';
+import { normalizeSiteSettings, parseSiteSettingsRows } from './settings.mjs';
+import { mediaConfig } from './media-storage.mjs';
 
 function normalizeRoute(value) { const raw = String(value || '').trim().toLowerCase().replace(/[^a-z0-9áéíóöőúüű\/-]+/g, '-'); const withStart = raw.startsWith('/') ? raw : `/${raw}`; return withStart.endsWith('/') ? withStart : `${withStart}/`; }
 function validationError(message) { const error = new Error(message); error.code = 'VALIDATION_ERROR'; error.status = 400; return error; }
@@ -19,6 +21,25 @@ async function requireReadyMedia(pool, path, kind) {
   if (!media || media.path !== path || media.status === 'archived' || media.processing_status !== 'ready' || !types.has(media.type)) throw validationError(kind === 'video' ? 'Csak aktív, kész MP4 videó választható.' : 'Csak aktív, kész WebP/JPG/PNG kép választható posternek.');
   return media;
 }
+
+
+async function requirePdfNotUsedAsLegalDocument(pool, media) {
+  if (!media || media.type !== 'application/pdf') return;
+  const [rows] = await pool.query('SELECT `key`,`value` FROM site_settings WHERE `key`=? LIMIT 1', ['legalDocuments']);
+  const settings = parseSiteSettingsRows(rows);
+  const used = Object.values(settings.legalDocuments || {}).some((path) => path && path === media.path);
+  if (used) throw validationError('A dokumentum jelenleg jogi dokumentumként van használatban. Előbb távolítsd el az Alapadatok oldalon.');
+}
+
+async function requireLegalPdf(pool, pdfPath, env = process.env) {
+  if (!pdfPath) return;
+  const base = `${mediaConfig(env).publicBase}/`;
+  if (!String(pdfPath).startsWith(base)) throw validationError('Csak feltöltött PDF dokumentum választható.');
+  const [rows] = await pool.query('SELECT path,type,status,processing_status FROM site_media_assets WHERE path=? LIMIT 1', [pdfPath]);
+  const media = rows[0];
+  if (!media || media.status === 'archived' || media.processing_status !== 'ready' || media.type !== 'application/pdf') throw validationError('Csak aktív, kész PDF dokumentum választható.');
+}
+
 async function validateVideoConfigForSave(pool, value, context) {
   const config = normalizeVideoConfig(jsonOrNull(value), { context, allowNull: context === 'hero' });
   if (!config) return null;
@@ -41,6 +62,9 @@ function normalizeProgressMessage(value) { const raw = String(value || '').repla
 
 export function createAdminRepository(pool) {
   return {
+
+    async getSiteSettings() { const [rows] = await pool.query('SELECT `key`,`value` FROM site_settings WHERE `key` IN (?,?) ORDER BY `key`', ['analytics','legalDocuments']); return parseSiteSettingsRows(rows); },
+    async updateSiteSettings(input, env = process.env) { const settings = normalizeSiteSettings(input); await requireLegalPdf(pool, settings.legalDocuments.termsPdfPath, env); await requireLegalPdf(pool, settings.legalDocuments.privacyPdfPath, env); await requireLegalPdf(pool, settings.legalDocuments.cookiePdfPath, env); const conn = await pool.getConnection(); try { await conn.beginTransaction(); for (const key of ['analytics','legalDocuments']) await conn.execute('INSERT INTO site_settings (`key`,`value`) VALUES (?,?) ON DUPLICATE KEY UPDATE `value`=VALUES(`value`)', [key, JSON.stringify(settings[key])]); await conn.commit(); return settings; } catch (error) { await conn.rollback(); throw error; } finally { conn.release(); } },
     async findAdminUserByEmail(email) { const [r] = await pool.query('SELECT * FROM site_admin_users WHERE email=? LIMIT 1', [email]); return r[0] || null; },
     async markAdminLogin(id) { await pool.execute('UPDATE site_admin_users SET last_login_at=CURRENT_TIMESTAMP WHERE id=?', [id]); },
     async pages() { const [r] = await pool.query('SELECT id, route, slug, type, title, status, sort_order FROM site_pages ORDER BY sort_order, id'); return r; },
@@ -69,8 +93,8 @@ export function createAdminRepository(pool) {
     async listMedia({ includeArchived = false } = {}) { const [r] = includeArchived ? await pool.query('SELECT * FROM site_media_assets ORDER BY created_at DESC, id DESC') : await pool.query('SELECT * FROM site_media_assets WHERE status<>? ORDER BY created_at DESC, id DESC', ['archived']); return r; },
     async getMedia(id) { const [r] = await pool.query('SELECT * FROM site_media_assets WHERE id=? LIMIT 1', [id]); return r[0] || null; },
     async createMedia(p) { const [r] = await pool.execute('INSERT INTO site_media_assets (path, alt, type, status, processing_status, staging_path, original_size_bytes, final_size_bytes, processing_error, processing_progress_percent, processing_progress_message, processing_progress_updated_at, duration_seconds, width, height) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', [p.path, p.alt || '', p.type || '', p.status || 'active', p.processing_status || 'ready', p.staging_path || null, p.original_size_bytes || null, p.final_size_bytes || null, p.processing_error || null, p.processing_progress_percent ?? null, p.processing_progress_message || null, p.processing_progress_percent == null ? null : new Date(), p.duration_seconds || null, p.width || null, p.height || null]); return { id: r.insertId, path: p.path, alt: p.alt || '', type: p.type || '', status: p.status || 'active', processing_status: p.processing_status || 'ready', staging_path: p.staging_path || null, original_size_bytes: p.original_size_bytes || null, final_size_bytes: p.final_size_bytes || null, processing_error: p.processing_error || null, processing_progress_percent: p.processing_progress_percent ?? null, processing_progress_message: p.processing_progress_message || null, duration_seconds: p.duration_seconds || null, width: p.width || null, height: p.height || null }; },
-    async updateMedia(id, p) { const media = await this.getMedia(id); if (!media) return null; const status = p.status || media.status; if (!['active','archived'].includes(status)) throw validationError('Hibás média státusz.'); await pool.execute('UPDATE site_media_assets SET alt=?, status=? WHERE id=?', [p.alt ?? media.alt ?? '', status, id]); return { ...media, alt: p.alt ?? media.alt ?? '', status }; },
-    async archiveMedia(id) { const media = await this.getMedia(id); if (!media) return null; await pool.execute('UPDATE site_media_assets SET status=? WHERE id=?', ['archived', id]); return { ...media, status: 'archived' }; },
+    async updateMedia(id, p) { const media = await this.getMedia(id); if (!media) return null; const status = p.status || media.status; if (!['active','archived'].includes(status)) throw validationError('Hibás média státusz.'); if (status === 'archived' && media.status !== 'archived') await requirePdfNotUsedAsLegalDocument(pool, media); await pool.execute('UPDATE site_media_assets SET alt=?, status=? WHERE id=?', [p.alt ?? media.alt ?? '', status, id]); return { ...media, alt: p.alt ?? media.alt ?? '', status }; },
+    async archiveMedia(id) { const media = await this.getMedia(id); if (!media) return null; await requirePdfNotUsedAsLegalDocument(pool, media); await pool.execute('UPDATE site_media_assets SET status=? WHERE id=?', ['archived', id]); return { ...media, status: 'archived' }; },
     async claimNextMediaProcessingJob() { const conn = await pool.getConnection(); try { await conn.beginTransaction(); const [rows] = await conn.query("SELECT * FROM site_media_assets WHERE status<>'archived' AND processing_status='queued' ORDER BY id ASC LIMIT 1 FOR UPDATE SKIP LOCKED"); const media = rows[0]; if (!media) { await conn.commit(); return null; } await conn.execute("UPDATE site_media_assets SET processing_status='processing', processing_started_at=CURRENT_TIMESTAMP, processing_error=NULL, processing_progress_percent=0, processing_progress_message='Feldolgozás indult', processing_progress_updated_at=CURRENT_TIMESTAMP WHERE id=? AND processing_status='queued'", [media.id]); await conn.commit(); return { ...media, processing_status: 'processing', processing_started_at: new Date(), processing_progress_percent: 0, processing_progress_message: 'Feldolgozás indult' }; } catch (error) { await conn.rollback(); throw error; } finally { conn.release(); } },
     async recoverStaleMediaProcessingJobs({ timeoutSeconds = 3600 } = {}) { const [r] = await pool.execute("UPDATE site_media_assets SET processing_status='queued', processing_started_at=NULL, processing_progress_percent=NULL, processing_progress_message=NULL, processing_progress_updated_at=NULL, processing_error='Stale processing job recovered.' WHERE status<>'archived' AND processing_status='processing' AND processing_started_at IS NOT NULL AND processing_started_at < (CURRENT_TIMESTAMP - INTERVAL ? SECOND)", [Number(timeoutSeconds || 3600)]); return r.affectedRows || 0; },
     async markMediaProgress(id, p = {}) { const percent = normalizeProgressPercent(p.processing_progress_percent); const message = normalizeProgressMessage(p.processing_progress_message); if (percent == null && !message) return this.getMedia(id); await pool.execute("UPDATE site_media_assets SET processing_progress_percent=COALESCE(?, processing_progress_percent), processing_progress_message=COALESCE(?, processing_progress_message), processing_progress_updated_at=CURRENT_TIMESTAMP, duration_seconds=COALESCE(?, duration_seconds) WHERE id=? AND processing_status='processing'", [percent, message, p.duration_seconds || null, id]); return this.getMedia(id); },
