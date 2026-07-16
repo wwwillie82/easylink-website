@@ -1,10 +1,21 @@
 import assert from 'node:assert/strict';
-import { chmod, mkdir, mkdtemp, stat, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, readFile, stat, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createPublishService, contentHash, ensureWebrootPermissions, stableJson } from '../src/lib/admin/publish.mjs';
 import { publishPanel } from '../src/lib/admin/render.mjs';
+
+
+const workflow = await readFile('.github/workflows/deploy-site-dev.yml', 'utf8');
+assert.doesNotMatch(workflow, /name:\s*Deploy dist to site-dev/);
+assert.doesNotMatch(workflow, /rsync[\s\S]{0,220}dist\/[\s\S]{0,220}\$\{SITE_DEV_WEBROOT\}/);
+assert.match(workflow, /SITE_DEV_ENV_FILE:\s*\/var\/www\/clients\/client1\/web172\/private\/site-admin\.env/);
+assert.match(workflow, /SITE_ADMIN_ENV_FILE="\$SITE_DEV_ENV_FILE"\s*\\[\s\S]*SITE_CONTENT_SOURCE=db\s*\\[\s\S]*SITE_PUBLISH_REPO_DIR="\$SITE_DEV_SOURCE_ROOT"\s*\\[\s\S]*SITE_PUBLISH_WEBROOT="\$SITE_DEV_WEBROOT"\s*\\[\s\S]*SITE_PUBLISH_RELEASES_DIR="\$SITE_DEV_PRIVATE\/releases"\s*\\[\s\S]*npm run admin:publish/);
+const adminPublishSource = await readFile('scripts/admin-publish.mjs', 'utf8');
+assert.match(adminPublishSource, /process\.env\.SITE_ADMIN_ENV_FILE/);
+assert.match(adminPublishSource, /required: true/);
+assert.match(adminPublishSource, /process\.env\[match\[1\]\] !== undefined/);
 
 const content = { navigation: [{ id: 1, title: 'A' }], pages: [{ id: 1, route: '/', title: 'Home' }, { id: 2, route: '/arak/', title: 'Árak' }], blocks: [], settings: [], media: [
   { path: '/assets/site-media/2026/07/kep-a1b2c3d4.png', status: 'active', type: 'image/png' },
@@ -50,6 +61,13 @@ assert.equal(existsSync(join(deployedRelease, 'assets', 'site-media', '2026', '0
 assert.equal(existsSync(join(deployedRelease, 'assets', 'site-media', '2026', '07', 'failed-a1b2c3d4.mp4')), false);
 assert.equal(existsSync(join(deployedRelease, 'assets', 'site-media', '2026', '07', 'archived-a1b2c3d4.mp4')), false);
 assert.equal(existsSync(join(deployedRelease, 'assets', 'site-media', '2026', '07', 'orphan-a1b2c3d4.mp4')), false);
+
+let buildEnvSeen;
+const dbPublish = createPublishService({ repo, env: { SITE_CONTENT_SOURCE: 'db', SITE_PUBLISH_REPO_DIR: process.cwd(), SITE_MEDIA_STORAGE_DIR: mediaStorage }, build: async ({ releasePath, content: exportedContent, env }) => { buildEnvSeen = { source: env.SITE_CONTENT_SOURCE, title: exportedContent.pages[0].title }; await writeValidRelease(releasePath); return { ok: true, log: 'built-db-content' }; }, deploy: async () => ({ ok: true, log: 'deployed-db-content' }) });
+result = await dbPublish.publish({ label: 'deploy publish' });
+assert.equal(result.ok, true);
+assert.deepEqual(buildEnvSeen, { source: 'db', title: 'Home' });
+assert.equal(snapshots.at(-1).label, 'deploy publish');
 
 const webroot = await mkdtemp(join(tmpdir(), 'easylink-webroot-'));
 await mkdir(join(webroot, 'nested'), { recursive: true, mode: 0o700 });
