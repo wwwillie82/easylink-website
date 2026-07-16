@@ -27,7 +27,8 @@
     "smoke:video-admin-runtime": "node tests/video-admin-runtime-smoke.mjs && node tests/video-draft-guard-smoke.mjs",
     "smoke:video-final": "node tests/video-final-smoke.mjs",
     "smoke:ai-preview": "node tests/ai-preview-smoke.mjs",
-    "smoke:network-visual": "node tests/network-visual-smoke.mjs"
+    "smoke:network-visual": "node tests/network-visual-smoke.mjs",
+    "admin:publish": "node scripts/admin-publish.mjs"
   },
   "dependencies": {
     "astro": "7.0.5",

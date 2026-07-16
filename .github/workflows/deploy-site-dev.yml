@@ -25,6 +25,7 @@ jobs:
       SITE_DEV_WEB_USER: web172
       SITE_DEV_ADMIN_SUPERVISOR: easylink_site_dev_admin
       SITE_DEV_REPO_URL: https://github.com/wwwillie82/easylink-website.git
+      SITE_DEV_ENV_FILE: /var/www/clients/client1/web172/private/site-admin.env
 
     steps:
       - name: Checkout
@@ -57,27 +58,6 @@ jobs:
           chmod 600 ~/.ssh/site_dev_deploy_key
           ssh-keyscan -p "${{ secrets.SITE_DEV_SSH_PORT }}" "${{ secrets.SITE_DEV_SSH_HOST }}" >> ~/.ssh/known_hosts
 
-      - name: Deploy dist to site-dev
-        shell: bash
-        run: |
-          set -euo pipefail
-          rsync -az --delete \
-            --exclude='error/' \
-            --exclude='stats/' \
-            -e "ssh -i ~/.ssh/site_dev_deploy_key -p ${{ secrets.SITE_DEV_SSH_PORT }} -o IdentitiesOnly=yes" \
-            dist/ \
-            "${{ secrets.SITE_DEV_SSH_USER }}@${{ secrets.SITE_DEV_SSH_HOST }}:${SITE_DEV_WEBROOT}/"
-
-      - name: Fix webroot ownership
-        shell: bash
-        run: |
-          set -euo pipefail
-          ssh -i ~/.ssh/site_dev_deploy_key \
-            -p "${{ secrets.SITE_DEV_SSH_PORT }}" \
-            -o IdentitiesOnly=yes \
-            "${{ secrets.SITE_DEV_SSH_USER }}@${{ secrets.SITE_DEV_SSH_HOST }}" \
-            "chown -R web172:client1 '${SITE_DEV_WEBROOT}'"
-
       - name: Sync admin source checkout
         shell: bash
         run: |
@@ -86,7 +66,7 @@ jobs:
             -p "${{ secrets.SITE_DEV_SSH_PORT }}" \
             -o IdentitiesOnly=yes \
             "${{ secrets.SITE_DEV_SSH_USER }}@${{ secrets.SITE_DEV_SSH_HOST }}" \
-            "SITE_DEV_SOURCE_ROOT='${SITE_DEV_SOURCE_ROOT}' SITE_DEV_PRIVATE='${SITE_DEV_PRIVATE}' SITE_DEV_NODE_DIR='${SITE_DEV_NODE_DIR}' SITE_DEV_WEB_USER='${SITE_DEV_WEB_USER}' SITE_DEV_REPO_URL='${SITE_DEV_REPO_URL}' SITE_DEV_DEPLOY_SHA='${GITHUB_SHA}' SITE_DEV_ADMIN_SUPERVISOR='${SITE_DEV_ADMIN_SUPERVISOR}' bash -s" <<'REMOTE'
+            "SITE_DEV_SOURCE_ROOT='${SITE_DEV_SOURCE_ROOT}' SITE_DEV_WEBROOT='${SITE_DEV_WEBROOT}' SITE_DEV_PRIVATE='${SITE_DEV_PRIVATE}' SITE_DEV_ENV_FILE='${SITE_DEV_ENV_FILE}' SITE_DEV_NODE_DIR='${SITE_DEV_NODE_DIR}' SITE_DEV_WEB_USER='${SITE_DEV_WEB_USER}' SITE_DEV_REPO_URL='${SITE_DEV_REPO_URL}' SITE_DEV_DEPLOY_SHA='${GITHUB_SHA}' SITE_DEV_ADMIN_SUPERVISOR='${SITE_DEV_ADMIN_SUPERVISOR}' bash -s" <<'REMOTE'
           set -euo pipefail
 
           sudo -u "$SITE_DEV_WEB_USER" env \
@@ -95,6 +75,9 @@ jobs:
             PATH="$SITE_DEV_NODE_DIR:/usr/local/bin:/usr/bin:/bin" \
             npm_config_cache="$SITE_DEV_PRIVATE/.npm-cache" \
             SITE_DEV_SOURCE_ROOT="$SITE_DEV_SOURCE_ROOT" \
+            SITE_DEV_WEBROOT="$SITE_DEV_WEBROOT" \
+            SITE_DEV_PRIVATE="$SITE_DEV_PRIVATE" \
+            SITE_DEV_ENV_FILE="$SITE_DEV_ENV_FILE" \
             SITE_DEV_REPO_URL="$SITE_DEV_REPO_URL" \
             SITE_DEV_DEPLOY_SHA="$SITE_DEV_DEPLOY_SHA" \
             bash -lc '
@@ -124,6 +107,14 @@ jobs:
                 echo "Admin source HEAD mismatch: expected $SITE_DEV_DEPLOY_SHA, got $actual_sha"
                 exit 1
               fi
+
+              echo "--- publish current admin DB content to public webroot"
+              SITE_ADMIN_ENV_FILE="$SITE_DEV_ENV_FILE" \
+              SITE_CONTENT_SOURCE=db \
+              SITE_PUBLISH_REPO_DIR="$SITE_DEV_SOURCE_ROOT" \
+              SITE_PUBLISH_WEBROOT="$SITE_DEV_WEBROOT" \
+              SITE_PUBLISH_RELEASES_DIR="$SITE_DEV_PRIVATE/releases" \
+              npm run admin:publish -- "Deploy publish: $SITE_DEV_DEPLOY_SHA"
             '
 
           supervisorctl restart "$SITE_DEV_ADMIN_SUPERVISOR"
