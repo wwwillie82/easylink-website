@@ -5,8 +5,9 @@
   const TYPES = new Set(['demo', 'trial', 'email']);
   const safe = (value, max = 80) => String(value || '').trim().replace(/[^a-zA-Z0-9_.:-]/g, '-').slice(0, max);
   document.addEventListener('click', (event) => {
+    if (event.defaultPrevented) return;
     const anchor = event.target?.closest?.('a[data-easylink-cta]');
-    if (!anchor || event.defaultPrevented) return;
+    if (!anchor) return;
     const type = String(anchor.dataset.easylinkCta || '').trim();
     if (!TYPES.has(type)) return;
     const api = window.EasylinkAnalytics;
@@ -17,6 +18,6 @@
       cta_slot: safe(anchor.dataset.easylinkCtaSlot),
       page_path: window.location.pathname,
     });
-  }, true);
+  });
 })();
 </script>
