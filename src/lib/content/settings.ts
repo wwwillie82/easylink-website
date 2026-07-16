@@ -42,8 +42,9 @@ export async function getPublicLegalDocuments(): Promise<PublicLegalDocuments> {
   let pool: DbPool | null = null;
   try {
     const mod = await import('@/lib/db/client.mjs');
-    pool = await mod.createPool();
-    return await readPublicLegalDocumentsFromPool(pool);
+    const createdPool = (await mod.createPool()) as unknown as DbPool;
+    pool = createdPool;
+    return await readPublicLegalDocumentsFromPool(createdPool);
   } catch {
     return publicLegalDocuments(DEFAULT_SITE_SETTINGS);
   } finally {

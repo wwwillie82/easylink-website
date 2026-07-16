@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { validateMediaFile, safeMediaFilename, mediaConfig } from '../src/lib/admin/media-storage.mjs';
 import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
-import { readPublicLegalDocumentsFromPoolForTest } from '../src/lib/content/settings.test-helper.mjs';
+import { readPublicLegalDocumentsFromPoolForTest, getPublicLegalDocumentsFromPoolFactoryForTest } from '../src/lib/content/settings.test-helper.mjs';
 import { mediaMatchesKind, mediaPanel, mediaPickerJs } from '../src/lib/admin/render/media.mjs';
 const pdf=Buffer.from('%PDF-1.7\n');
 assert.equal(validateMediaFile({filename:'aszf.pdf', contentType:'application/pdf', buffer:pdf, size:pdf.length}).type, 'application/pdf');
@@ -62,7 +62,33 @@ for (const badPath of ['https://example.com/a.pdf', 'javascript:alert(1)', '/oth
 }
 docs = await readPublicLegalDocumentsFromPoolForTest({ async query(){ return [[{ key: 'legalDocuments', value: '{bad' }], null]; } });
 assert.equal(docs.termsPdfPath, '');
+
+let endCalls = 0;
+let queryCalls = [];
+docs = await getPublicLegalDocumentsFromPoolFactoryForTest(async () => ({
+  async query(sql) {
+    queryCalls.push(sql);
+    if (sql.includes('site_media_assets')) return [[{ path: '/assets/site-media/2026/07/terms.pdf', type: 'application/pdf', status: 'active', processing_status: 'ready' }], null];
+    return [[{ key: 'legalDocuments', value: JSON.stringify({ termsPdfPath: '/assets/site-media/2026/07/terms.pdf' }) }], null];
+  },
+  async end() { endCalls += 1; },
+}));
+assert.equal(docs.termsPdfPath, '/assets/site-media/2026/07/terms.pdf');
+assert.equal(queryCalls.some((sql) => sql.includes('site_settings')), true);
+assert.equal(queryCalls.some((sql) => sql.includes('site_media_assets')), true);
+assert.equal(endCalls, 1);
+endCalls = 0;
+docs = await getPublicLegalDocumentsFromPoolFactoryForTest(async () => ({
+  async query() { throw new Error('query failed'); },
+  async end() { endCalls += 1; },
+}));
+assert.deepEqual(docs, { termsPdfPath: '', privacyPdfPath: '', cookiePdfPath: '' });
+assert.equal(endCalls, 1);
+docs = await getPublicLegalDocumentsFromPoolFactoryForTest(async () => { throw new Error('no db'); });
+assert.deepEqual(docs, { termsPdfPath: '', privacyPdfPath: '', cookiePdfPath: '' });
 const publicSettingsSource = await readFile(new URL('../src/lib/content/settings.ts', import.meta.url), 'utf8');
+assert.match(publicSettingsSource, /const createdPool = \(await mod\.createPool\(\)\) as unknown as DbPool;/);
+assert.match(publicSettingsSource, /readPublicLegalDocumentsFromPool\(createdPool\)/);
 assert.match(publicSettingsSource, /finally \{[\s\S]*pool\?\.end\?\.\(\)/);
 const footer = await readFile(new URL('../src/components/Footer.astro', import.meta.url), 'utf8');
 assert.match(footer, /Általános Szerződési Feltételek/);
