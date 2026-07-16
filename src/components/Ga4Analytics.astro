@@ -31,7 +31,34 @@ const analyticsJson = JSON.stringify(analytics).replace(/</g, '\\u003c');
     analyticsGranted: false,
     listenerAttached: false,
   };
+
+  function sanitizeEvent(name, params) {
+    if (name !== 'cta_click' || !params || typeof params !== 'object') return null;
+    const type = String(params.cta_type || '').trim();
+    if (!['demo', 'trial', 'email'].includes(type)) return null;
+    const clean = (value, max) => String(value || '').trim().replace(/[^a-zA-Z0-9_.:-]/g, '-').slice(0, max);
+    const event = {
+      cta_type: type,
+      cta_id: clean(params.cta_id, 80),
+      cta_slot: clean(params.cta_slot, 80),
+      page_path: String(params.page_path || window.location.pathname || '/').split('?')[0].slice(0, 200),
+    };
+    if (!event.cta_id || !event.cta_slot || !event.page_path.startsWith('/')) return null;
+    return event;
+  }
+
+  function publishApi() {
+    window.EasylinkAnalytics = window.EasylinkAnalytics || {};
+    window.EasylinkAnalytics.trackEvent = function trackEvent(name, params) {
+      const eventParams = sanitizeEvent(name, params);
+      if (!eventParams || !runtime.analyticsGranted || !runtime.configured || typeof window.gtag !== 'function') return false;
+      if (getConsentState() !== 'granted') return false;
+      window.gtag('event', 'cta_click', eventParams);
+      return true;
+    };
+  }
   window.__easylinkGa4RuntimeState = runtime;
+  publishApi();
 
   function getConsentState() {
     try {

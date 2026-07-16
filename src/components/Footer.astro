@@ -2,6 +2,10 @@
 import { getPublicSiteSettings } from '@/lib/content/settings';
 const publicSettings = await getPublicSiteSettings();
 const legalDocuments = publicSettings.legalDocuments;
+const contact = publicSettings.contact;
+const emailHref = contact.email ? `mailto:${contact.email}` : '';
+const phoneHref = contact.phone ? `tel:${contact.phone.replace(/[^+0-9]/g, '')}` : '';
+const addressLines = [contact.companyName, [contact.postalCode, contact.city].filter(Boolean).join(' '), contact.addressLine, contact.country].filter(Boolean);
 const legalLinks = [
   ['Általános Szerződési Feltételek', legalDocuments.termsPdfPath],
   ['Adatkezelési Tájékoztató', legalDocuments.privacyPdfPath],
@@ -18,8 +22,10 @@ const legalLinks = [
     </div>
     <div>
       <b>Kapcsolat</b>
-      <a href="mailto:hello@easylink.hu">hello@easylink.hu</a>
-      <a href={import.meta.env.PUBLIC_DEPLOY_URL ?? 'https://deploy.easylink.hu'}>Belépés / demo</a>
+      {emailHref && <a href={emailHref} data-easylink-cta="email" data-easylink-cta-id="footer-email" data-easylink-cta-slot="footer">{contact.email}</a>}
+      {phoneHref && <a href={phoneHref}>{contact.phone}</a>}
+      {addressLines.length > 0 && <address>{addressLines.map((line) => <span>{line}</span>)}</address>}
+      <a href={import.meta.env.PUBLIC_DEPLOY_URL ?? 'https://deploy.easylink.hu'} data-easylink-cta="demo" data-easylink-cta-id="footer-demo" data-easylink-cta-slot="footer">Belépés / demo</a>
       {publicSettings.consent.active && <button type="button" class="cookie-settings-button" data-easylink-open-cookie-settings>Cookie-beállítások</button>}
       {legalLinks.length > 0 && <div class="legal-links" aria-label="Jogi dokumentumok">{legalLinks.map(([label, href]) => <a href={href} target="_blank" rel="noopener noreferrer">{label}</a>)}</div>}
     </div>
@@ -31,6 +37,7 @@ const legalLinks = [
   .foot { display: flex; justify-content: space-between; gap: 24px; }
   .brand img { width: 180px; }
   .foot div:last-child { display: grid; gap: 10px; }
+  address { display: grid; gap: 4px; font-style: normal; color: var(--color-ink); }
   .legal-links { display: grid; gap: 8px; margin-top: 8px; }
   .foot a:not(.brand), .cookie-settings-button { color: var(--color-navy); font-weight: 700; }
   .cookie-settings-button { appearance: none; border: 0; background: transparent; padding: 0; text-align: left; cursor: pointer; font: inherit; text-decoration: underline; }

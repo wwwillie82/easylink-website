@@ -129,7 +129,7 @@ const contactManifest = () => ({
   group: 'contact', route: '/kapcsolat/', applyAllowed: true, requiresApproval: true,
   page: { title: 'Kapcsolat', slug: 'kapcsolat', type: 'contact', seoTitle: 'Kapcsolat | Easylink', seoDescription: 'Kapcsolatfelvétel Easylink bevezetéshez.', heroEyebrow: 'Kapcsolat', heroTitle: 'Kapcsolódjunk össze.', heroDescription: 'Kérj bemutatót vagy egyeztetést az Easylink bevezetési lehetőségeiről.', heroAsset: '/assets/nati/hero-bg-flow-03.webp' },
   blocks: [
-    { block_key: '/kapcsolat/:cta:0', type: 'cta', title: 'Kapcsolat', body: 'Email: hello@easylink.hu', items: [{ label: 'Írj nekünk', url: 'mailto:hello@easylink.hu' }], sort_order: 10, status: 'published' },
+    { block_key: '/kapcsolat/:cta:0', type: 'cta', title: 'Kapcsolat', body: 'Írj nekünk, vagy kérj demót az alábbi kapcsolati adatokon.', items: [{ label: 'Írj nekünk' }], sort_order: 10, status: 'published' },
     { block_key: '/kapcsolat/:feature-list:1', type: 'feature-list', title: 'Miben tudunk segíteni?', items: ['Megnézzük, mely modulok illenek a jelenlegi működésedhez.', 'Átbeszéljük a hotel/szálláshely, vendéglátó vagy szolgáltatói fókuszt.', 'Összegyűjtjük, milyen integrációs irányokat érdemes előkészíteni.'], sort_order: 20, status: 'published' },
   ],
 });

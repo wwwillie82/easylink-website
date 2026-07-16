@@ -21,6 +21,8 @@ const blockLabels = {
 const asArray = (items) => Array.isArray(items) ? items : [];
 const textOf = (item) => typeof item === 'string' ? item : (item?.title ?? item?.text ?? item?.label ?? '');
 const linkAttrs = (value) => { const href = normalizePublicHref(value); return { href, target: publicHrefTarget(href), rel: publicHrefRel(href) }; };
+const validIntent = (value) => ['demo','trial','email'].includes(String(value || '').trim()) ? String(value).trim() : '';
+const safeId = (value) => String(value || '').trim().replace(/[^a-zA-Z0-9_.:-]/g, '-').slice(0, 80);
 ---
 <section class="section light">
   <div class="container blocks">
@@ -34,7 +36,10 @@ const linkAttrs = (value) => { const href = normalizePublicHref(value); return {
       if (type === 'cta') {
         const cta = items[0] ?? {};
         const link = linkAttrs(cta.url);
-        return <article class="content-card type-cta"><span class="eyebrow">{eyebrow}</span><h2>{block.title}</h2>{block.body && <p>{block.body}</p>}{link.href && <a class="button button-primary" href={link.href} target={link.target} rel={link.rel}>{cta.label || 'Tovább'}</a>}</article>;
+        const intent = validIntent(cta.analyticsIntent);
+        const analyticsId = safeId(cta.analyticsId);
+        const slot = safeId(cta.analyticsSlot || block.blockKey || block.block_key || 'content-block');
+        return <article class="content-card type-cta"><span class="eyebrow">{eyebrow}</span><h2>{block.title}</h2>{block.body && <p>{block.body}</p>}{link.href && <a class="button button-primary" href={link.href} target={link.target} rel={link.rel} data-easylink-cta={intent || undefined} data-easylink-cta-id={intent && analyticsId ? analyticsId : undefined} data-easylink-cta-slot={intent && analyticsId ? slot : undefined}>{cta.label || 'Tovább'}</a>}</article>;
       }
       if (type === 'cards' || type === 'card-grid') {
         return <article class="type-cards"><span class="eyebrow">{eyebrow}</span><h2>{block.title}</h2>{block.body && <p>{block.body}</p>}<ListingCards items={items} /></article>;
