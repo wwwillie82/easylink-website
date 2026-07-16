@@ -1,5 +1,8 @@
 ---
 import '../styles/global.css';
+import CookieConsent from '@/components/CookieConsent.astro';
+import { getPublicSiteSettings } from '@/lib/content/settings';
+const publicSettings = await getPublicSiteSettings();
 const { title = 'Easylink — Cégvezetés, könnyedén.', description = 'Modern ügyviteli rendszer számlázáshoz, adminisztrációhoz, CRM-hez és AI támogatott döntésekhez.' } = Astro.props;
 ---
 <!doctype html>
@@ -14,5 +17,6 @@ const { title = 'Easylink — Cégvezetés, könnyedén.', description = 'Modern
   </head>
   <body>
     <slot />
+    <CookieConsent consent={publicSettings.consent} />
   </body>
 </html>
