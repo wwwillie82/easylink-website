@@ -20,3 +20,19 @@ export async function readPublicLegalDocumentsFromPoolForTest(pool, { publicBase
   const allowed = new Set(mediaRows.filter((m) => m.status !== 'archived' && m.processing_status === 'ready' && m.type === 'application/pdf').map((m) => String(m.path)));
   return Object.fromEntries(candidates.map(([key, path]) => [key, path && allowed.has(path) ? path : '']));
 }
+
+
+export async function getPublicLegalDocumentsFromPoolFactoryForTest(createPool, { shouldTryDb = true } = {}) {
+  const fallback = () => publicLegalDocuments({ legalDocuments: { termsPdfPath: '', privacyPdfPath: '', cookiePdfPath: '' } });
+  if (!shouldTryDb) return fallback();
+  let pool = null;
+  try {
+    const createdPool = await createPool();
+    pool = createdPool;
+    return await readPublicLegalDocumentsFromPoolForTest(createdPool);
+  } catch {
+    return fallback();
+  } finally {
+    await pool?.end?.().catch(() => {});
+  }
+}
