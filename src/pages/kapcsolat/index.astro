@@ -7,13 +7,14 @@ import CTASection from '@/components/CTASection.astro';
 import Footer from '@/components/Footer.astro';
 const deployUrl = import.meta.env.PUBLIC_DEPLOY_URL ?? 'https://deploy.easylink.hu';
 import { getPublicSiteSettings } from '@/lib/content/settings';
+import { safeContactIntro } from '@/lib/content/contact.mjs';
 import { getPublicPageState } from '@/lib/content/provider';
 import { findRoleBlock, withoutBlocks } from '@/lib/content/blockRoles';
 const pageState = await getPublicPageState('/kapcsolat/');
 const page = pageState.page;
 const ctaBlock = findRoleBlock(page?.blocks, 'contact-main', (block) => block.type === 'cta' || block.type === 'text');
 const featureBlock = findRoleBlock(page?.blocks, 'contact-features', (block) => block.type === 'feature-list');
-const ctaItem = ctaBlock?.items?.[0];
+const contactIntro = safeContactIntro(ctaBlock?.body);
 const contactSettings = (await getPublicSiteSettings()).contact;
 const emailHref = contactSettings.email ? `mailto:${contactSettings.email}` : '';
 const phoneHref = contactSettings.phone ? `tel:${contactSettings.phone.replace(/[^+0-9]/g, '')}` : '';
@@ -33,13 +34,13 @@ if (pageState.hiddenByDb) Astro.response.status = 404;
       <div class="container contact-grid">
         <article class="card polished contact">
           <h2>{ctaBlock?.title ?? 'Kapcsolat'}</h2>
-          {ctaBlock?.body && <p>{ctaBlock.body}</p>}
+          {contactIntro && <p>{contactIntro}</p>}
           <div class="contact-values">
             {emailHref && <a href={emailHref} data-easylink-cta="email" data-easylink-cta-id="contact-page-email" data-easylink-cta-slot="contact-page">{contactSettings.email}</a>}
             {phoneHref && <a href={phoneHref}>{contactSettings.phone}</a>}
             {addressLines.length > 0 && <address>{addressLines.map((line) => <span>{line}</span>)}</address>}
           </div>
-          <a class="button button-primary" href={ctaItem?.url ?? deployUrl} data-easylink-cta="demo" data-easylink-cta-id="contact-page-demo" data-easylink-cta-slot="contact-page">{ctaItem?.label ?? 'Demót kérek'}</a>
+          <a class="button button-primary" href={deployUrl} data-easylink-cta="demo" data-easylink-cta-id="contact-page-demo" data-easylink-cta-slot="contact-page">Demót kérek</a>
         </article>
         <article class="card polished contact">
           <h2>{featureBlock?.title ?? 'Miben tudunk segíteni?'}</h2>
