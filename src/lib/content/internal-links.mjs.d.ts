@@ -1,0 +1,13 @@
+export const navigationTargetTypes: readonly ['legacy', 'page', 'external'];
+export function normalizeNavigationTargetType(value: unknown): 'legacy' | 'page' | 'external';
+export function isHttpExternalHref(value: unknown): boolean;
+export function isInternalRouteCandidate(value: unknown): boolean;
+export function normalizeRouteForExactMatch(value: unknown): string;
+export function navigationTitleOverride(value: unknown): string | null;
+export function positiveNavigationPageId(value: unknown): number | null;
+export function normalizeNavigationTargetFields(row?: Record<string, any>, options?: { validPageIds?: Set<number> }): { target_type: 'legacy' | 'page' | 'external'; target_page_id: number | null; title_override: string | null };
+export function resolveNavigationItem(row?: Record<string, any>, page?: Record<string, any> | null): { title: string; href: string; sortOrder: any; status: any };
+export function classifyNavigationHref(value: unknown): { kind: 'external' } | { kind: 'internal'; route: string } | { kind: 'legacy'; reason: string };
+export function originalNavigationCompareFields(nav?: Record<string, any>): { title: string; href: string; target_type: 'legacy' | 'page' | 'external'; target_page_id: number | null; title_override: string | null };
+export function planNavigationBackfillItem(nav: Record<string, any>, routeMatches?: Map<string, any[]>): Record<string, any>;
+export function buildRouteMatchMap(pages?: any[]): Map<string, any[]>;
