@@ -59,7 +59,7 @@ export function buildLiveSmokePlan() {
     { route: '/kinek-szol/', checks: [expected('audiences.heading', 'Kinek szól?'), expected('audiences.card', 'Hoteleknek és szálláshelyeknek')] },
     { route: '/integraciok/', checks: [expected('integrations.heading', 'Csomópontok'), expected('integrations.card', 'NAV Online Számla')] },
     { route: '/arak/', checks: [expected('pricing.grid', 'Mitől függhet az ár?'), expected('pricing.cta', 'Demó alapján pontosítunk')] },
-    { route: '/kapcsolat/', checks: [expected('contact.grid', 'Miben tudunk segíteni?'), expected('contact.email', 'hello@easylink.hu')] },
+    { route: '/kapcsolat/', checks: [expected('contact.grid', 'Miben tudunk segíteni?'), expected('contact.demo', 'Demót kérek')] },
   ];
 
   return { routes: [...routeSet].sort(), contentChecks };
