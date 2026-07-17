@@ -6,7 +6,7 @@ const footer = await readFile(new URL('../src/components/Footer.astro', import.m
 assert.doesNotMatch(footer, /Statikus Astro marketing site staging környezethez\./);
 assert.doesNotMatch(footer, /Belépés \/ demo/);
 assert.doesNotMatch(footer, /footer-demo/);
-assert.match(footer, /<img src="\/assets\/brand\/easylink-logo-horizontal\.png" alt="Easylink"/);
+assert.match(footer, /<img src=\{publicSettings\.brand\.footerLogoPath\} alt=\{publicSettings\.brand\.footerLogoAlt\}/);
 assert.match(footer, /class="footer-brand-column"[\s\S]*class="brand"[\s\S]*class="footer-legal-navigation"/);
 assert.match(footer, /class="footer-legal-navigation"[\s\S]*legalLinks\.map[\s\S]*data-easylink-open-cookie-settings/);
 assert.match(footer, /Általános Szerződési Feltételek/);
@@ -29,6 +29,9 @@ assert.match(footer, /legalDocuments\.cookiePdfPath/);
 assert.match(footer, /publicSettings\.consent\.active && <button[^>]*data-easylink-open-cookie-settings/);
 assert.match(footer, /target="_blank"/);
 assert.match(footer, /rel="noopener noreferrer"/);
+assert.match(footer, /socialLinks\.length > 0/);
+assert.match(footer, /rel="noopener noreferrer me"/);
+for (const platform of ['facebook','instagram','tiktok','youtube','linkedin']) assert.match(footer, new RegExp(platform));
 assert.match(footer, /grid-template-columns: minmax\(0, 1fr\) minmax\(280px, 420px\)/);
 assert.match(footer, /@media \(max-width: 700px\)[\s\S]*grid-template-columns: 1fr/);
 assert.match(footer, /\.foot a:focus-visible, \.cookie-settings-button:focus-visible/);

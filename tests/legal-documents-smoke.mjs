@@ -82,10 +82,10 @@ docs = await getPublicLegalDocumentsFromPoolFactoryForTest(async () => ({
   async query() { throw new Error('query failed'); },
   async end() { endCalls += 1; },
 }));
-assert.deepEqual(docs, { termsPdfPath: '', privacyPdfPath: '', cookiePdfPath: '' });
+assert.deepEqual(docs, { termsPdfPath: '', privacyPdfPath: '', cookiePdfPath: '', items: [] });
 assert.equal(endCalls, 1);
 docs = await getPublicLegalDocumentsFromPoolFactoryForTest(async () => { throw new Error('no db'); });
-assert.deepEqual(docs, { termsPdfPath: '', privacyPdfPath: '', cookiePdfPath: '' });
+assert.deepEqual(docs, { termsPdfPath: '', privacyPdfPath: '', cookiePdfPath: '', items: [] });
 const publicSettingsSource = await readFile(new URL('../src/lib/content/settings.ts', import.meta.url), 'utf8');
 assert.match(publicSettingsSource, /const createdPool = \(await mod\.createPool\(\)\) as unknown as DbPool;/);
 assert.match(publicSettingsSource, /readPublicLegalDocumentsFromPool\(createdPool\)/);

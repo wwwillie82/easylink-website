@@ -73,6 +73,53 @@ function settingsRuntime({ settingsResponse, uploadResponse } = {}) {
     'legalDocuments.termsPdfPath': { name: 'legalDocuments.termsPdfPath', value: '', addEventListener() {} },
     'legalDocuments.privacyPdfPath': { name: 'legalDocuments.privacyPdfPath', value: '', addEventListener() {} },
     'legalDocuments.cookiePdfPath': { name: 'legalDocuments.cookiePdfPath', value: '', addEventListener() {} },
+
+    'legalDocuments.terms.label': { name: 'legalDocuments.terms.label', value: 'Általános Szerződési Feltételek', addEventListener() {} },
+    'legalDocuments.terms.pdfPath': { name: 'legalDocuments.terms.pdfPath', value: '', addEventListener() {}, dispatchEvent() {} },
+    'legalDocuments.terms.active': { name: 'legalDocuments.terms.active', checked: true, value: 'on', addEventListener() {} },
+    'legalDocuments.terms.order': { name: 'legalDocuments.terms.order', value: '1', addEventListener() {} },
+    'legalDocuments.privacy.label': { name: 'legalDocuments.privacy.label', value: 'Adatkezelési Tájékoztató', addEventListener() {} },
+    'legalDocuments.privacy.pdfPath': { name: 'legalDocuments.privacy.pdfPath', value: '', addEventListener() {}, dispatchEvent() {} },
+    'legalDocuments.privacy.active': { name: 'legalDocuments.privacy.active', checked: true, value: 'on', addEventListener() {} },
+    'legalDocuments.privacy.order': { name: 'legalDocuments.privacy.order', value: '2', addEventListener() {} },
+    'legalDocuments.cookie.label': { name: 'legalDocuments.cookie.label', value: 'Cookie Tájékoztató', addEventListener() {} },
+    'legalDocuments.cookie.pdfPath': { name: 'legalDocuments.cookie.pdfPath', value: '', addEventListener() {}, dispatchEvent() {} },
+    'legalDocuments.cookie.active': { name: 'legalDocuments.cookie.active', checked: true, value: 'on', addEventListener() {} },
+    'legalDocuments.cookie.order': { name: 'legalDocuments.cookie.order', value: '3', addEventListener() {} },
+    'brand.headerLogoPath': { name: 'brand.headerLogoPath', value: '', addEventListener() {} },
+    'brand.headerLogoAlt': { name: 'brand.headerLogoAlt', value: 'Easylink', addEventListener() {} },
+    'brand.footerLogoPath': { name: 'brand.footerLogoPath', value: '', addEventListener() {} },
+    'brand.footerLogoAlt': { name: 'brand.footerLogoAlt', value: 'Easylink', addEventListener() {} },
+    searchVisibility: { name: 'searchVisibility', value: 'blocked', addEventListener() {} },
+    'social.linkedin.active': { name: 'social.linkedin.active', checked: false, value: '', addEventListener() {} },
+    'social.linkedin.url': { name: 'social.linkedin.url', value: '', addEventListener() {} },
+    'social.linkedin.order': { name: 'social.linkedin.order', value: '1', addEventListener() {} },
+    'defaultCta.secondaryUrl': { name: 'defaultCta.secondaryUrl', value: '', addEventListener() {} },
+    'contact.country': { name: 'contact.country', value: '', addEventListener() {} },
+    'contact.addressLine': { name: 'contact.addressLine', value: '', addEventListener() {} },
+    'contact.city': { name: 'contact.city', value: '', addEventListener() {} },
+    'contact.postalCode': { name: 'contact.postalCode', value: '', addEventListener() {} },
+    'contact.phone': { name: 'contact.phone', value: '', addEventListener() {} },
+    'contact.email': { name: 'contact.email', value: '', addEventListener() {} },
+    'contact.companyName': { name: 'contact.companyName', value: '', addEventListener() {} },
+    'defaultCta.secondaryLabel': { name: 'defaultCta.secondaryLabel', value: '', addEventListener() {} },
+    'defaultCta.primaryUrl': { name: 'defaultCta.primaryUrl', value: '', addEventListener() {} },
+    'defaultCta.primaryLabel': { name: 'defaultCta.primaryLabel', value: '', addEventListener() {} },
+    'defaultCta.description': { name: 'defaultCta.description', value: '', addEventListener() {} },
+    'defaultCta.title': { name: 'defaultCta.title', value: '', addEventListener() {} },
+    'defaultCta.eyebrow': { name: 'defaultCta.eyebrow', value: '', addEventListener() {} },
+    'social.youtube.active': { name: 'social.youtube.active', checked: false, value: '', addEventListener() {} },
+    'social.youtube.url': { name: 'social.youtube.url', value: '', addEventListener() {} },
+    'social.youtube.order': { name: 'social.youtube.order', value: '1', addEventListener() {} },
+    'social.tiktok.active': { name: 'social.tiktok.active', checked: false, value: '', addEventListener() {} },
+    'social.tiktok.url': { name: 'social.tiktok.url', value: '', addEventListener() {} },
+    'social.tiktok.order': { name: 'social.tiktok.order', value: '1', addEventListener() {} },
+    'social.instagram.active': { name: 'social.instagram.active', checked: false, value: '', addEventListener() {} },
+    'social.instagram.url': { name: 'social.instagram.url', value: '', addEventListener() {} },
+    'social.instagram.order': { name: 'social.instagram.order', value: '1', addEventListener() {} },
+    'social.facebook.active': { name: 'social.facebook.active', checked: false, value: '', addEventListener() {} },
+    'social.facebook.url': { name: 'social.facebook.url', value: '', addEventListener() {} },
+    'social.facebook.order': { name: 'social.facebook.order', value: '1', addEventListener() {} },
   };
   const listeners = {};
   const form = { elements: inputs, onsubmit: null, querySelector(selector) { return selector === 'button[type="submit"]' ? saveButton : null; }, addEventListener(type, fn) { listeners[type] = fn; } };
@@ -84,7 +131,7 @@ function settingsRuntime({ settingsResponse, uploadResponse } = {}) {
   const document = {
     getElementById(id) { return id === 'msg' ? msgEl : id === 'settings-form' ? form : null; },
     querySelector(selector) {
-      if (selector.startsWith('[name="legalDocuments.')) return inputs[selector.slice(7, -2)];
+      if (selector.startsWith('[name="')) return inputs[selector.slice(7, -2)];
       if (selector === '[data-legal-section="termsPdfPath"]') return section;
       return null;
     },
@@ -95,7 +142,7 @@ function settingsRuntime({ settingsResponse, uploadResponse } = {}) {
     },
   };
   const fetchCalls = [];
-  const context = { document, location: { reload() { reloads += 1; } }, FormData: class FormData { constructor(formArg) { this.form = formArg; } }, Event: class Event { constructor(type) { this.type = type; } }, fetch: async (url) => { fetchCalls.push(String(url)); const body = String(url).includes('/api/admin/media') ? uploadResponse : settingsResponse; return { async json() { if (body === 'bad-json') throw new Error('bad json'); return body ?? { ok: true, data: { analytics: {}, legalDocuments: { termsPdfPath: inputs['legalDocuments.termsPdfPath'].value, privacyPdfPath: '', cookiePdfPath: '' } }, publish: { ok: true } }; } }; } };
+  const context = { document, location: { reload() { reloads += 1; } }, FormData: class FormData { constructor(formArg) { this.form = formArg; } }, Event: class Event { constructor(type) { this.type = type; } }, fetch: async (url) => { fetchCalls.push(String(url)); const body = String(url).includes('/api/admin/media') ? uploadResponse : settingsResponse; return { async json() { if (body === 'bad-json') throw new Error('bad json'); return body ?? { ok: true, data: { analytics: {}, legalDocuments: { termsPdfPath: inputs['legalDocuments.terms.pdfPath'].value, privacyPdfPath: '', cookiePdfPath: '' } }, publish: { ok: true } }; } }; } };
   vm.runInNewContext(settingsAdminJs(), context);
   return { msgEl, saveButton, inputs, listeners, form, clearButton, uploadForm, fileInput, current, fetchCalls, reloads: () => reloads };
 }
@@ -141,21 +188,21 @@ rt = settingsRuntime({ uploadResponse: { ok: true, data: { path: '/assets/site-m
 await rt.uploadForm.onsubmit({ preventDefault() {} });
 assert.match(rt.current.innerHTML, /PDF megnyitása/);
 assert.match(rt.current.innerHTML, /\/assets\/site-media\/2026\/07\/terms\.pdf/);
-assert.equal(rt.inputs['legalDocuments.termsPdfPath'].value, '/assets/site-media/2026/07/terms.pdf');
+assert.equal(rt.inputs['legalDocuments.terms.pdfPath'].value, '/assets/site-media/2026/07/terms.pdf');
 assert.equal(rt.fileInput.value, '');
 assert.match(rt.msgEl.innerHTML, /Beállítások mentve/);
 
 rt = settingsRuntime({ uploadResponse: { ok: true, data: { path: '/assets/site-media/2026/07/new.pdf' } }, settingsResponse: { ok: false, error: { message: 'settings save failed' } } });
-rt.inputs['legalDocuments.termsPdfPath'].value = '/assets/site-media/2026/07/old.pdf';
+rt.inputs['legalDocuments.terms.pdfPath'].value = '/assets/site-media/2026/07/old.pdf';
 await rt.uploadForm.onsubmit({ preventDefault() {} });
-assert.equal(rt.inputs['legalDocuments.termsPdfPath'].value, '/assets/site-media/2026/07/old.pdf');
+assert.equal(rt.inputs['legalDocuments.terms.pdfPath'].value, '/assets/site-media/2026/07/old.pdf');
 assert.doesNotMatch(rt.current.innerHTML, /new\.pdf/);
 
 rt = settingsRuntime({ settingsResponse: { ok: true, data: {}, publish: { ok: false, status: 'failed' } } });
-rt.inputs['legalDocuments.termsPdfPath'].value = '/assets/site-media/2026/07/terms.pdf';
+rt.inputs['legalDocuments.terms.pdfPath'].value = '/assets/site-media/2026/07/terms.pdf';
 await rt.clearButton.onclick();
 assert.match(rt.current.innerHTML, /nincs beállítva/);
-assert.equal(rt.inputs['legalDocuments.termsPdfPath'].value, '');
+assert.equal(rt.inputs['legalDocuments.terms.pdfPath'].value, '');
 assert.match(rt.msgEl.innerHTML, /élő oldal változatlan maradt/);
 
 rt = settingsRuntime({ settingsResponse: 'bad-json' });

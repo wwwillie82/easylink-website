@@ -1,10 +1,11 @@
-import { DEFAULT_SITE_SETTINGS, parseSiteSettingsRows, publicLegalDocuments, publicContact } from '@/lib/admin/settings.mjs';
+import { DEFAULT_SITE_SETTINGS, LEGACY_LOGO_PATH, parseSiteSettingsRows, publicLegalDocuments, publicContact, publicBrand, publicSocial } from '@/lib/admin/settings.mjs';
+import { imageMimeTypes } from '@/lib/content/video.mjs';
 
-export type PublicLegalDocuments = { termsPdfPath: string; privacyPdfPath: string; cookiePdfPath: string };
+export type PublicLegalDocuments = { termsPdfPath: string; privacyPdfPath: string; cookiePdfPath: string; items?: Array<{ type: string; label: string; pdfPath: string; active: boolean; order: number }> };
 export type PublicConsentSettings = { active: boolean; configurationVersion: number; privacyPdfPath: string; cookiePdfPath: string };
 export type PublicAnalyticsSettings = { active: boolean; provider: 'ga4' | 'none'; measurementId: string; consentMode: 'basic'; configurationVersion: number };
 export type PublicContactSettings = { companyName: string; email: string; phone: string; postalCode: string; city: string; addressLine: string; country: string };
-export type PublicSiteSettings = { legalDocuments: PublicLegalDocuments; consent: PublicConsentSettings; analytics: PublicAnalyticsSettings; contact: PublicContactSettings };
+export type PublicSiteSettings = { legalDocuments: PublicLegalDocuments; consent: PublicConsentSettings; analytics: PublicAnalyticsSettings; contact: PublicContactSettings; brand: { headerLogoPath: string; headerLogoAlt: string; footerLogoPath: string; footerLogoAlt: string }; social: Array<{ id: string; active: boolean; url: string; order: number }>; searchVisibility: 'blocked' | 'indexable' };
 
 type DbPool = { query(sql: string, params?: unknown[]): Promise<[Array<Record<string, unknown>>, unknown]>; end?: () => Promise<void> };
 
@@ -50,27 +51,44 @@ function publicAnalyticsSettings(settings: typeof DEFAULT_SITE_SETTINGS): Public
 function publicFallback(): PublicSiteSettings {
   const legalDocuments = publicLegalDocuments(DEFAULT_SITE_SETTINGS);
   const analytics = publicAnalyticsSettings(DEFAULT_SITE_SETTINGS);
-  return { legalDocuments, analytics, contact: publicContact(DEFAULT_SITE_SETTINGS) as PublicContactSettings, consent: { active: false, configurationVersion: 1, privacyPdfPath: '', cookiePdfPath: '' } };
+  return { legalDocuments, analytics, contact: publicContact(DEFAULT_SITE_SETTINGS) as PublicContactSettings, brand: publicBrand(DEFAULT_SITE_SETTINGS), social: publicSocial(DEFAULT_SITE_SETTINGS), searchVisibility: 'blocked', consent: { active: false, configurationVersion: 1, privacyPdfPath: '', cookiePdfPath: '' } };
 }
 
 export async function readPublicSiteSettingsFromPool(pool: DbPool): Promise<PublicSiteSettings> {
-  const [rows] = await pool.query('SELECT `key`,`value` FROM site_settings WHERE `key` IN (?,?,?)', ['analytics','legalDocuments','contact']);
+  const [rows] = await pool.query('SELECT `key`,`value` FROM site_settings WHERE `key` IN (?,?,?,?,?,?,?)', ['analytics','legalDocuments','contact','brand','social','defaultCta','searchVisibility']);
   const settings = parseSiteSettingsRows(rows as Array<{ key: string; value: unknown }>);
   const docs = publicLegalDocuments(settings);
-  const candidates = Object.entries(docs).map(([key, path]) => [key, safeCandidate(path)] as const);
-  const wanted = candidates.map(([, path]) => path).filter(Boolean);
-  let legalDocuments = { termsPdfPath: '', privacyPdfPath: '', cookiePdfPath: '' } as PublicLegalDocuments;
+  const docCandidates = (docs.items || []).map((doc) => ({ ...doc, pdfPath: safeCandidate(doc.pdfPath) })).filter((doc) => doc.pdfPath);
+  const wanted = docCandidates.map((doc) => doc.pdfPath);
+  let legalDocuments = { termsPdfPath: '', privacyPdfPath: '', cookiePdfPath: '', items: [] } as PublicLegalDocuments;
   if (wanted.length > 0) {
     const [mediaRows] = await pool.query('SELECT path,type,status,processing_status FROM site_media_assets WHERE path IN (?)', [wanted]);
     const allowed = new Set(mediaRows.filter((m) => m.status !== 'archived' && m.processing_status === 'ready' && m.type === 'application/pdf').map((m) => String(m.path)));
-    legalDocuments = Object.fromEntries(candidates.map(([key, path]) => [key, path && allowed.has(path) ? path : ''])) as PublicLegalDocuments;
+    legalDocuments.items = docCandidates.filter((doc) => allowed.has(doc.pdfPath));
+    for (const doc of legalDocuments.items) {
+      if (doc.type === 'terms') legalDocuments.termsPdfPath = doc.pdfPath;
+      if (doc.type === 'privacy') legalDocuments.privacyPdfPath = doc.pdfPath;
+      if (doc.type === 'cookie') legalDocuments.cookiePdfPath = doc.pdfPath;
+    }
   }
   const analytics = publicAnalyticsSettings(settings as typeof DEFAULT_SITE_SETTINGS);
   const contact = publicContact(settings as typeof DEFAULT_SITE_SETTINGS) as PublicContactSettings;
+  const rawBrand = publicBrand(settings as typeof DEFAULT_SITE_SETTINGS);
+  let brand = { ...rawBrand };
+  const brandCandidates = [rawBrand.headerLogoPath, rawBrand.footerLogoPath].filter((path) => path && path !== LEGACY_LOGO_PATH);
+  if (brandCandidates.length > 0) {
+    const [brandRows] = await pool.query('SELECT path,type,status,processing_status FROM site_media_assets WHERE path IN (?)', [brandCandidates]);
+    const allowedImages = new Set(brandRows.filter((m) => m.status !== 'archived' && m.processing_status === 'ready' && imageMimeTypes.has(String(m.type))).map((m) => String(m.path)));
+    if (!allowedImages.has(rawBrand.headerLogoPath)) brand = { ...brand, headerLogoPath: LEGACY_LOGO_PATH, headerLogoAlt: 'Easylink' };
+    if (!allowedImages.has(rawBrand.footerLogoPath)) brand = { ...brand, footerLogoPath: LEGACY_LOGO_PATH, footerLogoAlt: 'Easylink' };
+  }
   return {
     legalDocuments,
     analytics,
     contact,
+    brand,
+    social: publicSocial(settings as typeof DEFAULT_SITE_SETTINGS),
+    searchVisibility: settings.searchVisibility as 'blocked' | 'indexable',
     consent: {
       active: analytics.active,
       configurationVersion: analytics.configurationVersion,
