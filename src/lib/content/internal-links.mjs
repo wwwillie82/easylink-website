@@ -88,8 +88,9 @@ export function originalNavigationCompareFields(nav = {}) {
 }
 
 export function planNavigationBackfillItem(nav, routeMatches = new Map()) {
-  const normalized = normalizeNavigationTargetFields(nav);
   const original = originalNavigationCompareFields(nav);
+  if (String(nav?.status ?? '').trim().toLowerCase() === 'archived') return { action: 'archived_skipped', id: nav.id, original, reason: 'archivált rekord' };
+  const normalized = normalizeNavigationTargetFields(nav);
   if (normalized.target_type === 'page' || normalized.target_type === 'external') return { action: 'already_migrated', id: nav.id, original };
   const oldResolved = resolveNavigationItem({ ...nav, target_type: 'legacy' });
   const classified = classifyNavigationHref(nav.href);

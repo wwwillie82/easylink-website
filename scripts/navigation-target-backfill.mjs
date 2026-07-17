@@ -26,7 +26,7 @@ export async function createMysqlNavigationBackfillAdapter(pool) {
   };
 }
 
-function emptySummary() { return { page: [], external: [], legacy: [], already_migrated: [], conflict: [], error: [], applied: 0, dryRun: true }; }
+function emptySummary() { return { page: [], external: [], legacy: [], already_migrated: [], archived_skipped: [], conflict: [], error: [], applied: 0, dryRun: true }; }
 
 export async function planNavigationBackfill(adapter) {
   const pages = await adapter.listPages();
@@ -60,6 +60,7 @@ export function formatSummary(summary) {
     `external targetté alakítható: ${summary.external.length}`,
     `legacy marad: ${summary.legacy.length}`,
     `már migrált: ${summary.already_migrated.length}`,
+    `archivált / kihagyva: ${summary.archived_skipped.length}`,
     `conflict / kihagyva: ${summary.conflict.length}`,
     `hiba: ${summary.error.length}`,
     `alkalmazott módosítás: ${summary.applied}`,
