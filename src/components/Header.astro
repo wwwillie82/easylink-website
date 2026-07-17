@@ -1,8 +1,11 @@
 ---
 import { deployUrl } from '@/content/siteNavigation';
 import { listNavigation } from '@/lib/content/provider';
+import { getPublicSiteSettings } from '@/lib/content/settings';
 
 const siteNavigation = await listNavigation();
+const publicSettings = await getPublicSiteSettings();
+const brand = publicSettings.brand;
 ---
 <header class="site-header">
   <div class="container nav-wrap">
@@ -13,8 +16,8 @@ const siteNavigation = await listNavigation();
     >
       <span class="brand-logo-frame">
         <img
-          src="/assets/brand/easylink-logo-horizontal.png"
-          alt="Easylink"
+          src={brand.headerLogoPath}
+          alt={brand.headerLogoAlt}
         />
       </span>
     </a>

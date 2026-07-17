@@ -27,18 +27,21 @@ async function requirePdfNotUsedAsLegalDocument(pool, media) {
   if (!media || media.type !== 'application/pdf') return;
   const [rows] = await pool.query('SELECT `key`,`value` FROM site_settings WHERE `key`=? LIMIT 1', ['legalDocuments']);
   const settings = parseSiteSettingsRows(rows);
-  const used = Object.values(settings.legalDocuments || {}).some((path) => path && path === media.path);
+  const used = [settings.legalDocuments?.termsPdfPath,settings.legalDocuments?.privacyPdfPath,settings.legalDocuments?.cookiePdfPath,...(settings.legalDocuments?.items||[]).map((d)=>d.pdfPath)].some((path) => path && path === media.path);
   if (used) throw validationError('A dokumentum jelenleg jogi dokumentumként van használatban. Előbb távolítsd el az Alapadatok oldalon.');
 }
 
-async function requireLegalPdf(pool, pdfPath, env = process.env) {
-  if (!pdfPath) return;
+async function requireMediaPath(pool, path, env, { type, message, baseMessage }) {
+  if (!path) return;
   const base = `${mediaConfig(env).publicBase}/`;
-  if (!String(pdfPath).startsWith(base)) throw validationError('Csak feltöltött PDF dokumentum választható.');
-  const [rows] = await pool.query('SELECT path,type,status,processing_status FROM site_media_assets WHERE path=? LIMIT 1', [pdfPath]);
+  if (!String(path).startsWith(base)) throw validationError(baseMessage);
+  const [rows] = await pool.query('SELECT path,type,status,processing_status FROM site_media_assets WHERE path=? LIMIT 1', [path]);
   const media = rows[0];
-  if (!media || media.status === 'archived' || media.processing_status !== 'ready' || media.type !== 'application/pdf') throw validationError('Csak aktív, kész PDF dokumentum választható.');
+  const okType = type === 'image' ? imageMimeTypes.has(media?.type) : media?.type === type;
+  if (!media || media.status === 'archived' || media.processing_status !== 'ready' || !okType) throw validationError(message);
 }
+async function requireLegalPdf(pool, pdfPath, env = process.env) { return requireMediaPath(pool, pdfPath, env, { type: 'application/pdf', baseMessage: 'Csak feltöltött PDF dokumentum választható.', message: 'Csak aktív, kész PDF dokumentum választható.' }); }
+async function requireLogoImage(pool, imagePath, env = process.env) { return requireMediaPath(pool, imagePath, env, { type: 'image', baseMessage: 'Csak feltöltött képfájl választható logóként.', message: 'Csak aktív, kész képfájl választható logóként.' }); }
 
 async function validateVideoConfigForSave(pool, value, context) {
   const config = normalizeVideoConfig(jsonOrNull(value), { context, allowNull: context === 'hero' });
@@ -63,8 +66,8 @@ function normalizeProgressMessage(value) { const raw = String(value || '').repla
 export function createAdminRepository(pool) {
   return {
 
-    async getSiteSettings() { const [rows] = await pool.query('SELECT `key`,`value` FROM site_settings WHERE `key` IN (?,?,?) ORDER BY `key`', ['analytics','legalDocuments','contact']); return parseSiteSettingsRows(rows); },
-    async updateSiteSettings(input, env = process.env) { const settings = normalizeSiteSettings(input); await requireLegalPdf(pool, settings.legalDocuments.termsPdfPath, env); await requireLegalPdf(pool, settings.legalDocuments.privacyPdfPath, env); await requireLegalPdf(pool, settings.legalDocuments.cookiePdfPath, env); const conn = await pool.getConnection(); try { await conn.beginTransaction(); for (const key of ['analytics','legalDocuments','contact']) await conn.execute('INSERT INTO site_settings (`key`,`value`) VALUES (?,?) ON DUPLICATE KEY UPDATE `value`=VALUES(`value`)', [key, JSON.stringify(settings[key])]); await conn.commit(); return settings; } catch (error) { await conn.rollback(); throw error; } finally { conn.release(); } },
+    async getSiteSettings() { const [rows] = await pool.query('SELECT `key`,`value` FROM site_settings WHERE `key` IN (?,?,?,?,?,?,?) ORDER BY `key`', ['analytics','legalDocuments','contact','brand','social','defaultCta','searchVisibility']); return parseSiteSettingsRows(rows); },
+    async updateSiteSettings(input, env = process.env) { const settings = normalizeSiteSettings(input); for (const d of settings.legalDocuments.items) await requireLegalPdf(pool, d.pdfPath, env); await requireLogoImage(pool, settings.brand.headerLogoPath, env); await requireLogoImage(pool, settings.brand.footerLogoPath, env); const conn = await pool.getConnection(); try { await conn.beginTransaction(); for (const key of ['analytics','legalDocuments','contact','brand','social','defaultCta','searchVisibility']) await conn.execute('INSERT INTO site_settings (`key`,`value`) VALUES (?,?) ON DUPLICATE KEY UPDATE `value`=VALUES(`value`)', [key, JSON.stringify(settings[key])]); await conn.commit(); return settings; } catch (error) { await conn.rollback(); throw error; } finally { conn.release(); } },
     async findAdminUserByEmail(email) { const [r] = await pool.query('SELECT * FROM site_admin_users WHERE email=? LIMIT 1', [email]); return r[0] || null; },
     async markAdminLogin(id) { await pool.execute('UPDATE site_admin_users SET last_login_at=CURRENT_TIMESTAMP WHERE id=?', [id]); },
     async pages() { const [r] = await pool.query('SELECT id, route, slug, type, title, status, sort_order FROM site_pages ORDER BY sort_order, id'); return r; },
