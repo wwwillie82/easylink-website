@@ -48,11 +48,16 @@ CREATE TABLE IF NOT EXISTS site_navigation_items (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
   title VARCHAR(255) NOT NULL,
   href VARCHAR(512) NOT NULL UNIQUE,
+  target_type VARCHAR(32) NOT NULL DEFAULT 'legacy',
+  target_page_id BIGINT UNSIGNED NULL,
+  title_override VARCHAR(255) NULL,
   sort_order INT NOT NULL DEFAULT 0,
   status VARCHAR(32) NOT NULL DEFAULT 'published',
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  INDEX idx_site_navigation_items_status_order (status, sort_order)
+  INDEX idx_site_navigation_items_status_order (status, sort_order),
+  INDEX idx_site_navigation_items_target_page (target_page_id),
+  CONSTRAINT fk_site_navigation_items_target_page FOREIGN KEY (target_page_id) REFERENCES site_pages(id) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS site_settings (`key` VARCHAR(160) NOT NULL PRIMARY KEY, value JSON NULL, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -70,6 +75,7 @@ CREATE TABLE IF NOT EXISTS site_admin_users (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS site_media_assets (id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY, path VARCHAR(512) NOT NULL, alt VARCHAR(255) NULL, type VARCHAR(80) NULL, status VARCHAR(32) NOT NULL DEFAULT 'active', processing_status VARCHAR(32) NOT NULL DEFAULT 'ready', staging_path VARCHAR(1024) NULL, original_size_bytes BIGINT UNSIGNED NULL, final_size_bytes BIGINT UNSIGNED NULL, processing_error TEXT NULL, processing_progress_percent TINYINT UNSIGNED NULL, processing_progress_message VARCHAR(255) NULL, processing_progress_updated_at TIMESTAMP NULL, duration_seconds DECIMAL(10,3) NULL, width INT UNSIGNED NULL, height INT UNSIGNED NULL, processing_started_at TIMESTAMP NULL, processing_finished_at TIMESTAMP NULL, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, INDEX idx_site_media_processing (processing_status, id), INDEX idx_site_media_processing_claim (processing_status, status, processing_started_at, id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 
 ALTER TABLE site_media_assets ADD COLUMN IF NOT EXISTS processing_status VARCHAR(32) NOT NULL DEFAULT 'ready';
 ALTER TABLE site_media_assets ADD COLUMN IF NOT EXISTS staging_path VARCHAR(1024) NULL;

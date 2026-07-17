@@ -7,6 +7,7 @@ import { layout, loginHtml, mediaPanel, navHtml, pageForm, pagesTable, publishPa
 import { createPublishService, PublishInProgressError } from './publish.mjs';
 import { datedMediaTarget, finalizeStagedMediaFile, isVideoType, maxRequestBytes, mediaConfig, mediaValidationError, removeFileQuietly, storagePathForPublicPath, validateMediaFile } from './media-storage.mjs';
 import { parseMediaMultipart } from './multipart-upload.mjs';
+import { normalizeNavigationTargetType } from '../content/internal-links.mjs';
 
 const apiError = (res, status, code, message) => json(res, status, { ok: false, error: { code, message } });
 const json = (res, status, body, headers = {}) => { res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', ...headers }); res.end(JSON.stringify(body)); };
@@ -25,7 +26,7 @@ async function multipart(req, env) {
 async function readHeader(filePath) { const fh = await open(filePath, 'r'); try { const b = Buffer.alloc(64); const { bytesRead } = await fh.read(b, 0, b.length, 0); return b.subarray(0, bytesRead); } finally { await fh.close(); } }
 function sendFileRange(req, res, filePath, type) { return stat(filePath).then((s) => { const size = s.size; const headers = { 'content-type': type || 'application/octet-stream', 'cache-control': 'private, max-age=60', 'x-content-type-options': 'nosniff', 'accept-ranges': 'bytes' }; const range = req.headers.range; if (!range) { res.writeHead(200, { ...headers, 'content-length': size }); return createReadStream(filePath).pipe(res); } const m = /^bytes=(\d*)-(\d*)$/.exec(String(range)); if (!m) { res.writeHead(416, { ...headers, 'content-range': `bytes */${size}`, 'content-length': 0 }); return res.end(); } let start = m[1] === '' ? 0 : Number(m[1]); let end = m[2] === '' ? size - 1 : Number(m[2]); if (m[1] === '' && m[2] !== '') { const suffix = Number(m[2]); start = Math.max(0, size - suffix); end = size - 1; } if (!Number.isInteger(start) || !Number.isInteger(end) || start < 0 || end < start || start >= size) { res.writeHead(416, { ...headers, 'content-range': `bytes */${size}`, 'content-length': 0 }); return res.end(); } end = Math.min(end, size - 1); res.writeHead(206, { ...headers, 'content-range': `bytes ${start}-${end}/${size}`, 'content-length': end - start + 1 }); return createReadStream(filePath, { start, end }).pipe(res); }); }
 
-function validateNavPayload(payload) {
+export function validateNavPayload(payload) {
   if (!Array.isArray(payload?.items) || payload.items.length === 0) return { ok: false, error: { code: 'INVALID_NAVIGATION_ITEMS', message: 'Legalább egy menüpont szükséges.' } };
   const required = ['title', 'href', 'sort_order', 'status'];
   for (const [index, item] of payload.items.entries()) {
@@ -35,6 +36,14 @@ function validateNavPayload(payload) {
     }
     if (item.id !== undefined && item.id !== null && String(item.id).trim() !== '' && !/^\d+$/.test(String(item.id))) return { ok: false, error: { code: 'INVALID_NAVIGATION_ITEM', message: 'Hibás menüpont azonosító.' } };
     if (!['published','draft','archived'].includes(item.status)) return { ok: false, error: { code: 'INVALID_NAVIGATION_STATUS', message: 'Hibás menüpont státusz.' } };
+    const hasTargetType = item.target_type !== undefined;
+    const hasTargetPageId = item.target_page_id !== undefined && item.target_page_id !== null && String(item.target_page_id).trim() !== '';
+    const hasTitleOverride = item.title_override !== undefined && item.title_override !== null && String(item.title_override).trim() !== '';
+    if (!hasTargetType && (hasTargetPageId || hasTitleOverride)) return { ok: false, error: { code: 'INVALID_NAVIGATION_TARGET', message: 'A cél típusát is meg kell adni a target mezők mellé.' } };
+    if (hasTargetType && normalizeNavigationTargetType(item.target_type) !== String(item.target_type).trim().toLowerCase()) return { ok: false, error: { code: 'INVALID_NAVIGATION_TARGET', message: 'Hibás menüpont cél típusa.' } };
+    const targetType = hasTargetType ? normalizeNavigationTargetType(item.target_type) : 'legacy';
+    if (hasTargetType && targetType === 'page' && (!hasTargetPageId || !/^\d+$/.test(String(item.target_page_id)) || Number(item.target_page_id) <= 0 || !Number.isSafeInteger(Number(item.target_page_id)))) return { ok: false, error: { code: 'INVALID_NAVIGATION_TARGET', message: 'Belső oldal célhoz oldalazonosító szükséges.' } };
+    if (hasTargetType && targetType !== 'page' && (hasTargetPageId || hasTitleOverride)) return { ok: false, error: { code: 'INVALID_NAVIGATION_TARGET', message: 'Legacy és külső link célhoz nem tartozhat oldalazonosító vagy menüfelirat override.' } };
   }
   return { ok: true, data: payload.items };
 }

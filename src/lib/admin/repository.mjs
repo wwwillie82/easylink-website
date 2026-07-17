@@ -3,6 +3,7 @@ import { normalizeBlockItems, parseJsonItems } from './validation.mjs';
 import { imageMimeTypes, normalizeVideoConfig, videoMimeTypes } from '../content/video.mjs';
 import { normalizeSiteSettings, parseSiteSettingsRows } from './settings.mjs';
 import { mediaConfig } from './media-storage.mjs';
+import { normalizeNavigationTargetFields, normalizeNavigationTargetType, resolveNavigationItem } from '../content/internal-links.mjs';
 
 function normalizeRoute(value) { const raw = String(value || '').trim().toLowerCase().replace(/[^a-z0-9áéíóöőúüű\/-]+/g, '-'); const withStart = raw.startsWith('/') ? raw : `/${raw}`; return withStart.endsWith('/') ? withStart : `${withStart}/`; }
 function validationError(message) { const error = new Error(message); error.code = 'VALIDATION_ERROR'; error.status = 400; return error; }
@@ -50,6 +51,38 @@ async function validateVideoConfigForSave(pool, value, context) {
   if (config.poster) await requireReadyMedia(pool, config.poster, 'image');
   return config;
 }
+
+function normalizeNavigationSnapshotRow(row = {}, options = {}) {
+  return { ...row, ...normalizeNavigationTargetFields(row, options) };
+}
+function hasOwn(obj, key) { return Object.prototype.hasOwnProperty.call(obj || {}, key); }
+async function normalizeNavTargetPatch(pool, item, existing = {}) {
+  const typeProvided = hasOwn(item, 'target_type');
+  const pageProvided = hasOwn(item, 'target_page_id');
+  const overrideProvided = hasOwn(item, 'title_override');
+  const existingTarget = normalizeNavigationTargetFields(existing);
+  if (!typeProvided && (pageProvided || overrideProvided)) throw validationError('A cél típusát is meg kell adni a target mezők mellé.');
+  if (!typeProvided && !pageProvided && !overrideProvided) {
+    if (existingTarget.target_type !== 'page') return existingTarget;
+    const [pages] = await pool.query('SELECT id, route, title FROM site_pages WHERE id=? LIMIT 1', [existingTarget.target_page_id]);
+    const page = pages[0];
+    if (!page) return { target_type: 'legacy', target_page_id: null, title_override: null };
+    if (String(item.href || '') !== String(page.route || '')) return { target_type: 'legacy', target_page_id: null, title_override: null };
+    return { target_type: 'page', target_page_id: existingTarget.target_page_id, title_override: String(item.title || '') === String(page.title || '') ? null : String(item.title || '') };
+  }
+  const targetType = typeProvided ? normalizeNavigationTargetType(item.target_type) : existingTarget.target_type;
+  if (targetType === 'page') {
+    const pageId = pageProvided ? item.target_page_id : existingTarget.target_page_id;
+    const normalized = normalizeNavigationTargetFields({ target_type: 'page', target_page_id: pageId, title_override: overrideProvided ? item.title_override : existingTarget.title_override });
+    if (normalized.target_type !== 'page') throw validationError('Belső oldalhivatkozáshoz érvényes oldalazonosító szükséges.');
+    const [pages] = await pool.query('SELECT id FROM site_pages WHERE id=? LIMIT 1', [normalized.target_page_id]);
+    if (!pages[0]) throw validationError('A kiválasztott belső oldal nem található.');
+    return normalized;
+  }
+  if ((pageProvided && item.target_page_id !== undefined && item.target_page_id !== null && String(item.target_page_id).trim() !== '') || (overrideProvided && item.title_override !== undefined && item.title_override !== null && String(item.title_override).trim() !== '')) throw validationError('Legacy és külső link célhoz nem tartozhat oldalazonosító vagy menüfelirat override.');
+  return normalizeNavigationTargetFields({ target_type: targetType });
+}
+
 function normalizeHeroDisplay(p = {}) { return {
   hero_height: normalizeEnum(p.hero_height, HERO_HEIGHTS, 'magasság'),
   hero_image_fit: normalizeEnum(p.hero_image_fit, HERO_FITS, 'kép illesztése'),
@@ -91,8 +124,8 @@ export function createAdminRepository(pool) {
       return { id: r.insertId, block_key: blockKey };
     },
     async deleteBlock(id) { const [r] = await pool.execute('UPDATE site_content_blocks SET status=? WHERE id=?', ['archived', id]); if (r.affectedRows === 0) throw new Error(`Block not found: ${id}`); },
-    async nav() { const [r] = await pool.query('SELECT * FROM site_navigation_items ORDER BY sort_order,id'); return r; },
-    async updateNav(items) { for (const item of items) { if (item.id) { const [existing] = await pool.query('SELECT id FROM site_navigation_items WHERE id=? LIMIT 1', [item.id]); if (!existing[0]) throw new Error(`Navigation item not found: ${item.id}`); await pool.execute('UPDATE site_navigation_items SET title=?, href=?, sort_order=?, status=? WHERE id=?', [item.title, item.href, Number(item.sort_order || 0), item.status, item.id]); } else { await pool.execute('INSERT INTO site_navigation_items (title, href, sort_order, status) VALUES (?,?,?,?)', [item.title, item.href, Number(item.sort_order || 0), item.status]); } } },
+    async nav() { const [r] = await pool.query('SELECT n.*, p.route AS target_route, p.title AS target_title FROM site_navigation_items n LEFT JOIN site_pages p ON p.id=n.target_page_id ORDER BY n.sort_order,n.id'); return r.map((row) => { const normalized = normalizeNavigationSnapshotRow(row); const resolved = resolveNavigationItem(normalized, normalized.target_type === 'page' && row.target_route ? { id: normalized.target_page_id, route: row.target_route, title: row.target_title } : null); return { ...normalized, title: resolved.title, href: resolved.href }; }); },
+    async updateNav(items) { for (const item of items) { if (item.id) { const [rows] = await pool.query('SELECT * FROM site_navigation_items WHERE id=? LIMIT 1', [item.id]); const existing = rows[0]; if (!existing) throw new Error(`Navigation item not found: ${item.id}`); const patch = await normalizeNavTargetPatch(pool, item, existing); if (patch.target_type !== undefined) await pool.execute('UPDATE site_navigation_items SET title=?, href=?, sort_order=?, status=?, target_type=?, target_page_id=?, title_override=? WHERE id=?', [item.title, item.href, Number(item.sort_order || 0), item.status, patch.target_type, patch.target_page_id, patch.title_override, item.id]); else await pool.execute('UPDATE site_navigation_items SET title=?, href=?, sort_order=?, status=? WHERE id=?', [item.title, item.href, Number(item.sort_order || 0), item.status, item.id]); } else { const patch = await normalizeNavTargetPatch(pool, item, { target_type: 'legacy', target_page_id: null, title_override: null }); await pool.execute('INSERT INTO site_navigation_items (title, href, target_type, target_page_id, title_override, sort_order, status) VALUES (?,?,?,?,?,?,?)', [item.title, item.href, patch.target_type || 'legacy', patch.target_page_id ?? null, patch.title_override ?? null, Number(item.sort_order || 0), item.status]); } } },
     async listMedia({ includeArchived = false } = {}) { const [r] = includeArchived ? await pool.query('SELECT * FROM site_media_assets ORDER BY created_at DESC, id DESC') : await pool.query('SELECT * FROM site_media_assets WHERE status<>? ORDER BY created_at DESC, id DESC', ['archived']); return r; },
     async getMedia(id) { const [r] = await pool.query('SELECT * FROM site_media_assets WHERE id=? LIMIT 1', [id]); return r[0] || null; },
     async createMedia(p) { const [r] = await pool.execute('INSERT INTO site_media_assets (path, alt, type, status, processing_status, staging_path, original_size_bytes, final_size_bytes, processing_error, processing_progress_percent, processing_progress_message, processing_progress_updated_at, duration_seconds, width, height) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', [p.path, p.alt || '', p.type || '', p.status || 'active', p.processing_status || 'ready', p.staging_path || null, p.original_size_bytes || null, p.final_size_bytes || null, p.processing_error || null, p.processing_progress_percent ?? null, p.processing_progress_message || null, p.processing_progress_percent == null ? null : new Date(), p.duration_seconds || null, p.width || null, p.height || null]); return { id: r.insertId, path: p.path, alt: p.alt || '', type: p.type || '', status: p.status || 'active', processing_status: p.processing_status || 'ready', staging_path: p.staging_path || null, original_size_bytes: p.original_size_bytes || null, final_size_bytes: p.final_size_bytes || null, processing_error: p.processing_error || null, processing_progress_percent: p.processing_progress_percent ?? null, processing_progress_message: p.processing_progress_message || null, duration_seconds: p.duration_seconds || null, width: p.width || null, height: p.height || null }; },
@@ -116,13 +149,14 @@ export function createAdminRepository(pool) {
       try {
         await conn.beginTransaction();
         await conn.query('DELETE FROM site_content_blocks');
-        await conn.query('DELETE FROM site_pages');
         await conn.query('DELETE FROM site_navigation_items');
+        await conn.query('DELETE FROM site_pages');
         await conn.query('DELETE FROM site_settings');
         await conn.query('DELETE FROM site_media_assets');
         for (const p of content.pages || []) await conn.query('INSERT INTO site_pages SET ?', [p]);
         for (const b of content.blocks || []) await conn.query('INSERT INTO site_content_blocks SET ?', [b]);
-        for (const n of content.navigation || []) await conn.query('INSERT INTO site_navigation_items SET ?', [n]);
+        const validPageIds = new Set((content.pages || []).map((p) => Number(p.id)).filter((id) => Number.isSafeInteger(id) && id > 0));
+        for (const n of content.navigation || []) await conn.query('INSERT INTO site_navigation_items SET ?', [normalizeNavigationSnapshotRow(n, { validPageIds })]);
         for (const st of content.settings || []) await conn.query('INSERT INTO site_settings SET ?', [st]);
         for (const m of content.media || []) await conn.query('INSERT INTO site_media_assets SET ?', [m]);
         await conn.commit();
