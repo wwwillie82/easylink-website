@@ -47,6 +47,9 @@ assert.equal(planNavigationBackfillItem({ id: 6, title: 'Done', href: '/arak/', 
 assert.equal(planNavigationBackfillItem({ id: 60, title: 'External done', href: 'https://example.com', target_type: 'external' }, routeMatches).action, 'already_migrated');
 assert.equal(planNavigationBackfillItem({ id: 61, title: 'Inkonzisztens', href: '/arak/', target_type: 'legacy', target_page_id: 12 }, routeMatches).action, 'page');
 assert.equal(planNavigationBackfillItem({ id: 62, title: 'Hibás page', href: '/missing/', target_type: 'page', target_page_id: 0 }, routeMatches).action, 'legacy');
+assert.equal(planNavigationBackfillItem({ id: 17, title: 'Teszt', href: '/teszt', status: 'archived', target_type: 'legacy' }, routeMatches).action, 'archived_skipped');
+assert.equal(planNavigationBackfillItem({ id: 18, title: 'Archived external', href: 'https://example.com', status: 'archived', target_type: 'legacy' }, routeMatches).action, 'archived_skipped');
+assert.equal(planNavigationBackfillItem({ id: 19, title: 'Archived mismatch', href: '/arak/', status: 'archived', target_type: 'legacy' }, buildRouteMatchMap([{ id: 1, route: '/arak/', title: 'Más' }])).action, 'archived_skipped');
 const ambiguous = buildRouteMatchMap([{ id: 1, route: '/dup/', title: 'A' }, { id: 2, route: '/dup', title: 'B' }]);
 assert.equal(planNavigationBackfillItem({ id: 7, title: 'Dup', href: '/dup/', target_type: 'legacy' }, ambiguous).reason, 'többértelmű route egyezés');
 
@@ -57,6 +60,8 @@ const navRows = [
   { id: 1, title: 'Áraink', href: '/arak/', sort_order: 1, status: 'published', target_type: 'legacy', target_page_id: null, title_override: null },
   { id: 2, title: 'Külső', href: 'https://example.com', sort_order: 2, status: 'published', target_type: 'legacy', target_page_id: null, title_override: null },
   { id: 3, title: 'Query', href: '/arak/?x=1', sort_order: 3, status: 'published', target_type: 'legacy', target_page_id: null, title_override: null },
+  { id: 17, title: 'Teszt', href: '/teszt', sort_order: 4, status: 'archived', target_type: 'legacy', target_page_id: null, title_override: null },
+  ...Array.from({ length: 6 }, (_, index) => ({ id: 20 + index, title: `Migrated ${index}`, href: '/arak/', sort_order: 10 + index, status: 'published', target_type: 'page', target_page_id: 1, title_override: null })),
 ];
 const adapter = {
   async listPages() { return pages; },
@@ -68,23 +73,44 @@ assert.equal(summary.dryRun, true);
 assert.equal(summary.page.length, 1);
 assert.equal(summary.external.length, 1);
 assert.equal(summary.legacy.length, 1);
+assert.equal(summary.archived_skipped.length, 1);
+assert.equal(summary.error.length, 0);
+assert.equal(summary.already_migrated.length, 6);
 assert.equal(navRows[0].target_type, 'legacy');
 summary = await runNavigationBackfill(adapter, { apply: true });
 assert.equal(summary.applied, 2);
+assert.equal(summary.archived_skipped.length, 1);
+assert.equal(summary.error.length, 0);
+assert.equal(navRows.find((r) => r.id === 17).target_type, 'legacy');
 assert.equal(navRows[0].target_type, 'page');
 assert.equal(navRows[0].target_page_id, 1);
 assert.equal(navRows[0].title_override, 'Áraink');
 assert.equal(navRows[1].target_type, 'external');
 const afterApply = await runNavigationBackfill(adapter, { apply: true });
 assert.equal(afterApply.applied, 0);
-assert.equal(afterApply.already_migrated.length, 2);
-assert.match(formatSummary(afterApply), /már migrált: 2/);
+assert.equal(afterApply.already_migrated.length, 8);
+assert.equal(afterApply.archived_skipped.length, 1);
+assert.equal(afterApply.error.length, 0);
+assert.match(formatSummary(afterApply), /már migrált: 8/);
+assert.match(formatSummary(afterApply), /archivált \/ kihagyva: 1/);
 assert.deepEqual(parseArgs([]), { ok: true, help: false, apply: false, dryRun: true });
 assert.equal(parseArgs(['--apply']).apply, true);
 assert.equal(parseArgs(['--apply', '--dry-run']).ok, false);
 assert.equal(parseArgs(['--wat']).ok, false);
 assert.throws(() => execFileSync(process.execPath, ['scripts/navigation-target-backfill.mjs', '--apply', '--dry-run'], { encoding: 'utf8', stdio: 'pipe' }), /A --apply és --dry-run/);
 assert.throws(() => execFileSync(process.execPath, ['scripts/navigation-target-backfill.mjs', '--wat'], { encoding: 'utf8', stdio: 'pipe' }), /Ismeretlen kapcsoló/);
+
+let archivedApplyCalls = 0;
+const archivedOnlySummary = await runNavigationBackfill({ async listPages() { return pages; }, async listNavigation() { return [{ id: 17, title: 'Teszt', href: '/teszt', status: 'archived', target_type: 'legacy' }]; }, async applyUpdate() { archivedApplyCalls += 1; return 1; } }, { apply: true });
+assert.equal(archivedOnlySummary.archived_skipped.length, 1);
+assert.equal(archivedOnlySummary.error.length, 0);
+assert.equal(archivedOnlySummary.applied, 0);
+assert.equal(archivedApplyCalls, 0);
+assert.match(formatSummary(archivedOnlySummary), /archivált \/ kihagyva: 1/);
+const publishedMismatch = await runNavigationBackfill({ async listPages() { return [{ id: 1, route: '/teszt/', title: 'Más' }]; }, async listNavigation() { return [{ id: 21, title: 'Teszt', href: '/teszt', status: 'published', target_type: 'legacy' }]; }, async applyUpdate() { return 1; } }, { apply: true });
+assert.equal(publishedMismatch.error.length, 1);
+assert.equal(publishedMismatch.applied, 0);
+
 const zeroApplySummary = await runNavigationBackfill({ async listPages() { return pages; }, async listNavigation() { return [{ id: 10, title: 'Árak', href: '/arak/', target_type: 'legacy' }]; }, async applyUpdate() { return 0; } }, { apply: true });
 assert.equal(zeroApplySummary.applied, 0);
 assert.equal(zeroApplySummary.conflict.length, 1);
