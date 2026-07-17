@@ -162,7 +162,11 @@ const adminPool = {
     }
     return [{ affectedRows: 1 }, null];
   },
-  async getConnection() { throw new Error('not used'); },
+  async beginTransaction() {},
+  async commit() {},
+  async rollback() {},
+  release() {},
+  async getConnection() { return this; },
 };
 const adminRepo = createAdminRepository(adminPool);
 let adminNav = await adminRepo.nav();

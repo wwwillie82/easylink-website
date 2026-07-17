@@ -35,7 +35,8 @@
     "smoke:ga4-runtime": "node tests/ga4-runtime-smoke.mjs",
     "smoke:cta-tracking": "node tests/cta-tracking-smoke.mjs",
     "smoke:footer": "node tests/footer-smoke.mjs",
-    "smoke:navigation-target": "node tests/navigation-target-smoke.mjs"
+    "smoke:navigation-target": "node tests/navigation-target-smoke.mjs",
+    "smoke:menu-a2b": "node tests/menu-a2b-smoke.mjs"
   },
   "dependencies": {
     "astro": "7.0.5",

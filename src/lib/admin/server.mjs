@@ -7,7 +7,7 @@ import { layout, loginHtml, mediaPanel, navHtml, pageForm, pagesTable, publishPa
 import { createPublishService, PublishInProgressError } from './publish.mjs';
 import { datedMediaTarget, finalizeStagedMediaFile, isVideoType, maxRequestBytes, mediaConfig, mediaValidationError, removeFileQuietly, storagePathForPublicPath, validateMediaFile } from './media-storage.mjs';
 import { parseMediaMultipart } from './multipart-upload.mjs';
-import { normalizeNavigationTargetType } from '../content/internal-links.mjs';
+import { isValidHttpExternalUrl, normalizeNavigationTargetType, positiveNavigationPageId } from '../content/internal-links.mjs';
 
 const apiError = (res, status, code, message) => json(res, status, { ok: false, error: { code, message } });
 const json = (res, status, body, headers = {}) => { res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', ...headers }); res.end(JSON.stringify(body)); };
@@ -16,6 +16,11 @@ const redirect = (res, location, headers = {}) => { res.writeHead(303, { locatio
 async function rawBody(req) { const chunks = []; for await (const c of req) chunks.push(c); return Buffer.concat(chunks).toString('utf8'); }
 async function body(req) { const raw = await rawBody(req); if (!raw) return {}; if (req.headers['content-type']?.includes('application/x-www-form-urlencoded')) return Object.fromEntries(new URLSearchParams(raw)); return JSON.parse(raw); }
 function wantsHtml(req) { return String(req.headers.accept || '').includes('text/html'); }
+function navValidationCode(error) {
+  if (error?.code === 'DUPLICATE_NAVIGATION_HREF' || /Duplikált menüpont link/i.test(String(error?.message || ''))) return 'DUPLICATE_NAVIGATION_HREF';
+  if (error?.code === 'ER_DUP_ENTRY') return 'DUPLICATE_NAVIGATION_HREF';
+  return 'INVALID_NAVIGATION_ITEM';
+}
 function authed(req, env) { return requireAuthFromRequest({ headers: { get: (name) => req.headers[name.toLowerCase()] || '' } }, env); }
 async function multipart(req, env) {
   const maxBytes = maxRequestBytes(env);
@@ -26,9 +31,18 @@ async function multipart(req, env) {
 async function readHeader(filePath) { const fh = await open(filePath, 'r'); try { const b = Buffer.alloc(64); const { bytesRead } = await fh.read(b, 0, b.length, 0); return b.subarray(0, bytesRead); } finally { await fh.close(); } }
 function sendFileRange(req, res, filePath, type) { return stat(filePath).then((s) => { const size = s.size; const headers = { 'content-type': type || 'application/octet-stream', 'cache-control': 'private, max-age=60', 'x-content-type-options': 'nosniff', 'accept-ranges': 'bytes' }; const range = req.headers.range; if (!range) { res.writeHead(200, { ...headers, 'content-length': size }); return createReadStream(filePath).pipe(res); } const m = /^bytes=(\d*)-(\d*)$/.exec(String(range)); if (!m) { res.writeHead(416, { ...headers, 'content-range': `bytes */${size}`, 'content-length': 0 }); return res.end(); } let start = m[1] === '' ? 0 : Number(m[1]); let end = m[2] === '' ? size - 1 : Number(m[2]); if (m[1] === '' && m[2] !== '') { const suffix = Number(m[2]); start = Math.max(0, size - suffix); end = size - 1; } if (!Number.isInteger(start) || !Number.isInteger(end) || start < 0 || end < start || start >= size) { res.writeHead(416, { ...headers, 'content-range': `bytes */${size}`, 'content-length': 0 }); return res.end(); } end = Math.min(end, size - 1); res.writeHead(206, { ...headers, 'content-range': `bytes ${start}-${end}/${size}`, 'content-length': end - start + 1 }); return createReadStream(filePath, { start, end }).pipe(res); }); }
 
-export function validateNavPayload(payload) {
+function positiveSortOrder(value) {
+  if (value === undefined || value === null || String(value).trim() === '') return null;
+  if (!/^\d+$/.test(String(value).trim())) return null;
+  const n = Number(value);
+  return Number.isSafeInteger(n) && n >= 1 ? n : null;
+}
+
+export function validateNavPayload(payload, pages = []) {
+  const pageMap = new Map((pages || []).map((page) => [Number(page.id), page]));
   if (!Array.isArray(payload?.items) || payload.items.length === 0) return { ok: false, error: { code: 'INVALID_NAVIGATION_ITEMS', message: 'Legalább egy menüpont szükséges.' } };
-  const required = ['title', 'href', 'sort_order', 'status'];
+  const required = ['title', 'href', 'status'];
+  const effectiveHrefs = new Map();
   for (const [index, item] of payload.items.entries()) {
     if (!item || typeof item !== 'object') return { ok: false, error: { code: 'INVALID_NAVIGATION_ITEM', message: `Hibás menüpont: ${index + 1}.` } };
     for (const field of required) {
@@ -36,14 +50,28 @@ export function validateNavPayload(payload) {
     }
     if (item.id !== undefined && item.id !== null && String(item.id).trim() !== '' && !/^\d+$/.test(String(item.id))) return { ok: false, error: { code: 'INVALID_NAVIGATION_ITEM', message: 'Hibás menüpont azonosító.' } };
     if (!['published','draft','archived'].includes(item.status)) return { ok: false, error: { code: 'INVALID_NAVIGATION_STATUS', message: 'Hibás menüpont státusz.' } };
+    if (!positiveSortOrder(item.sort_order)) return { ok: false, error: { code: 'INVALID_NAVIGATION_SORT_ORDER', message: 'A sorrend csak pozitív egész szám lehet.' } };
     const hasTargetType = item.target_type !== undefined;
     const hasTargetPageId = item.target_page_id !== undefined && item.target_page_id !== null && String(item.target_page_id).trim() !== '';
     const hasTitleOverride = item.title_override !== undefined && item.title_override !== null && String(item.title_override).trim() !== '';
     if (!hasTargetType && (hasTargetPageId || hasTitleOverride)) return { ok: false, error: { code: 'INVALID_NAVIGATION_TARGET', message: 'A cél típusát is meg kell adni a target mezők mellé.' } };
     if (hasTargetType && normalizeNavigationTargetType(item.target_type) !== String(item.target_type).trim().toLowerCase()) return { ok: false, error: { code: 'INVALID_NAVIGATION_TARGET', message: 'Hibás menüpont cél típusa.' } };
     const targetType = hasTargetType ? normalizeNavigationTargetType(item.target_type) : 'legacy';
-    if (hasTargetType && targetType === 'page' && (!hasTargetPageId || !/^\d+$/.test(String(item.target_page_id)) || Number(item.target_page_id) <= 0 || !Number.isSafeInteger(Number(item.target_page_id)))) return { ok: false, error: { code: 'INVALID_NAVIGATION_TARGET', message: 'Belső oldal célhoz oldalazonosító szükséges.' } };
+    if (hasTargetType && targetType === 'page') {
+      const pageId = positiveNavigationPageId(item.target_page_id);
+      if (!pageId) return { ok: false, error: { code: 'INVALID_NAVIGATION_TARGET', message: 'Belső oldal célhoz oldalazonosító szükséges.' } };
+      const page = pageMap.get(pageId);
+      if (pageMap.size && !page) return { ok: false, error: { code: 'INVALID_NAVIGATION_TARGET', message: 'A kiválasztott belső oldal nem található.' } };
+      if (page && String(item.href || '') !== String(page.route || '')) return { ok: false, error: { code: 'INVALID_NAVIGATION_TARGET', message: 'A belső oldal linkje csak az oldal aktuális route-ja lehet.' } };
+      if (page && hasTitleOverride && String(item.title || '') !== String(item.title_override || '').trim()) return { ok: false, error: { code: 'INVALID_NAVIGATION_TARGET', message: 'Az egyedi menüfelirat és a kompatibilitási title mező eltér.' } };
+      if (page && !hasTitleOverride && String(item.title || '') !== String(page.title || '')) return { ok: false, error: { code: 'INVALID_NAVIGATION_TARGET', message: 'Örökölt feliratnál a title az oldal címe legyen.' } };
+    }
+    if (hasTargetType && targetType === 'external' && !isValidHttpExternalUrl(item.href)) return { ok: false, error: { code: 'INVALID_NAVIGATION_TARGET', message: 'A külső URL csak http:// vagy https:// lehet.' } };
     if (hasTargetType && targetType !== 'page' && (hasTargetPageId || hasTitleOverride)) return { ok: false, error: { code: 'INVALID_NAVIGATION_TARGET', message: 'Legacy és külső link célhoz nem tartozhat oldalazonosító vagy menüfelirat override.' } };
+    const effectiveHref = String(item.href || '').trim();
+    const previousHrefIndex = effectiveHrefs.get(effectiveHref);
+    if (previousHrefIndex !== undefined) return { ok: false, error: { code: 'DUPLICATE_NAVIGATION_HREF', message: `Duplikált menüpont link (${previousHrefIndex + 1}. és ${index + 1}. sor).` } };
+    effectiveHrefs.set(effectiveHref, index);
   }
   return { ok: true, data: payload.items };
 }
@@ -90,7 +118,7 @@ export function createAdminServer({ repo, env = process.env, publishService } = 
       }
       if (url.pathname.startsWith('/api/admin/blocks/') && req.method === 'DELETE') { await repo.deleteBlock(url.pathname.split('/').pop()); return json(res, 200, { ok: true, publish: await publishAfterSave(user, `Blokk inaktiválás`) }); }
       if (url.pathname === '/api/admin/settings') { if (req.method === 'GET') return json(res, 200, { ok: true, data: await repo.getSiteSettings() }); if (req.method === 'PUT' || req.method === 'POST') { try { const data = await repo.updateSiteSettings(await body(req), env); return json(res, 200, { ok: true, data, publish: await publishAfterSave(user, 'Alapadatok mentés') }); } catch (error) { if (error.status === 400 || error.code === 'VALIDATION_ERROR') return apiError(res, 400, 'INVALID_SETTINGS', error.message); throw error; } } }
-      if (url.pathname === '/api/admin/navigation') { if (req.method === 'GET') return json(res, 200, { ok: true, data: await repo.nav() }); const valid = validateNavPayload(await body(req)); if (!valid.ok) return json(res, 400, valid); await repo.updateNav(valid.data); return json(res, 200, { ok: true, publish: await publishAfterSave(user, 'Menü mentés') }); }
+      if (url.pathname === '/api/admin/navigation') { if (req.method === 'GET') return json(res, 200, { ok: true, data: await repo.nav() }); const pages = await repo.pages(); const valid = validateNavPayload(await body(req), pages); if (!valid.ok) return json(res, 400, valid); let navigationIds; try { navigationIds = await repo.updateNav(valid.data); } catch (error) { if (error.status === 400 || error.code === 'VALIDATION_ERROR' || error.code === 'ER_DUP_ENTRY') return apiError(res, 400, navValidationCode(error), error.code === 'ER_DUP_ENTRY' || /Duplikált menüpont link/i.test(String(error.message || '')) ? 'Duplikált menüpont link.' : error.message); throw error; } return json(res, 200, { ok: true, data: { navigationIds }, publish: await publishAfterSave(user, 'Menü mentés') }); }
       if (url.pathname === '/api/admin/media') {
         if (req.method === 'GET') return json(res, 200, { ok: true, data: await repo.listMedia() });
         if (req.method === 'POST') {
@@ -157,7 +185,7 @@ export function createAdminServer({ repo, env = process.env, publishService } = 
       if (url.pathname === '/admin/publish') return html(res, publishPanel({ snapshots: await repo.publishSnapshots(20) }), 200, '/admin/publish');
       if (url.pathname === '/admin/pages') return html(res, pagesTable(await repo.pages()), 200, '/admin/pages');
       if (url.pathname.startsWith('/admin/pages/')) { const page = await repo.page(url.pathname.split('/').pop()); return page ? html(res, pageForm(page), 200, '/admin/pages') : html(res, '<p class="msg err">Az oldal nem található.</p>', 404); }
-      if (url.pathname === '/admin/menu') return html(res, `<h2>Menü</h2>${navHtml(await repo.nav())}`, 200, '/admin/menu');
+      if (url.pathname === '/admin/menu') return html(res, navHtml(await repo.nav(), await repo.pages()), 200, '/admin/menu');
       if (url.pathname === '/admin/media') return html(res, mediaPanel({ maxBytes: mediaConfig(env).maxBytes, videoMaxBytes: mediaConfig(env).videoMaxBytes, documentMaxBytes: mediaConfig(env).documentMaxBytes }), 200, '/admin/media');
       if (url.pathname === '/admin/settings') return html(res, settingsPanel(await repo.getSiteSettings()), 200, '/admin/settings');
       return url.pathname.startsWith('/api/') ? apiError(res, 404, 'NOT_FOUND', 'Not found') : html(res, '<p class="msg err">Nem található.</p>', 404);

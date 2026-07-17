@@ -10,6 +10,15 @@ export function isHttpExternalHref(value) {
   return /^https?:\/\//i.test(String(value ?? '').trim());
 }
 
+export function isValidHttpExternalUrl(value) {
+  try {
+    const url = new URL(String(value ?? '').trim());
+    return (url.protocol === 'http:' || url.protocol === 'https:') && Boolean(url.hostname || url.host);
+  } catch {
+    return false;
+  }
+}
+
 export function isInternalRouteCandidate(value) {
   const raw = String(value ?? '').trim();
   if (!raw || !raw.startsWith('/')) return false;
