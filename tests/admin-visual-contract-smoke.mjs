@@ -19,14 +19,14 @@ for (const type of ['terms','privacy','cookie']) {
   assert.match(card, /Megjelenik a footerben/);
 }
 assert.match(html, /Ez egy előkészített sablon\./);
-assert.equal((html.match(/a jelenlegi Easylink alaplogó fog megjelenni/g) || []).length, 2);
+assert.equal((html.match(/A jelenlegi Easylink alaplogó fog megjelenni/g) || []).length, 2);
 assert.match(html, /<div class="admin-save-bar">[\s\S]*<button type="submit">Beállítások mentése és élesítés<\/button>/);
 assert.match(settingsAdminJs(), /setupDirtyForm\(form,\(\)=>JSON\.stringify\(payload\(\)\)\)/);
 
 const layout = await readFile('src/lib/admin/render/layout.mjs', 'utf8');
 assert.match(layout, /\.admin-section/);
 assert.match(layout, /\.admin-grid[^}]*grid-template-columns:repeat\(auto-fit,minmax\(240px,1fr\)\)/);
-assert.match(layout, /@media\(max-width:680px\)\{\.admin-grid,\.grid,\.admin-grid--compact\{grid-template-columns:1fr\}/);
+assert.match(layout, /@media\(max-width:680px\)\{\.admin-grid,\.grid,\.admin-grid--compact,\.admin-grid--social\{grid-template-columns:1fr\}/);
 
 const publicCssFiles = ['src/styles/global.css'];
 for (const file of publicCssFiles) {
