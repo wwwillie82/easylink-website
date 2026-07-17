@@ -3,7 +3,7 @@ import { normalizeBlockItems, parseJsonItems } from './validation.mjs';
 import { imageMimeTypes, normalizeVideoConfig, videoMimeTypes } from '../content/video.mjs';
 import { normalizeSiteSettings, parseSiteSettingsRows } from './settings.mjs';
 import { mediaConfig } from './media-storage.mjs';
-import { normalizeNavigationTargetFields, normalizeNavigationTargetType, resolveNavigationItem } from '../content/internal-links.mjs';
+import { isValidHttpExternalUrl, normalizeNavigationTargetFields, normalizeNavigationTargetType, resolveNavigationItem } from '../content/internal-links.mjs';
 
 function normalizeRoute(value) { const raw = String(value || '').trim().toLowerCase().replace(/[^a-z0-9áéíóöőúüű\/-]+/g, '-'); const withStart = raw.startsWith('/') ? raw : `/${raw}`; return withStart.endsWith('/') ? withStart : `${withStart}/`; }
 function validationError(message) { const error = new Error(message); error.code = 'VALIDATION_ERROR'; error.status = 400; return error; }
@@ -56,6 +56,35 @@ function normalizeNavigationSnapshotRow(row = {}, options = {}) {
   return { ...row, ...normalizeNavigationTargetFields(row, options) };
 }
 function hasOwn(obj, key) { return Object.prototype.hasOwnProperty.call(obj || {}, key); }
+function normalizeNavSortOrder(value) {
+  if (value === undefined || value === null || String(value).trim() === '') throw validationError('A sorrend csak pozitív egész szám lehet.');
+  if (!/^\d+$/.test(String(value).trim())) throw validationError('A sorrend csak pozitív egész szám lehet.');
+  const n = Number(value);
+  if (!Number.isSafeInteger(n) || n < 1) throw validationError('A sorrend csak pozitív egész szám lehet.');
+  return n;
+}
+function validateUniqueNavigationHrefs(items = []) {
+  const seen = new Map();
+  for (const [index, item] of items.entries()) {
+    const href = String(item?.href || '').trim();
+    if (!href) continue;
+    if (seen.has(href)) throw validationError(`Duplikált menüpont link (${seen.get(href) + 1}. és ${index + 1}. sor).`);
+    seen.set(href, index);
+  }
+}
+
+async function validateNavigationHrefConflicts(pool, items = []) {
+  for (const item of items) {
+    const href = String(item?.href || '').trim();
+    if (!href) continue;
+    const id = item?.id && /^\d+$/.test(String(item.id)) ? Number(item.id) : 0;
+    const [rows] = id
+      ? await pool.query('SELECT id FROM site_navigation_items WHERE href=? AND id<>? LIMIT 1', [href, id])
+      : await pool.query('SELECT id FROM site_navigation_items WHERE href=? LIMIT 1', [href]);
+    if (rows[0]) throw validationError('Duplikált menüpont link.');
+  }
+}
+
 async function normalizeNavTargetPatch(pool, item, existing = {}) {
   const typeProvided = hasOwn(item, 'target_type');
   const pageProvided = hasOwn(item, 'target_page_id');
@@ -75,11 +104,16 @@ async function normalizeNavTargetPatch(pool, item, existing = {}) {
     const pageId = pageProvided ? item.target_page_id : existingTarget.target_page_id;
     const normalized = normalizeNavigationTargetFields({ target_type: 'page', target_page_id: pageId, title_override: overrideProvided ? item.title_override : existingTarget.title_override });
     if (normalized.target_type !== 'page') throw validationError('Belső oldalhivatkozáshoz érvényes oldalazonosító szükséges.');
-    const [pages] = await pool.query('SELECT id FROM site_pages WHERE id=? LIMIT 1', [normalized.target_page_id]);
-    if (!pages[0]) throw validationError('A kiválasztott belső oldal nem található.');
+    const [pages] = await pool.query('SELECT id, route, title FROM site_pages WHERE id=? LIMIT 1', [normalized.target_page_id]);
+    const page = pages[0];
+    if (!page) throw validationError('A kiválasztott belső oldal nem található.');
+    if (String(item.href || '') !== String(page.route || '')) throw validationError('A belső oldal linkje csak az oldal aktuális route-ja lehet.');
+    if (normalized.title_override && String(item.title || '') !== String(normalized.title_override)) throw validationError('Az egyedi menüfelirat és a kompatibilitási title mező eltér.');
+    if (!normalized.title_override && String(item.title || '') !== String(page.title || '')) throw validationError('Örökölt feliratnál a title az oldal címe legyen.');
     return normalized;
   }
   if ((pageProvided && item.target_page_id !== undefined && item.target_page_id !== null && String(item.target_page_id).trim() !== '') || (overrideProvided && item.title_override !== undefined && item.title_override !== null && String(item.title_override).trim() !== '')) throw validationError('Legacy és külső link célhoz nem tartozhat oldalazonosító vagy menüfelirat override.');
+  if (targetType === 'external' && !isValidHttpExternalUrl(item.href)) throw validationError('A külső URL csak http:// vagy https:// lehet.');
   return normalizeNavigationTargetFields({ target_type: targetType });
 }
 
@@ -125,7 +159,7 @@ export function createAdminRepository(pool) {
     },
     async deleteBlock(id) { const [r] = await pool.execute('UPDATE site_content_blocks SET status=? WHERE id=?', ['archived', id]); if (r.affectedRows === 0) throw new Error(`Block not found: ${id}`); },
     async nav() { const [r] = await pool.query('SELECT n.*, p.route AS target_route, p.title AS target_title FROM site_navigation_items n LEFT JOIN site_pages p ON p.id=n.target_page_id ORDER BY n.sort_order,n.id'); return r.map((row) => { const normalized = normalizeNavigationSnapshotRow(row); const resolved = resolveNavigationItem(normalized, normalized.target_type === 'page' && row.target_route ? { id: normalized.target_page_id, route: row.target_route, title: row.target_title } : null); return { ...normalized, title: resolved.title, href: resolved.href }; }); },
-    async updateNav(items) { for (const item of items) { if (item.id) { const [rows] = await pool.query('SELECT * FROM site_navigation_items WHERE id=? LIMIT 1', [item.id]); const existing = rows[0]; if (!existing) throw new Error(`Navigation item not found: ${item.id}`); const patch = await normalizeNavTargetPatch(pool, item, existing); if (patch.target_type !== undefined) await pool.execute('UPDATE site_navigation_items SET title=?, href=?, sort_order=?, status=?, target_type=?, target_page_id=?, title_override=? WHERE id=?', [item.title, item.href, Number(item.sort_order || 0), item.status, patch.target_type, patch.target_page_id, patch.title_override, item.id]); else await pool.execute('UPDATE site_navigation_items SET title=?, href=?, sort_order=?, status=? WHERE id=?', [item.title, item.href, Number(item.sort_order || 0), item.status, item.id]); } else { const patch = await normalizeNavTargetPatch(pool, item, { target_type: 'legacy', target_page_id: null, title_override: null }); await pool.execute('INSERT INTO site_navigation_items (title, href, target_type, target_page_id, title_override, sort_order, status) VALUES (?,?,?,?,?,?,?)', [item.title, item.href, patch.target_type || 'legacy', patch.target_page_id ?? null, patch.title_override ?? null, Number(item.sort_order || 0), item.status]); } } },
+    async updateNav(items) { const conn = await pool.getConnection(); const savedIds = []; try { await conn.beginTransaction(); validateUniqueNavigationHrefs(items); for (const item of items) normalizeNavSortOrder(item.sort_order); await validateNavigationHrefConflicts(conn, items); for (const item of items) { const sortOrder = normalizeNavSortOrder(item.sort_order); if (item.id) { const [rows] = await conn.query('SELECT * FROM site_navigation_items WHERE id=? LIMIT 1', [item.id]); const existing = rows[0]; if (!existing) throw new Error(`Navigation item not found: ${item.id}`); const patch = await normalizeNavTargetPatch(conn, item, existing); if (patch.target_type !== undefined) await conn.execute('UPDATE site_navigation_items SET title=?, href=?, sort_order=?, status=?, target_type=?, target_page_id=?, title_override=? WHERE id=?', [item.title, item.href, sortOrder, item.status, patch.target_type, patch.target_page_id, patch.title_override, item.id]); else await conn.execute('UPDATE site_navigation_items SET title=?, href=?, sort_order=?, status=? WHERE id=?', [item.title, item.href, sortOrder, item.status, item.id]); savedIds.push(Number(item.id)); } else { const patch = await normalizeNavTargetPatch(conn, item, { target_type: 'legacy', target_page_id: null, title_override: null }); const [result] = await conn.execute('INSERT INTO site_navigation_items (title, href, target_type, target_page_id, title_override, sort_order, status) VALUES (?,?,?,?,?,?,?)', [item.title, item.href, patch.target_type || 'legacy', patch.target_page_id ?? null, patch.title_override ?? null, sortOrder, item.status]); savedIds.push(Number(result.insertId)); } } await conn.commit(); return savedIds; } catch (error) { await conn.rollback(); throw error; } finally { conn.release(); } },
     async listMedia({ includeArchived = false } = {}) { const [r] = includeArchived ? await pool.query('SELECT * FROM site_media_assets ORDER BY created_at DESC, id DESC') : await pool.query('SELECT * FROM site_media_assets WHERE status<>? ORDER BY created_at DESC, id DESC', ['archived']); return r; },
     async getMedia(id) { const [r] = await pool.query('SELECT * FROM site_media_assets WHERE id=? LIMIT 1', [id]); return r[0] || null; },
     async createMedia(p) { const [r] = await pool.execute('INSERT INTO site_media_assets (path, alt, type, status, processing_status, staging_path, original_size_bytes, final_size_bytes, processing_error, processing_progress_percent, processing_progress_message, processing_progress_updated_at, duration_seconds, width, height) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', [p.path, p.alt || '', p.type || '', p.status || 'active', p.processing_status || 'ready', p.staging_path || null, p.original_size_bytes || null, p.final_size_bytes || null, p.processing_error || null, p.processing_progress_percent ?? null, p.processing_progress_message || null, p.processing_progress_percent == null ? null : new Date(), p.duration_seconds || null, p.width || null, p.height || null]); return { id: r.insertId, path: p.path, alt: p.alt || '', type: p.type || '', status: p.status || 'active', processing_status: p.processing_status || 'ready', staging_path: p.staging_path || null, original_size_bytes: p.original_size_bytes || null, final_size_bytes: p.final_size_bytes || null, processing_error: p.processing_error || null, processing_progress_percent: p.processing_progress_percent ?? null, processing_progress_message: p.processing_progress_message || null, duration_seconds: p.duration_seconds || null, width: p.width || null, height: p.height || null }; },
