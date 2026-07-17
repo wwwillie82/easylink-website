@@ -11,36 +11,40 @@ const legalLinks = [
   ['Adatkezelési Tájékoztató', legalDocuments.privacyPdfPath],
   ['Cookie Tájékoztató', legalDocuments.cookiePdfPath],
 ].filter(([, href]) => Boolean(href));
+const hasLegalNavigation = legalLinks.length > 0 || publicSettings.consent.active;
 ---
 <footer id="kapcsolat" class="footer">
   <div class="container foot">
-    <div>
+    <div class="footer-brand-column">
       <a class="brand" href="/">
         <img src="/assets/brand/easylink-logo-horizontal.png" alt="Easylink" />
       </a>
-      <p>Statikus Astro marketing site staging környezethez.</p>
+      {hasLegalNavigation && <nav class="footer-legal-navigation" aria-label="Jogi dokumentumok és beállítások">
+        {legalLinks.map(([label, href]) => <a href={href} target="_blank" rel="noopener noreferrer">{label}</a>)}
+        {publicSettings.consent.active && <button type="button" class="cookie-settings-button" data-easylink-open-cookie-settings>Cookie-beállítások</button>}
+      </nav>}
     </div>
-    <div>
+    <div class="footer-contact-column" aria-label="Kapcsolati adatok">
       <b>Kapcsolat</b>
       {emailHref && <a href={emailHref} data-easylink-cta="email" data-easylink-cta-id="footer-email" data-easylink-cta-slot="footer">{contact.email}</a>}
       {phoneHref && <a href={phoneHref}>{contact.phone}</a>}
       {addressLines.length > 0 && <address>{addressLines.map((line) => <span>{line}</span>)}</address>}
-      <a href={import.meta.env.PUBLIC_DEPLOY_URL ?? 'https://deploy.easylink.hu'} data-easylink-cta="demo" data-easylink-cta-id="footer-demo" data-easylink-cta-slot="footer">Belépés / demo</a>
-      {publicSettings.consent.active && <button type="button" class="cookie-settings-button" data-easylink-open-cookie-settings>Cookie-beállítások</button>}
-      {legalLinks.length > 0 && <div class="legal-links" aria-label="Jogi dokumentumok">{legalLinks.map(([label, href]) => <a href={href} target="_blank" rel="noopener noreferrer">{label}</a>)}</div>}
     </div>
   </div>
 </footer>
 
 <style>
-  .footer { padding: 52px 0; background: #f5f7f4; border-top: 1px solid var(--color-line); }
-  .foot { display: flex; justify-content: space-between; gap: 24px; }
-  .brand img { width: 180px; }
-  .foot div:last-child { display: grid; gap: 10px; }
+  .footer { padding: 56px 0; background: #f5f7f4; border-top: 1px solid var(--color-line); }
+  .foot { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 420px); align-items: start; justify-content: space-between; gap: clamp(40px, 9vw, 128px); }
+  .footer-brand-column, .footer-contact-column, .footer-legal-navigation { display: grid; align-content: start; }
+  .footer-brand-column { gap: 24px; }
+  .brand { width: fit-content; }
+  .brand img { width: 180px; max-width: 100%; }
+  .footer-legal-navigation { gap: 12px; max-width: 360px; }
+  .footer-contact-column { gap: 10px; max-width: 420px; justify-self: start; }
   address { display: grid; gap: 4px; font-style: normal; color: var(--color-ink); }
-  .legal-links { display: grid; gap: 8px; margin-top: 8px; }
   .foot a:not(.brand), .cookie-settings-button { color: var(--color-navy); font-weight: 700; }
-  .cookie-settings-button { appearance: none; border: 0; background: transparent; padding: 0; text-align: left; cursor: pointer; font: inherit; text-decoration: underline; }
-  .cookie-settings-button:focus-visible { outline: 3px solid #ffbf47; outline-offset: 3px; border-radius: 4px; }
-  @media (max-width: 700px) { .foot { display: grid; } }
+  .cookie-settings-button { appearance: none; border: 0; background: transparent; padding: 0; text-align: left; cursor: pointer; font: inherit; text-decoration: underline; width: fit-content; }
+  .foot a:focus-visible, .cookie-settings-button:focus-visible { outline: 3px solid #ffbf47; outline-offset: 3px; border-radius: 4px; }
+  @media (max-width: 700px) { .footer { padding: 44px 0; } .foot { grid-template-columns: 1fr; gap: 32px; } .footer-contact-column { max-width: 100%; } }
 </style>
