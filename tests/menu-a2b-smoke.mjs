@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { buildNavigationPayloadItem, isValidHttpExternalUrlForMenu, navHtml, prefillTargetModeFields } from '../src/lib/admin/render/menu.mjs';
+import { applySavedNavigationRowState, buildNavigationPayloadItem, initializeMenuDirtyState, isValidHttpExternalUrlForMenu, navHtml, prefillTargetModeFields } from '../src/lib/admin/render/menu.mjs';
+import { dirtyStateJs } from '../src/lib/admin/render/client-js.mjs';
 import { validateNavPayload } from '../src/lib/admin/server.mjs';
 import { createAdminRepository } from '../src/lib/admin/repository.mjs';
 import { createAdminServer } from '../src/lib/admin/server.mjs';
@@ -17,7 +18,96 @@ const items = [
   { id: 11, title: 'Docs', href: 'https://example.com/docs', sort_order: 2, status: 'draft', target_type: 'external', target_page_id: null, title_override: null },
   { id: 12, title: 'Régi', href: '/kezi?x=1', sort_order: 3, status: 'archived', target_type: 'legacy', target_page_id: null, title_override: null },
 ];
+
+class FakeEl {
+  constructor({ value = '', textContent = '', children = [] } = {}) {
+    this.value = value;
+    this.textContent = textContent;
+    this.children = children;
+    this.dataset = {};
+    this.hidden = false;
+    this.removed = false;
+    this.disabled = false;
+    this._innerHTML = '';
+    this.listeners = {};
+    for (const child of children) child.parent = this;
+  }
+  get innerHTML() { return this._innerHTML; }
+  set innerHTML(value) { this._innerHTML = String(value); this.children = []; }
+  querySelector(selector) {
+    if (selector === 'button[type="submit"]') return this.submitButton || null;
+    if (selector === '[data-dirty-message]') return this.children.find((child) => child.dataset.dirtyMessage && !child.removed) || null;
+    if (selector === 'option[value="legacy"]') return this.children.find((child) => child.value === 'legacy' && !child.removed) || null;
+    return this.map?.[selector] || null;
+  }
+  querySelectorAll(selector) {
+    if (selector === '[data-nav-item]') return this.children.filter((child) => !child.removed);
+    return [];
+  }
+  addEventListener(type, handler) { this.listeners[type] = handler; }
+  dispatchEvent(event) { this.listeners[event.type]?.(event); }
+  insertAdjacentHTML(_position, html) {
+    if (html.includes('value="legacy"')) this.children.push(new FakeEl({ value: 'legacy', textContent: 'Régi kézi URL' }));
+    if (html.includes('data-dirty-message')) { const child = new FakeEl({ textContent: 'Nem mentett módosítások.' }); child.dataset.dirtyMessage = '1'; this.children.push(child); }
+  }
+  remove() { this.removed = true; }
+}
+function fakeRow({ id = '', initialTarget = 'legacy', hasLegacyOption = true, hasLegacyHelp = true } = {}) {
+  const legacyOption = hasLegacyOption ? new FakeEl({ value: 'legacy', textContent: 'Régi kézi URL' }) : null;
+  const select = new FakeEl({ children: legacyOption ? [legacyOption] : [] });
+  const idInput = new FakeEl({ value: id });
+  const idLabel = new FakeEl({ textContent: id || 'új' });
+  const help = hasLegacyHelp ? new FakeEl({ textContent: 'Régi kézi URL.' }) : null;
+  const row = new FakeEl();
+  row.dataset = { new: id ? '0' : '1', initialTarget };
+  row.map = {
+    '[data-field="id"]': idInput,
+    '[data-nav-id-label]': idLabel,
+    '[data-role="target-type"]': select,
+    '[data-legacy-help]': help,
+  };
+  return { row, select, idInput, idLabel, help };
+}
+
+
+{
+  const msg = new FakeEl();
+  const setupDirtyForm = Function('document', `${dirtyStateJs};return setupDirtyForm;`)({ getElementById: () => msg });
+  const form = new FakeEl();
+  form.submitButton = new FakeEl();
+  const model = { value: 'baseline' };
+  const state = setupDirtyForm(form, () => JSON.stringify(model));
+  assert.equal(state.changed(), false);
+  assert.equal(form.submitButton.disabled, true);
+  assert.equal(msg.querySelector('[data-dirty-message]'), null);
+  model.value = 'changed';
+  form.dispatchEvent({ type: 'input' });
+  assert.equal(state.changed(), true);
+  assert.equal(form.submitButton.disabled, false);
+  assert.ok(msg.querySelector('[data-dirty-message]'));
+  model.value = 'baseline';
+  form.dispatchEvent({ type: 'input' });
+  assert.equal(state.changed(), false);
+  assert.equal(form.submitButton.disabled, true);
+  assert.equal(msg.querySelector('[data-dirty-message]'), null);
+  const serverError = new FakeEl({ textContent: 'Szerverhiba' });
+  serverError.className = 'msg err';
+  msg.children.push(serverError);
+  form.dispatchEvent({ type: 'change' });
+  assert.equal(msg.children.includes(serverError), true);
+  model.value = 'changed again';
+  form.dispatchEvent({ type: 'input' });
+  state.markSaving();
+  assert.match(msg.innerHTML, /Mentés folyamatban/);
+  assert.equal(msg.querySelector('[data-dirty-message]'), null);
+  model.value = 'saved';
+  state.markSaved();
+  assert.equal(state.changed(), false);
+  assert.equal(msg.querySelector('[data-dirty-message]'), null);
+}
+
 const html = navHtml(items, pages);
+const layoutCss = await readFile('src/lib/admin/render/layout.mjs', 'utf8');
 
 assert.match(html, /data-nav-item/);
 assert.match(html, /Árak — \/arak\/ — Publikus/);
@@ -30,12 +120,125 @@ assert.match(html, /data-mode="legacy"/);
 assert.match(html, /Válassz célt/);
 assert.match(html, /admin-save-bar/);
 assert.match(html, /admin-grid--compact/);
-assert.match(html, /<option value="legacy" >Régi kézi URL<\/option>/);
+assert.ok(html.indexOf('id="nav-rows"') < html.indexOf('id="add-nav"') && html.indexOf('id="add-nav"') < html.indexOf('admin-save-bar'));
+assert.doesNotMatch(html.slice(html.indexOf('<header class="admin-section-header"'), html.indexOf('id="nav-rows"')), /Menüpont hozzáadása/);
+assert.match(html, /nav-list-actions/);
+assert.match(layoutCss, /\.admin-form\{padding-bottom:180px\}/);
+assert.match(html, /target-page-meta/);
+assert.match(html, /data-role="page-status-badge"/);
+assert.doesNotMatch(html, /data-role="page-status"/);
+assert.match(html, /Menüpont láthatósága/);
+assert.doesNotMatch(html, />Státusz<\/span>/);
+assert.match(html, /<span>Menüpont felirata<\/span><input data-field="title_override" data-role="title-override"/);
+assert.doesNotMatch(html, /Örökölt \/ effektív felirat|Aktuális oldalroute|Oldal státusza|<span>Egyedi menüfelirat<\/span>/);
+assert.match(html, /A céloldal állapota az Oldalak felületen módosítható/);
+assert.match(html, /<option value="legacy" selected>Régi kézi URL<\/option>/);
+assert.doesNotMatch(html.match(/data-new="0"[\s\S]*?target_type[\s\S]*?<\/select>/)[0], /value="legacy"/);
 assert.match(html, /data-new=\\"1\\"/);
 assert.doesNotMatch(html.match(/const newCardHtml="([\s\S]*?)";/)[1], /value=\\"legacy\\"/);
 assert.match(html, /function menuMsg[\s\S]*textContent/);
 assert.match(html, /!e\.target\.matches\('\[data-role=\"target-type\"\]'\)/);
 assert.match(html, /previousState=\{\.\.\.rawRowState\(row\),target_type:row\.dataset\.targetMode\}/);
+
+assert.match(html, /applySavedNavigationState\(j\.data\?\.navigationIds\|\|\[\],items\);state\.markSaved\(\)/);
+assert.match(html, /function applySavedNavigationState\(ids=\[\],submittedItems=\[\]\)/);
+{
+  const { row, select, idInput, idLabel, help } = fakeRow({ id: '12', initialTarget: 'legacy' });
+  assert.ok(select.querySelector('option[value="legacy"]'));
+  assert.ok(help && !help.hidden && !help.removed);
+  applySavedNavigationRowState(row, 12, { target_type: 'page' });
+  assert.equal(row.dataset.new, '0');
+  assert.equal(row.dataset.initialTarget, 'page');
+  assert.equal(idInput.value, '12');
+  assert.equal(idLabel.textContent, '12');
+  assert.equal(select.querySelector('option[value="legacy"]'), null);
+  assert.equal(help.removed || help.hidden, true);
+}
+{
+  const { row, select, help } = fakeRow({ id: '12', initialTarget: 'legacy' });
+  applySavedNavigationRowState(row, 12, { target_type: 'external' });
+  assert.equal(row.dataset.initialTarget, 'external');
+  assert.equal(select.querySelector('option[value="legacy"]'), null);
+  assert.equal(help.removed || help.hidden, true);
+}
+{
+  const { row, select, help } = fakeRow({ id: '12', initialTarget: 'legacy' });
+  applySavedNavigationRowState(row, 12, { target_type: 'legacy' });
+  assert.equal(row.dataset.initialTarget, 'legacy');
+  assert.ok(select.querySelector('option[value="legacy"]'));
+  assert.equal(help.hidden, false);
+  assert.equal(help.removed, false);
+}
+
+{
+  const msg = new FakeEl();
+  const setupDirtyForm = Function('document', `${dirtyStateJs};return setupDirtyForm;`)({ getElementById: () => msg });
+  const pageRow = new FakeEl();
+  pageRow.state = { target_type: 'page', title_mode: 'inherit', title_override: '' };
+  const rowsContainer = new FakeEl({ children: [pageRow] });
+  const form = new FakeEl();
+  form.submitButton = new FakeEl();
+  const serializer = () => JSON.stringify(rowsContainer.querySelectorAll('[data-nav-item]').map((row) => row.state));
+  const state = initializeMenuDirtyState(form, rowsContainer, serializer, (row) => { if (row.state.target_type === 'page' && row.state.title_mode === 'inherit') row.state.title_override = 'Árak'; }, setupDirtyForm);
+  assert.equal(pageRow.state.title_override, 'Árak');
+  assert.equal(state.changed(), false);
+  assert.equal(form.submitButton.disabled, true);
+  assert.doesNotMatch(msg.innerHTML, /Nem mentett módosítások/);
+  pageRow.state.title_override = 'Áraink';
+  form.dispatchEvent({ type: 'input' });
+  assert.equal(state.changed(), true);
+  assert.equal(form.submitButton.disabled, false);
+  pageRow.state.title_override = 'Árak';
+  form.dispatchEvent({ type: 'input' });
+  assert.equal(state.changed(), false);
+  assert.equal(form.submitButton.disabled, true);
+}
+{
+  const setupDirtyForm = Function('document', `${dirtyStateJs};return setupDirtyForm;`)({ getElementById: () => new FakeEl() });
+  for (const rowState of [
+    { target_type: 'page', title_mode: 'custom', title_override: 'Egyedi' },
+    { target_type: 'external', external_title: 'Docs', external_href: 'https://example.com/docs' },
+    { target_type: 'legacy', legacy_title: 'Régi', legacy_href: '/kezi?x=1' },
+  ]) {
+    const row = new FakeEl();
+    row.state = structuredClone(rowState);
+    const rowsContainer = new FakeEl({ children: [row] });
+    const form = new FakeEl();
+    form.submitButton = new FakeEl();
+    const serializer = () => JSON.stringify(rowsContainer.querySelectorAll('[data-nav-item]').map((item) => item.state));
+    const state = initializeMenuDirtyState(form, rowsContainer, serializer, () => {}, setupDirtyForm);
+    assert.equal(state.changed(), false);
+    assert.equal(form.submitButton.disabled, true);
+  }
+}
+{
+  const setupDirtyForm = Function('document', `${dirtyStateJs};return setupDirtyForm;`)({ getElementById: () => new FakeEl() });
+  const row = new FakeEl();
+  row.state = { target_type: 'external', external_title: 'Docs', external_href: 'https://example.com/docs' };
+  const rowsContainer = new FakeEl({ children: [row] });
+  const form = new FakeEl();
+  form.submitButton = new FakeEl();
+  const serializer = () => JSON.stringify(rowsContainer.querySelectorAll('[data-nav-item]').map((item) => item.state));
+  const state = initializeMenuDirtyState(form, rowsContainer, serializer, () => {}, setupDirtyForm);
+  const added = new FakeEl();
+  added.state = { target_type: '', title_override: '' };
+  rowsContainer.children.push(added);
+  form.dispatchEvent({ type: 'input' });
+  assert.equal(state.changed(), true);
+  applySavedNavigationRowState(added, 22, { target_type: 'page' });
+  added.state = { target_type: 'page', title_override: 'Új oldal' };
+  state.markSaved();
+  assert.equal(state.changed(), false);
+  assert.equal(form.submitButton.disabled, true);
+}
+{
+  const { row, select, help } = fakeRow({ id: '', initialTarget: '', hasLegacyOption: false, hasLegacyHelp: false });
+  applySavedNavigationRowState(row, 21, { target_type: 'page' });
+  assert.equal(row.dataset.new, '0');
+  assert.equal(row.dataset.initialTarget, 'page');
+  assert.equal(select.querySelector('option[value="legacy"]'), null);
+  assert.equal(help, null);
+}
 
 
 assert.deepEqual(prefillTargetModeFields({ target_type: 'page', target_page_id: '1', title_mode: 'inherit', title_override: '', external_title: '', external_href: '', legacy_title: '', legacy_href: '' }, pages), { title: 'Árak', href: '/arak/' });
@@ -55,6 +258,9 @@ assert.throws(() => buildNavigationPayloadItem({ is_new: '1', target_type: '', s
 assert.throws(() => buildNavigationPayloadItem({ is_new: '0', target_type: 'external', external_title: 'X', external_href: 'https://', sort_order: '1', status: 'draft' }, pages), /URL/);
 assert.equal(buildNavigationPayloadItem({ is_new: '1', target_type: 'external', external_title: 'X', external_href: 'https://example.com', sort_order: '7', status: 'draft' }, pages).sort_order, '7');
 assert.equal(buildNavigationPayloadItem({ is_new: '1', target_type: 'external', external_title: 'Max', external_href: 'https://example.com/max', sort_order: String(Number.MAX_SAFE_INTEGER), status: 'draft' }, pages).sort_order, String(Number.MAX_SAFE_INTEGER));
+assert.equal(buildNavigationPayloadItem({ is_new: '0', target_type: 'page', target_page_id: '1', title_mode: 'inherit', title_override: 'Korábbi override', sort_order: '1', status: 'draft' }, pages).title_override, null);
+assert.equal(buildNavigationPayloadItem({ is_new: '0', target_type: 'page', target_page_id: '2', title_mode: 'inherit', title_override: 'Árak', sort_order: '1', status: 'draft' }, pages).title, 'Draft oldal');
+assert.throws(() => buildNavigationPayloadItem({ is_new: '0', target_type: 'page', target_page_id: '1', title_mode: 'custom', title_override: '', sort_order: '1', status: 'draft' }, pages), /egyedi menüfelirat/i);
 assert.throws(() => buildNavigationPayloadItem({ is_new: '0', target_type: 'page', target_page_id: '999', title_mode: 'inherit', sort_order: '1', status: 'draft' }, pages), /belső oldalt/);
 for (const sort_order of [0, -1, 1.5, 'abc', '', Number.MAX_SAFE_INTEGER + 1]) {
   assert.throws(() => buildNavigationPayloadItem({ is_new: '1', target_type: 'external', external_title: 'Bad sort', external_href: 'https://example.com/client-bad-sort', sort_order, status: 'draft' }, pages), /sorrend/);
