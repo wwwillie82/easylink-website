@@ -538,14 +538,15 @@ try {
   const menuHtml = await response.text();
   assert.match(menuHtml, /data-nav-item/);
   assert.match(menuHtml, /data-field=\"title\"/);
-  assert.match(menuHtml, /Menüpont neve/);
-  assert.match(menuHtml, /Link/);
+  assert.match(menuHtml, /Menüpont felirata/);
+  assert.match(menuHtml, /Külső URL/);
   assert.match(menuHtml, /Sorrend/);
   assert.match(menuHtml, /Látható/);
   assert.match(menuHtml, /Rejtett piszkozat/);
   assert.match(menuHtml, /Menüpont hozzáadása/);
+  { const bodyMenu = menuHtml.slice(menuHtml.indexOf('<form class="admin-form admin-section" id="nav-form"')); assert.ok(bodyMenu.indexOf('id="nav-rows"') < bodyMenu.indexOf('id="add-nav"') && bodyMenu.indexOf('id="add-nav"') < bodyMenu.indexOf('admin-save-bar')); }
   assert.match(menuHtml, /navSerializer/);
-  assert.match(menuHtml, /setupDirtyForm\(form,navSerializer\)/);
+  assert.match(menuHtml, /initializeMenuDirtyState\(form,rows,navSerializer,updateRow,setupDirtyForm\)/);
   assert.match(menuHtml, /renumber\(\)/);
   assert.doesNotMatch(menuHtml, /<th>title<\/th>/);
   assert.doesNotMatch(menuHtml, /text-decoration:line-through/);
@@ -673,7 +674,8 @@ try {
   assert.match(pageEditorHtml, /baseline/);
   assert.match(pageEditorHtml, /addEventListener\('input',sync\)/);
   assert.match(pageEditorHtml, /Nem mentett módosítások/);
-  assert.match(pageEditorHtml, /if\(dirty&&status\)status.innerHTML/);
+  assert.match(pageEditorHtml, /data-dirty-message/);
+  assert.match(pageEditorHtml, /current\.remove\(\)/);
   assert.doesNotMatch(pageEditorHtml, /querySelector\('\.err'\)/);
   assert.match(pageEditorHtml, /Oldal neve/);
   assert.match(pageEditorHtml, /Főcím/);

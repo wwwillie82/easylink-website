@@ -71,7 +71,7 @@ const layout = await readFile('src/lib/admin/render/layout.mjs', 'utf8');
 assert.match(layout, /\.admin-grid--social\{grid-template-columns:repeat\(3,minmax\(220px,1fr\)\)\}/);
 assert.match(layout, /@media\(max-width:980px\)\{\.admin-grid--social\{grid-template-columns:repeat\(2,minmax\(220px,1fr\)\)\}\}/);
 assert.match(layout, /@media\(max-width:680px\)\{\.admin-grid,\.grid,\.admin-grid--compact,\.admin-grid--social\{grid-template-columns:1fr\}/);
-assert.match(layout, /\.admin-form\{padding-bottom:140px\}/);
+assert.match(layout, /\.admin-form\{padding-bottom:180px\}/);
 assert.match(layout, /scroll-margin-bottom:160px/);
 
 for (const text of ['dirty-state','payload','stabil platform ID','public Header komponens','public Footer komponens','meglévő publish visszajelzés fut']) {
