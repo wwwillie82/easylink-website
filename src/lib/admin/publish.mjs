@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { copyMediaToRelease } from './media-storage.mjs';
+import { validateContentReferences, referenceValidationSummary } from '../content/reference-validation.mjs';
 
 export class PublishInProgressError extends Error { constructor() { super('Élesítés folyamatban, próbáld újra később.'); this.code = 'PUBLISH_IN_PROGRESS'; } }
 
@@ -90,6 +91,8 @@ export function createPublishService({ repo, env = process.env, build, deploy } 
       const content = await repo.exportContentSnapshot();
       const hash = contentHash(content);
       snapshotId = await repo.createPublishSnapshot({ created_by_admin_id: adminId, label, content_json: content, content_hash: hash, status: 'failed' });
+      const referenceValidation = validateContentReferences(content);
+      if (!referenceValidation.ok) { const excerpt = referenceValidationSummary(referenceValidation); await repo.markPublishFinished(snapshotId, { status: 'failed', build_log_excerpt: excerpt }); return { ok: false, status: 'failed', contentSaved: true, liveUnchanged: true, error: 'A tartalmi referenciák hibásak, ezért az élesítés nem indult el.', details: referenceValidation }; }
       await repo.markPublishStarted(snapshotId);
       const releasesRoot = env.SITE_PUBLISH_RELEASES_DIR || tmpdir();
       await ensureReleasesRoot(releasesRoot);

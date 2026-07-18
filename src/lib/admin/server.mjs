@@ -8,8 +8,9 @@ import { createPublishService, PublishInProgressError } from './publish.mjs';
 import { datedMediaTarget, finalizeStagedMediaFile, isVideoType, maxRequestBytes, mediaConfig, mediaValidationError, removeFileQuietly, storagePathForPublicPath, validateMediaFile } from './media-storage.mjs';
 import { parseMediaMultipart } from './multipart-upload.mjs';
 import { isValidHttpExternalUrl, normalizeNavigationTargetType, positiveNavigationPageId } from '../content/internal-links.mjs';
+import { normalizeSnapshotForReferenceValidation, referenceValidationSummary, validateContentReferences } from '../content/reference-validation.mjs';
 
-const apiError = (res, status, code, message) => json(res, status, { ok: false, error: { code, message } });
+const apiError = (res, status, code, message, details) => json(res, status, { ok: false, error: { code, message, ...(details ? { details } : {}) } });
 const json = (res, status, body, headers = {}) => { res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', ...headers }); res.end(JSON.stringify(body)); };
 const html = (res, body, status = 200, current = '') => { res.writeHead(status, { 'content-type': 'text/html; charset=utf-8' }); res.end(layout(body, { current })); };
 const redirect = (res, location, headers = {}) => { res.writeHead(303, { location, ...headers }); res.end(); };
@@ -62,6 +63,7 @@ export function validateNavPayload(payload, pages = []) {
       if (!pageId) return { ok: false, error: { code: 'INVALID_NAVIGATION_TARGET', message: 'Belső oldal célhoz oldalazonosító szükséges.' } };
       const page = pageMap.get(pageId);
       if (pageMap.size && !page) return { ok: false, error: { code: 'INVALID_NAVIGATION_TARGET', message: 'A kiválasztott belső oldal nem található.' } };
+      if (page && item.status === 'published' && String(page.status || '') !== 'published') return { ok: false, error: { code: 'NAVIGATION_TARGET_PAGE_NOT_PUBLISHED', message: 'Publikus menüpont csak publikus oldalra mutathat.' } };
       if (page && String(item.href || '') !== String(page.route || '')) return { ok: false, error: { code: 'INVALID_NAVIGATION_TARGET', message: 'A belső oldal linkje csak az oldal aktuális route-ja lehet.' } };
       if (page && hasTitleOverride && String(item.title || '') !== String(item.title_override || '').trim()) return { ok: false, error: { code: 'INVALID_NAVIGATION_TARGET', message: 'Az egyedi menüfelirat és a kompatibilitási title mező eltér.' } };
       if (page && !hasTitleOverride && String(item.title || '') !== String(page.title || '')) return { ok: false, error: { code: 'INVALID_NAVIGATION_TARGET', message: 'Örökölt feliratnál a title az oldal címe legyen.' } };
@@ -106,7 +108,7 @@ export function createAdminServer({ repo, env = process.env, publishService } = 
         const page = await repo.page(id);
         if (!page) return apiError(res, 404, 'PAGE_NOT_FOUND', 'Az oldal nem található.');
         if (req.method === 'GET') return json(res, 200, { ok: true, data: page });
-        try { await repo.updatePage(id, await body(req)); } catch (error) { if (error.status === 400 || error.code === 'VALIDATION_ERROR') return apiError(res, 400, 'INVALID_PAGE', error.message); throw error; }
+        try { await repo.updatePage(id, await body(req)); } catch (error) { if (error.code === 'PAGE_IN_USE') return apiError(res, 409, 'PAGE_IN_USE', error.message, error.details); if (error.code === 'DUPLICATE_NAVIGATION_HREF') return apiError(res, 409, 'DUPLICATE_NAVIGATION_HREF', error.message, error.details); if (error.status === 400 || error.code === 'VALIDATION_ERROR') return apiError(res, 400, 'INVALID_PAGE', error.message); throw error; }
         return json(res, 200, { ok: true, publish: await publishAfterSave(user, `Oldal mentés: ${id}`) });
       }
       if (url.pathname === '/api/admin/blocks' && req.method === 'POST') {
@@ -118,7 +120,7 @@ export function createAdminServer({ repo, env = process.env, publishService } = 
       }
       if (url.pathname.startsWith('/api/admin/blocks/') && req.method === 'DELETE') { await repo.deleteBlock(url.pathname.split('/').pop()); return json(res, 200, { ok: true, publish: await publishAfterSave(user, `Blokk inaktiválás`) }); }
       if (url.pathname === '/api/admin/settings') { if (req.method === 'GET') return json(res, 200, { ok: true, data: await repo.getSiteSettings() }); if (req.method === 'PUT' || req.method === 'POST') { try { const data = await repo.updateSiteSettings(await body(req), env); return json(res, 200, { ok: true, data, publish: await publishAfterSave(user, 'Alapadatok mentés') }); } catch (error) { if (error.status === 400 || error.code === 'VALIDATION_ERROR') return apiError(res, 400, 'INVALID_SETTINGS', error.message); throw error; } } }
-      if (url.pathname === '/api/admin/navigation') { if (req.method === 'GET') return json(res, 200, { ok: true, data: await repo.nav() }); const pages = await repo.pages(); const valid = validateNavPayload(await body(req), pages); if (!valid.ok) return json(res, 400, valid); let navigationIds; try { navigationIds = await repo.updateNav(valid.data); } catch (error) { if (error.status === 400 || error.code === 'VALIDATION_ERROR' || error.code === 'ER_DUP_ENTRY') return apiError(res, 400, navValidationCode(error), error.code === 'ER_DUP_ENTRY' || /Duplikált menüpont link/i.test(String(error.message || '')) ? 'Duplikált menüpont link.' : error.message); throw error; } return json(res, 200, { ok: true, data: { navigationIds }, publish: await publishAfterSave(user, 'Menü mentés') }); }
+      if (url.pathname === '/api/admin/navigation') { if (req.method === 'GET') return json(res, 200, { ok: true, data: await repo.nav() }); const pages = await repo.pages(); const valid = validateNavPayload(await body(req), pages); if (!valid.ok) return json(res, valid.error?.code === 'NAVIGATION_TARGET_PAGE_NOT_PUBLISHED' ? 409 : 400, valid); let navigationIds; try { navigationIds = await repo.updateNav(valid.data); } catch (error) { if (error.code === 'NAVIGATION_TARGET_PAGE_NOT_PUBLISHED') return apiError(res, 409, 'NAVIGATION_TARGET_PAGE_NOT_PUBLISHED', error.message, error.details); if (error.status === 400 || error.code === 'VALIDATION_ERROR' || error.code === 'ER_DUP_ENTRY') return apiError(res, 400, navValidationCode(error), error.code === 'ER_DUP_ENTRY' || /Duplikált menüpont link/i.test(String(error.message || '')) ? 'Duplikált menüpont link.' : error.message); throw error; } return json(res, 200, { ok: true, data: { navigationIds }, publish: await publishAfterSave(user, 'Menü mentés') }); }
       if (url.pathname === '/api/admin/media') {
         if (req.method === 'GET') return json(res, 200, { ok: true, data: await repo.listMedia() });
         if (req.method === 'POST') {
@@ -180,7 +182,7 @@ export function createAdminServer({ repo, env = process.env, publishService } = 
         if (req.method === 'DELETE') { try { const data = await repo.archiveMedia(id); return data ? json(res, 200, { ok: true, data }) : apiError(res, 404, 'MEDIA_NOT_FOUND', 'A média elem nem található.'); } catch (error) { if (error.status === 400 || error.code === 'VALIDATION_ERROR') return apiError(res, 400, 'INVALID_MEDIA', error.message); throw error; } }
       }
       if (url.pathname === '/api/admin/publish' && req.method === 'POST') return json(res, 200, { ok: true, publish: await publishAfterSave(user, 'Kézi újraélesítés') });
-      if (url.pathname.startsWith('/api/admin/publish/rollback/') && req.method === 'POST') { const snap = await repo.publishSnapshot(url.pathname.split('/').pop()); if (!snap) return apiError(res, 404, 'SNAPSHOT_NOT_FOUND', 'Snapshot nem található.'); await repo.importContentSnapshot(snap.content_json); return json(res, 200, { ok: true, publish: await publishAfterSave(user, `Rollback: ${snap.id}`) }); }
+      if (url.pathname.startsWith('/api/admin/publish/rollback/') && req.method === 'POST') { const snap = await repo.publishSnapshot(url.pathname.split('/').pop()); if (!snap) return apiError(res, 404, 'SNAPSHOT_NOT_FOUND', 'Snapshot nem található.'); const preflight = validateContentReferences(snap.content_json); if (!preflight.ok) return apiError(res, 409, 'CONTENT_REFERENCE_INVALID', referenceValidationSummary(preflight), preflight); const content = normalizeSnapshotForReferenceValidation(snap.content_json); await repo.importContentSnapshot(content); return json(res, 200, { ok: true, publish: await publishAfterSave(user, `Rollback: ${snap.id}`) }); }
       if (url.pathname === '/admin/dashboard') return redirect(res, '/admin/pages');
       if (url.pathname === '/admin/publish') return html(res, publishPanel({ snapshots: await repo.publishSnapshots(20) }), 200, '/admin/publish');
       if (url.pathname === '/admin/pages') return html(res, pagesTable(await repo.pages()), 200, '/admin/pages');
