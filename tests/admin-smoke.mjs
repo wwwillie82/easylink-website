@@ -769,7 +769,8 @@ const seededTypes = new Set(staticPagesData.flatMap((page) => page.blocks.map((b
 for (const type of ['text', 'feature-list', 'cards', 'cta']) assert.ok(seededTypes.has(type), `missing seeded block type ${type}`);
 const dynamicCatchAllSource = readFileSync('src/pages/[...slug].astro', 'utf8');
 assert.match(dynamicCatchAllSource, /listPublishedPublicPages/);
-assert.match(dynamicCatchAllSource, /getPublicPageRenderer/);
+assert.match(dynamicCatchAllSource, /PublicPageRenderer/);
+assert.doesNotMatch(dynamicCatchAllSource, /getPublicPageRenderer/);
 const homeSource = readFileSync('src/pages/index.astro', 'utf8');
 assert.match(homeSource, /getPublicPageState/);
 assert.match(homeSource, /hiddenByDb/);

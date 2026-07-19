@@ -120,7 +120,8 @@ assert.equal(pool.state.pages[0].hero_video, null);
 
 async function files(dir) { const out = []; for (const ent of await readdir(dir, { withFileTypes: true })) { const full = path.join(dir, ent.name); if (ent.isDirectory()) out.push(...await files(full)); else if (full.endsWith('.astro')) out.push(full); } return out; }
 const pageSources = await Promise.all((await files('src/pages')).map(async (file) => [file, await readFile(file, 'utf8')]));
-assert.equal(pageSources.some(([file, src]) => file === 'src/pages/[...slug].astro' && src.includes('getPublicPageRenderer')), true, 'catch-all must dispatch through the public renderer registry');
+assert.equal(pageSources.some(([file, src]) => file === 'src/pages/[...slug].astro' && src.includes('PublicPageRenderer')), true, 'catch-all must dispatch through the public Astro renderer dispatcher');
+assert.equal(pageSources.some(([file, src]) => file === 'src/pages/[...slug].astro' && src.includes('getPublicPageRenderer')), false, 'catch-all must not use the TypeScript renderer registry for Astro components');
 assert.equal(pageSources.some(([, src]) => src.includes('<PageHero')), false, 'route entry points must not render PageHero directly');
 const rendererHeroFiles = [];
 for (const file of await files('src/components/page-renderers')) { const src = await readFile(file, 'utf8'); if (src.includes('<PageHero')) rendererHeroFiles.push(file); }
