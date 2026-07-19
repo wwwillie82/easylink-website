@@ -1,0 +1,37 @@
+---
+import type { PublicPageRendererProps } from './types';
+import PageHero from '@/components/PageHero.astro';
+import ContentBlocks from '@/components/ContentBlocks.astro';
+import CTASection from '@/components/CTASection.astro';
+const deployUrl = import.meta.env.PUBLIC_DEPLOY_URL ?? 'https://deploy.easylink.hu';
+import { getPublicSiteSettings } from '@/lib/content/settings';
+import { safeContactIntro } from '@/lib/content/contact.mjs';
+import { findRoleBlock, withoutBlocks } from '@/lib/content/blockRoles';
+type Props = PublicPageRendererProps;
+const { page } = Astro.props;
+const ctaBlock = findRoleBlock(page?.blocks, 'contact-main', (block) => block.type === 'cta' || block.type === 'text');
+const featureBlock = findRoleBlock(page?.blocks, 'contact-features', (block) => block.type === 'feature-list');
+const contactIntro = safeContactIntro(ctaBlock?.body);
+const contactSettings = (await getPublicSiteSettings()).contact;
+const emailHref = contactSettings.email ? `mailto:${contactSettings.email}` : '';
+const phoneHref = contactSettings.phone ? `tel:${contactSettings.phone.replace(/[^+0-9]/g, '')}` : '';
+const addressLines = [contactSettings.companyName, [contactSettings.postalCode, contactSettings.city].filter(Boolean).join(' '), contactSettings.addressLine, contactSettings.country].filter(Boolean);
+const helpItems = featureBlock?.items?.length ? featureBlock.items : ['Megnézzük, mely modulok illenek a jelenlegi működésedhez.', 'Átbeszéljük a hotel/szálláshely, vendéglátó vagy szolgáltatói fókuszt.', 'Összegyűjtjük, milyen integrációs irányokat érdemes előkészíteni.'];
+const ctaSectionBlock = findRoleBlock(page?.blocks, 'cta-section', (block) => block.type === 'cta' && block !== ctaBlock);
+const remainingBlocks = withoutBlocks(page?.blocks, [ctaBlock, featureBlock, ctaSectionBlock]);
+---
+<PageHero eyebrow={page?.heroEyebrow ?? "Kapcsolat"} title={page?.heroTitle ?? "Kapcsolódjunk össze."} description={page?.heroDescription ?? "Kérj bemutatót vagy egyeztetést az Easylink bevezetési lehetőségeiről."} asset={page?.heroAsset || undefined} height={page?.heroHeight} imageFit={page?.heroImageFit} imagePositionX={page?.heroImagePositionX} imagePositionY={page?.heroImagePositionY} imagePositionMobileX={page?.heroImagePositionMobileX} imagePositionMobileY={page?.heroImagePositionMobileY} overlayStrength={page?.heroOverlayStrength} imageScale={page?.heroImageScale} video={page?.heroVideo} />
+<section class="section light"><div class="container contact-grid"><article class="card polished contact"><h2>{ctaBlock?.title ?? 'Kapcsolat'}</h2>{contactIntro && <p>{contactIntro}</p>}<div class="contact-values">{emailHref && <a href={emailHref} data-easylink-cta="email" data-easylink-cta-id="contact-page-email" data-easylink-cta-slot="contact-page">{contactSettings.email}</a>}{phoneHref && <a href={phoneHref}>{contactSettings.phone}</a>}{addressLines.length > 0 && <address>{addressLines.map((line) => <span>{line}</span>)}</address>}</div><a class="button button-primary" href={deployUrl} data-easylink-cta="demo" data-easylink-cta-id="contact-page-demo" data-easylink-cta-slot="contact-page">Demót kérek</a></article><article class="card polished contact"><h2>{featureBlock?.title ?? 'Miben tudunk segíteni?'}</h2><ul>{helpItems.map((item) => <li>{item}</li>)}</ul></article></div></section>
+{remainingBlocks.length > 0 && <ContentBlocks blocks={remainingBlocks} />}
+<CTASection block={ctaSectionBlock} />
+<style>
+  .light { background: var(--color-soft); }
+  .contact-grid { display: grid; grid-template-columns: 0.85fr 1.15fr; gap: 22px; }
+  .contact { padding: 34px; border-radius: 28px; box-shadow: 0 22px 70px rgba(15,17,89,.1); }
+  .contact h2 { color: var(--color-navy); font-size: clamp(1.8rem, 4vw, 3rem); }
+  .contact a:not(.button) { color: var(--color-navy); font-weight: 800; }
+  .contact-values { display: grid; gap: 8px; margin: 16px 0; }
+  address { display: grid; gap: 4px; font-style: normal; color: var(--color-ink); }
+  li { margin: 12px 0; color: var(--color-navy); line-height: 1.55; font-weight: 600; }
+  @media (max-width: 860px) { .contact-grid { grid-template-columns: 1fr; } }
+</style>

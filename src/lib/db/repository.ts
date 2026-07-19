@@ -52,14 +52,18 @@ export function createContentRepository(pool: Pool) {
       const page = await this.getPageByRouteAny(route);
       return page?.status === 'published' ? page : null;
     },
-    async listContentPages() {
-      const [pages] = await pool.query('SELECT * FROM site_pages WHERE status = ? AND type = ? ORDER BY sort_order ASC, id ASC', ['published', 'content_page']);
+    async listPublishedPublicPages() {
+      const [pages] = await pool.query('SELECT * FROM site_pages WHERE status = ? ORDER BY sort_order ASC, id ASC', ['published']);
       const result = [];
       for (const page of pages) {
         const [blocks] = await pool.query('SELECT * FROM site_content_blocks WHERE page_id = ? AND status = ? ORDER BY sort_order ASC, id ASC', [page.id, 'published']);
         result.push(mapPageRow(page, blocks));
       }
       return result;
+    },
+    async listContentPages() {
+      const pages = await this.listPublishedPublicPages();
+      return pages.filter((page) => page.type === 'content_page');
     },
     async listNavigation() {
       const [rows] = await pool.query(`SELECT n.title, n.href, n.target_type, n.target_page_id, n.title_override, n.sort_order AS sortOrder, n.status, p.route AS target_route, p.title AS target_title FROM site_navigation_items n LEFT JOIN site_pages p ON p.id = n.target_page_id WHERE n.status = ? ORDER BY n.sort_order ASC, n.id ASC`, ['published']);

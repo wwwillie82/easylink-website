@@ -1,31 +1,34 @@
 ---
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import Header from '@/components/Header.astro';
-import PageHero from '@/components/PageHero.astro';
-import ContentBlocks from '@/components/ContentBlocks.astro';
-import CTASection from '@/components/CTASection.astro';
 import Footer from '@/components/Footer.astro';
-import { getPageByRoute, listContentPages } from '@/lib/content/provider';
-import { findRoleBlock, withoutBlocks } from '@/lib/content/blockRoles';
+import { listPublishedPublicPages } from '@/lib/content/provider';
+import { buildPublicRouteIndex, normalizePublicRoute, routeToStaticParam } from '@/lib/content/public-pages';
+import { getPublicPageRenderer } from '@/components/page-renderers/registry';
 
 export async function getStaticPaths() {
-  const pages = await listContentPages();
-  return pages.map((page) => ({ params: { slug: page.route.replace(/^\//, '').replace(/\/$/, '') }, props: { route: page.route } }));
+  const { mode, pages } = await listPublishedPublicPages();
+  return pages.map((page) => {
+    if (page.route === '/' || page.type === 'home') throw new Error(`Home oldal nem generálható catch-all route-ból: ${page.route}`);
+    return { params: { slug: routeToStaticParam(page.route) }, props: { page, allPages: pages, mode } };
+  });
 }
 
-const route = Astro.props.route || `/${Astro.params.slug}/`;
-const page = await getPageByRoute(route);
-if (!page || page.type !== 'content_page' || page.status !== 'published') return Astro.redirect('/404');
-const ctaSectionBlock = findRoleBlock(page.blocks, 'cta-section', (block) => block.type === 'cta');
-const contentBlocks = withoutBlocks(page.blocks, [ctaSectionBlock]);
+const page = Astro.props.page;
+const allPages = Astro.props.allPages ?? [];
+const mode = Astro.props.mode;
+const requestedRoute = normalizePublicRoute(`/${Astro.params.slug ?? ''}/`);
+const routeIndex = buildPublicRouteIndex(allPages);
+if (!page) throw new Error(`Published public oldal nem található a catch-all propsban: ${requestedRoute}`);
+if (normalizePublicRoute(page.route) !== requestedRoute) throw new Error(`A catch-all props route és a kért route eltér: props=${page.route} requested=${requestedRoute}`);
+if (page.route === '/' || page.type === 'home') throw new Error(`Home oldal nem renderelhető catch-all route-on: ${page.route}`);
+const Renderer = getPublicPageRenderer(page.type);
 ---
 
 <BaseLayout title={page.seoTitle} description={page.seoDescription}>
   <Header />
   <main>
-    <PageHero eyebrow={page.heroEyebrow} title={page.heroTitle} description={page.heroDescription} asset={page.heroAsset || undefined} height={page.heroHeight} imageFit={page.heroImageFit} imagePositionX={page.heroImagePositionX} imagePositionY={page.heroImagePositionY} imagePositionMobileX={page.heroImagePositionMobileX} imagePositionMobileY={page.heroImagePositionMobileY} overlayStrength={page.heroOverlayStrength} imageScale={page.heroImageScale} video={page.heroVideo} />
-    <ContentBlocks blocks={contentBlocks} />
-    <CTASection block={ctaSectionBlock} />
+    <Renderer page={page} routeIndex={routeIndex} mode={mode} />
   </main>
   <Footer />
 </BaseLayout>

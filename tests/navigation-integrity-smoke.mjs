@@ -79,6 +79,92 @@ await expectBlockedUpdatePage('draft', 'published');
   assert.equal(calls.commit, 0);
 }
 
+function routeSyncPool({ currentRoute = '/megoldasaink/crm-ugyfelkezeles/', nextRoute = '/uzleti-megoldasok/crm-rendszer/', invalidItems = false } = {}) {
+  const state = {
+    page: page(1, 'published', currentRoute, 'CRM'),
+    nav: [nav({ href: currentRoute, target_page_id: 1 })],
+    blocks: [
+      { id: 1, status: 'published', items: JSON.stringify([{ title: 'CRM', url: currentRoute }, { title: 'External', url: 'https://example.com' }, { title: 'Asset', url: '/assets/demo.png' }, { title: 'Text', label: `régi route ${currentRoute}` }, { title: 'Other', href: '/masik/' }]) },
+      { id: 2, status: 'draft', items: JSON.stringify([{ label: 'Draft CTA', primaryUrl: currentRoute.replace(/\/$/, ''), secondaryUrl: currentRoute }]) },
+      { id: 3, status: 'archived', items: JSON.stringify([{ title: 'Archived', url: currentRoute }]) },
+    ],
+    settings: [{ key: 'defaultCta', value: JSON.stringify({ primaryUrl: currentRoute, secondaryUrl: currentRoute.replace(/\/$/, ''), deployUrl: 'https://deploy.easylink.hu' }) }],
+  };
+  const calls = { commit: 0, rollback: 0, blockUpdates: [], settingUpdates: [], navCompatibilityUpdates: [] };
+  const snapshot = () => structuredClone(state);
+  const conn = {
+    async beginTransaction() {},
+    async commit() { calls.commit += 1; },
+    async rollback() { calls.rollback += 1; state.page = snapshotBefore.page; state.nav = snapshotBefore.nav; state.blocks = snapshotBefore.blocks; state.settings = snapshotBefore.settings; },
+    release() {},
+    async query(sql, params = []) {
+      if (/SELECT \* FROM site_pages WHERE id=\?/i.test(sql)) return [[state.page], null];
+      if (/SELECT id FROM site_pages WHERE route=\?/i.test(sql)) return [[], null];
+      if (/FROM site_navigation_items/i.test(sql) && /FOR UPDATE/i.test(sql)) return [state.nav, null];
+      if (/FROM site_content_blocks/i.test(sql) && /FOR UPDATE/i.test(sql)) return [state.blocks.filter((block) => block.items != null && block.status !== 'archived').map((block) => ({ ...block, items: invalidItems && block.id === 1 ? '{bad json' : block.items })), null];
+      if (/FROM site_settings/i.test(sql) && /FOR UPDATE/i.test(sql)) return [state.settings, null];
+      return [[], null];
+    },
+    async execute(sql, params = []) {
+      if (/UPDATE site_pages SET/i.test(sql)) { state.page.route = params[0]; state.page.slug = params[1]; state.page.title = params[3]; return [{ affectedRows: 1 }, null]; }
+      if (/UPDATE site_navigation_items SET href=\?/i.test(sql)) { calls.navCompatibilityUpdates.push({ sql, params }); state.nav.forEach((item) => { item.href = params[0]; item.title = item.title_override || params[1]; }); return [{ affectedRows: state.nav.length }, null]; }
+      if (/UPDATE site_content_blocks SET items=\?/i.test(sql)) { calls.blockUpdates.push({ id: params[1], items: params[0] }); state.blocks.find((block) => block.id === params[1]).items = params[0]; return [{ affectedRows: 1 }, null]; }
+      if (/UPDATE site_settings SET `value`=\?/i.test(sql)) { calls.settingUpdates.push({ key: params[1], value: params[0] }); state.settings.find((row) => row.key === params[1]).value = params[0]; return [{ affectedRows: 1 }, null]; }
+      return [{ affectedRows: 1 }, null];
+    },
+  };
+  const snapshotBefore = snapshot();
+  return { state, calls, pool: { async getConnection() { return conn; } }, nextRoute };
+}
+
+{
+  const { pool, state, calls, nextRoute } = routeSyncPool();
+  await createAdminRepository(pool).updatePage(1, { route: nextRoute, title: 'CRM rendszer' });
+  assert.equal(state.page.route, nextRoute);
+  assert.equal(state.nav[0].href, nextRoute);
+  const publishedItems = JSON.parse(state.blocks[0].items);
+  assert.equal(publishedItems[0].url, nextRoute);
+  assert.equal(publishedItems[1].url, 'https://example.com');
+  assert.equal(publishedItems[2].url, '/assets/demo.png');
+  assert.match(publishedItems[3].label, /megoldasaink\/crm-ugyfelkezeles/);
+  assert.equal(publishedItems[4].href, '/masik/');
+  const draftItems = JSON.parse(state.blocks[1].items);
+  assert.equal(draftItems[0].primaryUrl, nextRoute);
+  assert.equal(draftItems[0].secondaryUrl, nextRoute);
+  assert.equal(JSON.parse(state.blocks[2].items)[0].url, '/megoldasaink/crm-ugyfelkezeles/');
+  assert.equal(calls.commit, 1);
+  assert.equal(calls.rollback, 0);
+}
+
+{
+  const { pool, state, calls } = routeSyncPool({ currentRoute: '/kapcsolat/', nextRoute: '/elerhetoseg/' });
+  await createAdminRepository(pool).updatePage(1, { route: '/elerhetoseg/', title: 'Elérhetőség' });
+  const publishedItems = JSON.parse(state.blocks[0].items);
+  const settings = JSON.parse(state.settings[0].value);
+  assert.equal(publishedItems[0].url, '/elerhetoseg/');
+  assert.equal(settings.primaryUrl, '/elerhetoseg/');
+  assert.equal(settings.secondaryUrl, '/elerhetoseg/');
+  assert.equal(settings.deployUrl, 'https://deploy.easylink.hu');
+  assert.equal(calls.settingUpdates.length, 1);
+}
+
+{
+  const { pool, calls } = routeSyncPool({ currentRoute: '/kapcsolat/', nextRoute: '/kapcsolat/' });
+  await createAdminRepository(pool).updatePage(1, { route: '/kapcsolat/', title: 'Kapcsolat' });
+  assert.equal(calls.blockUpdates.length, 0);
+  assert.equal(calls.settingUpdates.length, 0);
+  assert.equal(calls.commit, 1);
+}
+
+{
+  const { pool, state, calls } = routeSyncPool({ invalidItems: true });
+  await assert.rejects(() => createAdminRepository(pool).updatePage(1, { route: '/uj/' }), /Hibás JSON/);
+  assert.equal(calls.rollback, 1);
+  assert.equal(calls.commit, 0);
+  assert.equal(state.page.route, '/megoldasaink/crm-ugyfelkezeles/');
+  assert.equal(state.nav[0].href, '/megoldasaink/crm-ugyfelkezeles/');
+}
+
 assert.equal(validateContentReferences(snapshot()).ok, true);
 assert.equal(validateContentReferences(snapshot([nav()], [page(1, 'draft')])).errors[0].code, 'NAVIGATION_TARGET_PAGE_NOT_PUBLISHED');
 assert.equal(validateContentReferences(snapshot([nav()], [page(1, 'archived')])).errors[0].code, 'NAVIGATION_TARGET_PAGE_NOT_PUBLISHED');

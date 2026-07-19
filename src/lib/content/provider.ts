@@ -1,74 +1,114 @@
-import { staticNavigationItems, staticPages, getStaticPageByRoute, getStaticPageBySlug, type SitePage } from './static';
+import { staticNavigationItems, staticPages, getStaticPageByRoute, type SitePage } from './static';
+import { buildPublicRouteIndex, normalizePublicRoute, publishedNonHomePages, type PublishedPublicPagesResult, type PublicContentMode } from './public-pages';
 
-type DbReader = { getPageByRoute(route: string): Promise<SitePage | null>; getPageByRouteAny?: (route: string) => Promise<SitePage | null>; listContentPages?: () => Promise<SitePage[]>; listNavigation(): Promise<Array<{ title: string; href: string; sortOrder: number; status: string }>> };
+type NavigationItem = { title: string; href: string; sortOrder: number; status: string };
+type DbReader = {
+  getPageByRoute(route: string): Promise<SitePage | null>;
+  getPageByRouteAny?: (route: string) => Promise<SitePage | null>;
+  listContentPages?: () => Promise<SitePage[]>;
+  listPublishedPublicPages?: () => Promise<SitePage[]>;
+  listNavigation(): Promise<NavigationItem[]>;
+};
 
-const env = (import.meta as unknown as { env?: Record<string, string | undefined> }).env ?? {};
+type SourceEnv = Record<string, string | undefined>;
+
+const env = (import.meta as unknown as { env?: SourceEnv }).env ?? {};
 export const contentSource = () => env.SITE_CONTENT_SOURCE ?? 'auto';
 export const hasDbConfig = () => Boolean(env.DATABASE_URL || (env.DB_HOST && env.DB_NAME && env.DB_USER));
 export const shouldTryDbContent = () => contentSource() === 'db' || (contentSource() === 'auto' && hasDbConfig());
+export const shouldTryDbContentForEnv = (sourceEnv: SourceEnv) => {
+  const source = sourceEnv.SITE_CONTENT_SOURCE ?? 'auto';
+  const configured = Boolean(sourceEnv.DATABASE_URL || (sourceEnv.DB_HOST && sourceEnv.DB_NAME && sourceEnv.DB_USER));
+  return source === 'db' || (source === 'auto' && configured);
+};
 
-async function getDbReader(): Promise<DbReader | null> {
-  if (!shouldTryDbContent()) return null;
-  try {
-    const mod = await import('@/lib/db/repository');
-    return mod.createMariaDbContentRepository();
-  } catch {
-    return null;
-  }
+function sourceModeForEnv(sourceEnv: SourceEnv): PublicContentMode {
+  const source = sourceEnv.SITE_CONTENT_SOURCE ?? 'auto';
+  const configured = Boolean(sourceEnv.DATABASE_URL || (sourceEnv.DB_HOST && sourceEnv.DB_NAME && sourceEnv.DB_USER));
+  return source === 'static' || (source === 'auto' && !configured) ? 'static' : 'db-authoritative';
 }
 
+async function createDefaultDbReader(): Promise<DbReader | null> {
+  if (!shouldTryDbContent()) return null;
+  const mod = await import('@/lib/db/repository');
+  return mod.createMariaDbContentRepository();
+}
 
-export async function getPublicPageState(route: string): Promise<{ page?: SitePage; hiddenByDb: boolean }> {
-  const normalized = route.endsWith('/') ? route : `${route}/`;
-  const db = await getDbReader();
-  if (db?.getPageByRouteAny) {
-    try {
-      const page = await db.getPageByRouteAny(normalized);
-      if (page) return { page: page.status === 'published' ? page : undefined, hiddenByDb: page.status !== 'published' };
-    } catch {}
-  } else if (db) {
-    try {
-      const page = await db.getPageByRoute(normalized);
-      if (page) return { page: page.status === 'published' ? page : undefined, hiddenByDb: page.status !== 'published' };
-    } catch {}
+function staticPublishedPublicPages() {
+  return publishedNonHomePages(staticPages);
+}
+
+export function createPublicContentProvider({ sourceEnv = env, dbReaderFactory = createDefaultDbReader, staticPageList = staticPages, staticNavigation = staticNavigationItems }: { sourceEnv?: SourceEnv; dbReaderFactory?: () => Promise<DbReader | null>; staticPageList?: SitePage[]; staticNavigation?: NavigationItem[] } = {}) {
+  const mode = sourceModeForEnv(sourceEnv);
+  async function requireDbReader() {
+    const db = await dbReaderFactory();
+    if (!db) throw new Error('DB content repository nem érhető el konfigurált DB content source mellett.');
+    return db;
   }
-  return { page: getStaticPageByRoute(normalized), hiddenByDb: false };
+  return {
+    mode,
+    async listPublishedPublicPages(): Promise<PublishedPublicPagesResult> {
+      if (mode === 'static') return { mode, pages: publishedNonHomePages(staticPageList) };
+      const db = await requireDbReader();
+      if (!db.listPublishedPublicPages) throw new Error('A DB content repository nem támogatja a listPublishedPublicPages contractot.');
+      const pages = await db.listPublishedPublicPages();
+      return { mode, pages: publishedNonHomePages(pages) };
+    },
+    async getPublicPageState(route: string): Promise<{ page?: SitePage; hiddenByDb: boolean; mode: PublicContentMode }> {
+      const normalized = normalizePublicRoute(route);
+      if (mode === 'static') return { page: getStaticPageByRoute(normalized), hiddenByDb: false, mode };
+      const db = await requireDbReader();
+      const page = db.getPageByRouteAny ? await db.getPageByRouteAny(normalized) : await db.getPageByRoute(normalized);
+      if (!page) return { page: undefined, hiddenByDb: false, mode };
+      return { page: page.status === 'published' ? page : undefined, hiddenByDb: page.status !== 'published', mode };
+    },
+    async getPageByRoute(route: string): Promise<SitePage | undefined> {
+      const normalized = normalizePublicRoute(route);
+      if (mode === 'static') return getStaticPageByRoute(normalized);
+      const db = await requireDbReader();
+      const page = db.getPageByRouteAny ? await db.getPageByRouteAny(normalized) : await db.getPageByRoute(normalized);
+      return page?.status === 'published' ? page : undefined;
+    },
+    async listNavigation(): Promise<NavigationItem[]> {
+      if (mode === 'static') return staticNavigation;
+      const db = await requireDbReader();
+      return db.listNavigation();
+    },
+  };
+}
+
+const defaultProvider = () => createPublicContentProvider();
+
+export async function listPublishedPublicPages(): Promise<PublishedPublicPagesResult> {
+  return defaultProvider().listPublishedPublicPages();
+}
+
+export async function getPublishedPublicPageByRoute(route: string): Promise<SitePage | undefined> {
+  const normalized = normalizePublicRoute(route);
+  const result = await listPublishedPublicPages();
+  return result.pages.find((page) => normalizePublicRoute(page.route) === normalized);
+}
+
+export async function getPublicRouteIndex() {
+  const result = await listPublishedPublicPages();
+  return { mode: result.mode, routeIndex: buildPublicRouteIndex(result.pages) };
+}
+
+export async function getPublicPageState(route: string): Promise<{ page?: SitePage; hiddenByDb: boolean; mode: PublicContentMode }> {
+  return defaultProvider().getPublicPageState(route);
 }
 
 export async function getPageByRoute(route: string): Promise<SitePage | undefined> {
-  const normalized = route.endsWith('/') ? route : `${route}/`;
-  const db = await getDbReader();
-  if (db) {
-    try {
-      const page = db.getPageByRouteAny ? await db.getPageByRouteAny(normalized) : await db.getPageByRoute(normalized);
-      if (page) return page.status === 'published' ? page : undefined;
-    } catch {}
-  }
-  return getStaticPageByRoute(normalized);
-}
-
-export async function getDetailPage(type: 'solution_detail' | 'audience_detail', slug: string): Promise<SitePage | undefined> {
-  const route = type === 'solution_detail' ? `/megoldasaink/${slug}/` : `/kinek-szol/${slug}/`;
-  return getPageByRoute(route) ?? getStaticPageBySlug(type, slug);
+  return defaultProvider().getPageByRoute(route);
 }
 
 export async function listContentPages() {
-  const db = await getDbReader();
-  if (db?.listContentPages) {
-    try { return await db.listContentPages(); } catch {}
-  }
-  return staticPages.filter((page) => page.type === 'content_page' && page.status === 'published');
+  const result = await listPublishedPublicPages();
+  return result.pages.filter((page) => page.type === 'content_page');
 }
 
 export async function listNavigation() {
-  const db = await getDbReader();
-  if (db) {
-    try {
-      const nav = await db.listNavigation();
-      if (nav.length > 0) return nav;
-    } catch {}
-  }
-  return staticNavigationItems;
+  return defaultProvider().listNavigation();
 }
 
 export { staticPages };

@@ -1,0 +1,18 @@
+---
+import type { PublicPageRendererProps } from './types';
+import PageHero from '@/components/PageHero.astro';
+import ContentBlocks from '@/components/ContentBlocks.astro';
+import CTASection from '@/components/CTASection.astro';
+import RelatedLinks from '@/components/RelatedLinks.astro';
+import { findRoleBlock, withoutBlocks } from '@/lib/content/blockRoles';
+import { relatedPages } from '@/lib/content/public-pages';
+type Props = PublicPageRendererProps;
+const { page, routeIndex } = Astro.props;
+const ctaSectionBlock = findRoleBlock(page.blocks, 'cta-section', (block) => block.type === 'cta');
+const contentBlocks = withoutBlocks(page.blocks, [ctaSectionBlock]);
+const related = relatedPages(routeIndex, page, 'audience_detail');
+---
+<PageHero eyebrow="Kinek szól?" title={page.heroTitle} description={page.heroDescription} variant="detail" asset={page.heroAsset || undefined} height={page.heroHeight} imageFit={page.heroImageFit} imagePositionX={page.heroImagePositionX} imagePositionY={page.heroImagePositionY} imagePositionMobileX={page.heroImagePositionMobileX} imagePositionMobileY={page.heroImagePositionMobileY} overlayStrength={page.heroOverlayStrength} imageScale={page.heroImageScale} video={page.heroVideo} />
+<ContentBlocks blocks={contentBlocks} />
+<RelatedLinks links={related} />
+<CTASection block={ctaSectionBlock} />
