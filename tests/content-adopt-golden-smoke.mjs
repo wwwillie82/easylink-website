@@ -79,6 +79,7 @@ function createFixtureDb() {
       { id: 1, route: '/', type: 'home', title: 'Easylink', status: 'published' },
     ],
     blocks: [
+      { id: 3, page_id: 2, type: 'text', title: 'Meglévő nem CTA blokk', body: 'current DB null JSON shape', items: 'null', sort_order: 10, status: 'published' },
       { id: 4, page_id: 3, type: 'text', title: 'TELEX KÁRTYA', body: 'placeholder pénzügy szöveg', items: null, sort_order: 10, status: 'published' },
       { id: 5, page_id: 3, type: 'feature-list', title: 'Konkrét fókuszok', body: '', items: JSON.stringify(['placeholder fókusz']), sort_order: 20, status: 'published' },
       { id: 43, page_id: 3, type: 'text', title: 'Mire jó?', body: 'draft old golden shape must stay draft', items: null, sort_order: 8, status: 'draft' },
@@ -202,7 +203,7 @@ const oldDeployUrl = process.env.PUBLIC_DEPLOY_URL;
 process.env.PUBLIC_DEPLOY_URL = 'https://custom.deploy.test';
 const ctaDry = await diffCtaDefaults(ctaDb);
 process.env.PUBLIC_DEPLOY_URL = oldDeployUrl;
-assert.ok(ctaDry.some((d) => d.route === '/megoldasaink/' && d.action === 'insert'));
+assert.ok(ctaDry.some((d) => d.route === '/megoldasaink/' && d.action === 'insert'), 'existing non-CTA block with items=\'null\' must not block CTA insert');
 assert.match(JSON.stringify(ctaDry.find((d) => d.route === '/megoldasaink/').target), /https:\/\/custom\.deploy\.test/);
 assert.ok(ctaDry.some((d) => d.route === '/kinek-szol/' && d.action === 'suppressed-archived' && d.blockId === 102));
 assert.ok(!ctaDry.some((d) => d.route === '/arak/'), 'pricing route already has its own DB CTA and must not receive default CTASection backfill');
@@ -223,11 +224,14 @@ const currentShapePages = [
   { id: 2, route: '/arak/', type: 'pricing', title: 'Árak', status: 'published' },
   ...Array.from({ length: 14 }, (_, i) => ({ id: i + 10, route: `/current-${i + 1}/`, type: i === 13 ? 'content_page' : 'solution_detail', title: `Current ${i + 1}`, status: i === 13 ? 'draft' : 'published' })),
 ];
+const currentShapeNullItemBlocks = new Map([[10, [{ id: 501, page_id: 10, type: 'text', title: 'Current null items 1', body: 'Current DB export stores JSON null as text.', items: 'null', sort_order: 10, status: 'published' }]], [12, [{ id: 502, page_id: 12, type: 'feature-list', title: 'Current null items 2', body: '', items: 'null', sort_order: 20, status: 'published' }]], [23, [{ id: 503, page_id: 23, type: 'cards', title: 'Current null items 3', body: '', items: 'null', sort_order: 30, status: 'draft' }]]]);
 const currentShapeDb = {
   async listNonHomePages() { return currentShapePages.filter((p) => p.route !== '/' && p.type !== 'home' && p.status !== 'archived').map(clone); },
-  async listBlocks(_pageId) { return []; },
+  async listBlocks(pageId) { return (currentShapeNullItemBlocks.get(Number(pageId)) || []).map(clone); },
   async getDefaultCta() { return { eyebrow: 'Következő lépés', title: 'Készen állsz könnyedebben vezetni a céged?', description: 'Kérj demót vagy próbáld ki ingyen a konfigurált Deploy felületen.', primaryLabel: 'Demót kérnék', primaryUrl: 'https://deploy.easylink.hu', secondaryLabel: 'Próbáld ki ingyen', secondaryUrl: 'https://deploy.easylink.hu' }; },
 };
+const currentShapeNullBlocks = (await Promise.all(currentShapePages.map((page) => currentShapeDb.listBlocks(page.id)))).flat().filter((block) => block.items === 'null');
+assert.ok(currentShapeNullBlocks.length >= 3, 'current DB-shape fixture must include several real JSON null text item blocks');
 const currentShapeCtaDry = await diffCtaDefaults(currentShapeDb);
 assert.equal(currentShapeCtaDry.filter((d) => d.action === 'insert').length, 14, 'current DB-shape fixture must produce exactly 14 generic CTA inserts');
 assert.ok(!currentShapeCtaDry.some((d) => d.route === '/' || d.route === '/arak/'), 'home and pricing must be skipped in current DB-shape fixture');

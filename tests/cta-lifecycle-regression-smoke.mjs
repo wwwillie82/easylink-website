@@ -34,6 +34,14 @@ assert.throws(() => pageForm({ page, defaultCta: dbDefault, navigationUsages: []
 
 assert.equal(isCanonicalCtaSection({ block_key: 'golden:cta-section', items: '[]' }), true);
 assert.equal(isCanonicalCtaSection({ block_key: 'manual:has:cta-section', items: '[]' }), false);
+assert.equal(isCanonicalCtaSection({ block_key: 'manual:null-string', items: 'null' }), false);
+assert.equal(isCanonicalCtaSection({ block_key: 'manual:null-value', items: null }), false);
+assert.equal(isCanonicalCtaSection({ block_key: 'manual:bad-json', items: '[{bad json]' }), false);
+assert.equal(isCanonicalCtaSection({ block_key: 'manual:object-json', items: '{\"presentationRole\":\"cta-section\"}' }), false);
+assert.equal(isCanonicalCtaSection({ block_key: 'manual:string-json', items: '\"cta-section\"' }), false);
+assert.equal(isCanonicalCtaSection({ block_key: 'manual:number-json', items: '42' }), false);
+assert.equal(isCanonicalCtaSection({ block_key: 'manual:boolean-json', items: 'true' }), false);
+assert.equal(isCanonicalCtaSection({ block_key: 'manual:array-role', items: JSON.stringify([{ presentationRole: 'cta-section' }]) }), true);
 assert.equal(isCanonicalCtaSection({ block_key: 'manual:x', items: JSON.stringify([{ presentationRole: 'cta-section' }]) }), true);
 assert.equal(blockHasRole({ block_key: 'manual:has:cta-section', items: [] }, 'cta-section'), false);
 assert.equal(blockHasRole({ block_key: 'manual:x', items: [{ role: 'cta-section' }] }, 'cta-section'), true);

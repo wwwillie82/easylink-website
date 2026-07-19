@@ -7,7 +7,7 @@ const parseItems = (items) => Array.isArray(items) ? items : (typeof items === '
 export function normalizeDefaultCta(value = {}) { return normalizeSiteSettings({ defaultCta: value }).defaultCta; }
 function envDefaultCta() { const envUrl = process.env.PUBLIC_DEPLOY_URL; const url = envUrl && envUrl !== 'undefined' ? envUrl : DEFAULT_SITE_SETTINGS.defaultCta.primaryUrl; return { ...DEFAULT_SITE_SETTINGS.defaultCta, primaryUrl: url, secondaryUrl: url }; }
 export function canonicalCtaBlockFromDefault(defaultCta = envDefaultCta()) { const d = normalizeDefaultCta(defaultCta); return { block_key: GOLDEN_CTA_KEY, type: 'cta', title: d.title, body: d.description, items: [{ eyebrow: d.eyebrow, label: d.primaryLabel, url: d.primaryUrl, secondaryLabel: d.secondaryLabel, secondaryUrl: d.secondaryUrl, presentationRole: CTA_SECTION_ROLE }], sort_order: CTA_SECTION_SORT_ORDER, status: 'published' }; }
-export function blockItems(block) { try { return parseItems(block?.items); } catch { return []; } }
+export function blockItems(block) { try { const parsed = parseItems(block?.items); return Array.isArray(parsed) ? parsed : []; } catch { return []; } }
 export function itemHasRole(item, role) { return Boolean(item && typeof item === 'object' && (item.presentationRole === role || item.role === role)); }
 export function blockHasExplicitRole(block, role) { return blockItems(block).some((item) => itemHasRole(item, role)); }
 export function isCanonicalCtaSection(block) { return block?.block_key === GOLDEN_CTA_KEY || block?.blockKey === GOLDEN_CTA_KEY || blockHasExplicitRole(block, CTA_SECTION_ROLE); }
