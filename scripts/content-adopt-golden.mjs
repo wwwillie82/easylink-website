@@ -5,6 +5,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import ts from 'typescript';
 import { getDatabaseConfig, createPool } from '../src/lib/db/client.mjs';
+import { canonicalCtaBlockFromDefault, isCanonicalCtaSection, assertSingleCanonicalCta, mergePricingCtaDefaults, isPricingCta } from '../src/lib/content/cta-contract.mjs';
 
 const ROOT = path.resolve(new URL('..', import.meta.url).pathname);
 const APPLY_GROUPS = new Set(['solutions', 'audiences', 'integrations', 'pricing', 'contact']);
@@ -171,9 +172,9 @@ const parseItems = (items) => {
 };
 const pricingCtaHasRequiredFields = (block) => {
   const first = parseItems(block?.items)?.[0];
-  return Boolean(first && typeof first === 'object' && ['eyebrow','label','url','secondaryLabel','secondaryUrl'].every((key) => Object.prototype.hasOwnProperty.call(first, key)));
+  return Boolean(first && typeof first === 'object' && isPricingCta(block) && ['eyebrow','label','url','secondaryLabel','secondaryUrl'].every((key) => Object.prototype.hasOwnProperty.call(first, key)));
 };
-function isCtaSectionBlock(block) { return String(block.block_key || '').includes(':cta-section') || String(block.block_key || '') === 'golden:cta-section' || parseItems(block.items)?.some?.((item) => item?.presentationRole === 'cta-section' || item?.role === 'cta-section'); }
+function isCtaSectionBlock(block) { return isCanonicalCtaSection(block); }
 const isRiskyBlock = (block) => RISK_RE.test(`${block.title || ''}\n${block.body || ''}\n${preview(block.items || '')}`);
 
 export async function diffRoute(entry, db) {
@@ -214,24 +215,18 @@ async function withTransaction(db, fn) {
 
 
 const defaultDeployUrl = () => process.env.PUBLIC_DEPLOY_URL || 'https://deploy.easylink.hu';
-const defaultCtaBlock = () => ({
-  block_key: 'golden:cta-section',
-  type: 'cta',
-  title: 'Készen állsz könnyedebben vezetni a céged?',
-  body: 'Kérj demót vagy próbáld ki ingyen a konfigurált Deploy felületen.',
-  items: [{ eyebrow: 'Következő lépés', label: 'Demót kérek', url: defaultDeployUrl(), secondaryLabel: 'Próbáld ki ingyen', secondaryUrl: defaultDeployUrl(), presentationRole: 'cta-section' }],
-  sort_order: 900,
-  status: 'published',
-});
 
-const hasActiveCtaSection = (blocks) => blocks.some((block) => block.status !== 'archived' && isCtaSectionBlock(block));
 
 export async function diffCtaDefaults(db) {
-  const pages = (await db.listNonHomePages()).filter((page) => page.type !== 'pricing' && page.route !== '/arak/');
+  const pages = (await db.listNonHomePages()).filter((page) => page.status !== 'archived' && page.type !== 'pricing' && page.route !== '/arak/');
+  const settings = db.getDefaultCta ? await db.getDefaultCta() : undefined;
   const diffs = [];
   for (const page of pages) {
     const blocks = await db.listBlocks(page.id);
-    diffs.push({ route: page.route, page: { id: page.id, type: page.type, status: page.status }, action: hasActiveCtaSection(blocks) ? 'keep' : (blocks.some(isCtaSectionBlock) ? 'reactivate' : 'insert'), blockId: blocks.find(isCtaSectionBlock)?.id, target: hasActiveCtaSection(blocks) ? undefined : defaultCtaBlock() });
+    const canonical = assertSingleCanonicalCta(blocks);
+    if (!canonical) diffs.push({ route: page.route, page: { id: page.id, type: page.type, status: page.status }, action: 'insert', target: canonicalCtaBlockFromDefault(settings) });
+    else if (canonical.status === 'archived') diffs.push({ route: page.route, page: { id: page.id, type: page.type, status: page.status }, action: 'suppressed-archived', blockId: canonical.id });
+    else diffs.push({ route: page.route, page: { id: page.id, type: page.type, status: page.status }, action: 'keep', blockId: canonical.id });
   }
   return diffs;
 }
@@ -240,7 +235,7 @@ export async function applyCtaDefaults(db) {
   return withTransaction(db, async (tx) => {
     if (tx.createAuditSnapshot) await tx.createAuditSnapshot('cta-defaults-adopt-before:all-non-home');
     const diffs = await diffCtaDefaults(tx);
-    for (const diff of diffs) { if (diff.action === 'insert') await tx.insertBlock(diff.page.id, diff.target); if (diff.action === 'reactivate') await tx.updateBlock(diff.blockId, diff.target); }
+    for (const diff of diffs) if (diff.action === 'insert') await tx.insertBlock(diff.page.id, diff.target);
     return diffCtaDefaults(tx);
   });
 }
@@ -255,7 +250,7 @@ function mergeMissingCtaFields(existingBlock, target) {
   const existingItems = parseItems(existingBlock?.items);
   const current = Array.isArray(existingItems) && existingItems[0] && typeof existingItems[0] === 'object' ? existingItems[0] : {};
   const desired = target.items?.[0] || {};
-  return { ...target, items: [{ ...desired, ...current }] };
+  return { ...target, ...mergePricingCtaDefaults(existingBlock, target), block_key: target.block_key, type: target.type, title: existingBlock?.title ?? target.title, body: existingBlock?.body ?? target.body, sort_order: existingBlock?.sort_order ?? target.sort_order, status: existingBlock?.status ?? target.status };
 }
 
 export async function applyRoute(entry, db) {
@@ -296,6 +291,7 @@ export function createMysqlDbAdapter(pool) {
   const adapterFor = (conn) => ({
     async getPageByRoute(route) { const [rows] = await conn.query('SELECT * FROM site_pages WHERE route=? LIMIT 1', [route]); return rows[0] || null; },
     async listNonHomePages() { const [rows] = await conn.query("SELECT * FROM site_pages WHERE route<>? AND type<>? AND status<>? ORDER BY sort_order,id", ['/', 'home', 'archived']); return rows; },
+    async getDefaultCta() { const [rows] = await conn.query('SELECT `value` FROM site_settings WHERE `key`=? LIMIT 1', ['defaultCta']); const row = rows[0]; return row ? (typeof row.value === 'string' ? JSON.parse(row.value) : row.value) : undefined; },
     async listBlocks(pageId) { const [rows] = await conn.query('SELECT * FROM site_content_blocks WHERE page_id=? ORDER BY sort_order,id', [pageId]); return rows; },
     async updatePageFields(id, page) { await conn.execute('UPDATE site_pages SET title=?, seo_title=?, seo_description=?, hero_eyebrow=?, hero_title=?, hero_description=?, hero_asset=? WHERE id=?', [page.title, page.seoTitle, page.seoDescription, page.heroEyebrow, page.heroTitle, page.heroDescription, page.heroAsset, id]); },
     async updateBlock(id, b) { await conn.execute('UPDATE site_content_blocks SET type=?, title=?, body=?, items=?, sort_order=?, status=? WHERE id=?', [b.type, b.title, b.body ?? null, b.items === undefined ? null : JSON.stringify(b.items), b.sort_order, b.status, id]); },

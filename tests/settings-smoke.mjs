@@ -62,7 +62,7 @@ import { settingsAdminJs, settingsSaveOutcome } from '../src/lib/admin/render/se
 
 function settingsRuntime({ settingsResponse, uploadResponse } = {}) {
   let reloads = 0;
-  const msgEl = { innerHTML: '' };
+  const msgEl = { innerHTML: '', querySelector(selector) { return selector === '[data-dirty-message]' && this.innerHTML.includes('data-dirty-message') ? { remove: () => { this.innerHTML = this.innerHTML.replace(/<p class=\"msg warn\" data-dirty-message>.*?<\/p>/, ''); } } : null; }, insertAdjacentHTML(_pos, html) { this.innerHTML += html; } };
   const saveButton = { disabled: false, type: 'submit' };
   const inputs = {
     'analytics.enabled': { name: 'analytics.enabled', checked: false, value: '', addEventListener() {} },
