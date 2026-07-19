@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 
 const home = await readFile('src/pages/index.astro', 'utf8');
@@ -100,7 +100,8 @@ assert.match(renderPageHeroStyle(publicHeroAsset, 25, 75), /25% 75%/);
 
 const catchAll = await readFile('src/pages/[...slug].astro', 'utf8');
 assert.match(catchAll, /listPublishedPublicPages/);
-assert.match(catchAll, /getPublicPageRenderer/);
+assert.match(catchAll, /PublicPageRenderer/);
+assert.doesNotMatch(catchAll, /getPublicPageRenderer/);
 assert.match(catchAll, /buildPublicRouteIndex\(allPages\)/);
 assert.doesNotMatch(catchAll, /getPublicRouteIndex/);
 assert.doesNotMatch(catchAll, /page\.type !== 'content_page'/);
@@ -136,8 +137,19 @@ assert.doesNotMatch(contentBlocks, /mini-card/);
 const registry = await readFile('src/components/page-renderers/registry.ts', 'utf8');
 for (const type of ['solutions_index','solution_detail','audiences_index','audience_detail','integrations','pricing','contact','content_page']) assert.match(registry, new RegExp(type));
 assert.doesNotMatch(registry, /home:/);
-assert.match(registry, /export type PublicPageRenderer = typeof ContentPageRenderer/);
+assert.match(registry, /export function isSupportedPublicPageType/);
+assert.match(registry, /unsupportedPublicPageTypeError/);
 assert.match(registry, /Unsupported published public page\.type/);
+assert.doesNotMatch(registry, /\.astro/);
+const dispatcher = await readFile('src/components/page-renderers/PublicPageRenderer.astro', 'utf8');
+for (const renderer of ['ContentPageRenderer','SolutionsIndexRenderer','SolutionDetailRenderer','AudiencesIndexRenderer','AudienceDetailRenderer','IntegrationsRenderer','PricingRenderer','ContactRenderer']) assert.match(dispatcher, new RegExp(`import ${renderer} from './${renderer}\\.astro'`));
+for (const type of ['solutions_index','solution_detail','audiences_index','audience_detail','integrations','pricing','contact','content_page']) assert.match(dispatcher, new RegExp(`${type}:`));
+assert.doesNotMatch(dispatcher, /home:/);
+assert.match(dispatcher, /if \(!isSupportedPublicPageType\(page\.type\)\) throw unsupportedPublicPageTypeError\(page\.type\)/);
+assert.match(dispatcher, /<Renderer page=\{page\} routeIndex=\{routeIndex\} mode=\{mode\} \/>/);
+async function collectTsFiles(dir) { const out = []; for (const entry of await readdir(dir, { withFileTypes: true })) { const file = `${dir}/${entry.name}`; if (entry.isDirectory()) out.push(...await collectTsFiles(file)); else if (entry.isFile() && file.endsWith('.ts')) out.push(file); } return out; }
+const tsSources = await Promise.all((await collectTsFiles('src')).map(async (file) => [file, await readFile(file, 'utf8')]));
+for (const [file, source] of tsSources) assert.doesNotMatch(source, /from ['\"][^'\"]+\.astro['\"]/, `${file} must not import Astro components from TypeScript`);
 
 const solutionsIndex = await readFile('src/components/page-renderers/SolutionsIndexRenderer.astro', 'utf8');
 assert.match(solutionsIndex, /findRoleBlock\(page\?\.blocks, 'golden-cards'/);
