@@ -5,6 +5,9 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { copyMediaToRelease } from './media-storage.mjs';
 import { validateContentReferences, referenceValidationSummary } from '../content/reference-validation.mjs';
+import { normalizeRootInvariantRoute, validateRootHomeSnapshot } from '../content/root-invariant.mjs';
+
+const supportedPublishedPageTypes = new Set(['home', 'solutions_index', 'solution_detail', 'audiences_index', 'audience_detail', 'integrations', 'pricing', 'contact', 'content_page']);
 
 export class PublishInProgressError extends Error { constructor() { super('Élesítés folyamatban, próbáld újra később.'); this.code = 'PUBLISH_IN_PROGRESS'; } }
 
@@ -40,8 +43,9 @@ export async function ensureWebrootPermissions(webroot) {
   }
   await walk(webroot);
 }
+function normalizeReleaseRoute(route) { return normalizeRootInvariantRoute(route); }
 function routeOutputPath(releasePath, route) {
-  const clean = String(route || '').replace(/^\/+|\/+$/g, '');
+  const clean = normalizeReleaseRoute(route).replace(/^\/+|\/+$/g, '');
   return clean ? path.join(releasePath, clean, 'index.html') : path.join(releasePath, 'index.html');
 }
 export async function validateRelease(releasePath, content = {}) {
@@ -49,9 +53,22 @@ export async function validateRelease(releasePath, content = {}) {
   const entries = await readdir(releasePath);
   if (entries.length === 0) return { ok: false, error: 'Release könyvtár üres.' };
   if (!(await exists(path.join(releasePath, 'index.html')))) return { ok: false, error: 'Release index.html hiányzik.' };
-  const routes = (content.pages || []).map((page) => page.route).filter(Boolean).slice(0, 5);
-  for (const route of routes) {
-    if (!(await exists(routeOutputPath(releasePath, route)))) return { ok: false, error: `Release route hiányzik: ${route}` };
+  if (Array.isArray(content.pages)) {
+    const rootInvariant = validateRootHomeSnapshot(content.pages);
+    if (!rootInvariant.ok) return rootInvariant;
+  }
+  const pages = Array.isArray(content.pages) ? content.pages.filter((page) => page?.status === undefined || page.status === 'published') : [];
+  const seenRoutes = new Map();
+  for (const page of pages) {
+    const route = String(page.route || '').trim();
+    const normalizedRoute = normalizeReleaseRoute(route);
+    const title = page.title || `#${page.id || '?'}`;
+    const type = String(page.type || 'content_page');
+    if (!route) return { ok: false, error: `Published oldal route hiányzik: ${title} (${type})` };
+    if (!supportedPublishedPageTypes.has(type)) return { ok: false, error: `Unsupported published page.type: ${title} (${type}) ${route}` };
+    if (seenRoutes.has(normalizedRoute)) return { ok: false, error: `Duplikált published route a snapshotban: ${normalizedRoute} (${seenRoutes.get(normalizedRoute)} és ${title})` };
+    seenRoutes.set(normalizedRoute, title);
+    if (!(await exists(routeOutputPath(releasePath, route)))) return { ok: false, error: `Release route hiányzik: ${title} (${type}) ${route}` };
   }
   return { ok: true };
 }

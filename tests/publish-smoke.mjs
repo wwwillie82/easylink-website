@@ -17,7 +17,7 @@ assert.match(adminPublishSource, /process\.env\.SITE_ADMIN_ENV_FILE/);
 assert.match(adminPublishSource, /required: true/);
 assert.match(adminPublishSource, /process\.env\[match\[1\]\] !== undefined/);
 
-const content = { navigation: [{ id: 1, title: 'A' }], pages: [{ id: 1, route: '/', title: 'Home' }, { id: 2, route: '/arak/', title: 'Árak' }], blocks: [], settings: [{ key: 'legalDocuments', value: JSON.stringify({ termsPdfPath: '/assets/site-media/2026/07/terms-a1b2c3d4.pdf' }) }], media: [
+const content = { navigation: [{ id: 1, title: 'A' }], pages: [{ id: 1, route: '/', type: 'home', title: 'Home' }, { id: 2, route: '/arak/', type: 'pricing', title: 'Árak' }], blocks: [], settings: [{ key: 'legalDocuments', value: JSON.stringify({ termsPdfPath: '/assets/site-media/2026/07/terms-a1b2c3d4.pdf' }) }], media: [
   { path: '/assets/site-media/2026/07/kep-a1b2c3d4.png', status: 'active', type: 'image/png' },
   { path: '/assets/site-media/2026/07/video-a1b2c3d4.mp4', status: 'active', processing_status: 'ready', type: 'video/mp4' },
   { path: '/assets/site-media/2026/07/terms-a1b2c3d4.pdf', status: 'active', processing_status: 'ready', type: 'application/pdf' },

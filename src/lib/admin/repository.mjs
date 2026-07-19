@@ -132,6 +132,58 @@ function normalizeHeroDisplay(p = {}) { return {
 function normalizeProgressPercent(value) { const n = Number(value); if (!Number.isFinite(n)) return null; return Math.max(0, Math.min(100, Math.round(n))); }
 function normalizeProgressMessage(value) { const raw = String(value || '').replace(/\s+/g, ' ').trim(); return raw ? raw.slice(0, 255) : null; }
 
+const persistedUrlFields = new Set(['url','href','primaryUrl','secondaryUrl','primary_url','secondary_url']);
+function isSyncableInternalRoute(value, oldRoute) {
+  const raw = String(value ?? '').trim();
+  if (!raw.startsWith('/') || raw.startsWith('/assets/')) return false;
+  return normalizeRoute(raw) === oldRoute;
+}
+function syncRouteValue(value, oldRoute, newRoute) {
+  if (typeof value !== 'string') return { value, changed: false };
+  return isSyncableInternalRoute(value, oldRoute) ? { value: newRoute, changed: true } : { value, changed: false };
+}
+function syncRouteReferences(value, oldRoute, newRoute, key = '') {
+  if (Array.isArray(value)) {
+    let changed = false;
+    const items = value.map((item) => { const result = syncRouteReferences(item, oldRoute, newRoute); changed ||= result.changed; return result.value; });
+    return { value: items, changed };
+  }
+  if (value && typeof value === 'object') {
+    let changed = false;
+    const next = {};
+    for (const [entryKey, entryValue] of Object.entries(value)) {
+      const result = persistedUrlFields.has(entryKey) ? syncRouteValue(entryValue, oldRoute, newRoute) : syncRouteReferences(entryValue, oldRoute, newRoute, entryKey);
+      changed ||= result.changed;
+      next[entryKey] = result.value;
+    }
+    return { value: next, changed };
+  }
+  return persistedUrlFields.has(key) ? syncRouteValue(value, oldRoute, newRoute) : { value, changed: false };
+}
+async function syncContentBlockRouteReferences(conn, oldRoute, newRoute) {
+  const [rows] = await conn.query("SELECT id,items,status FROM site_content_blocks WHERE items IS NOT NULL AND status<>? ORDER BY id FOR UPDATE", ['archived']);
+  for (const row of rows) {
+    let items;
+    try { items = typeof row.items === 'string' ? JSON.parse(row.items) : row.items; } catch (error) { throw validationError(`Hibás JSON a tartalmi blokk items mezőben, route szinkron megszakítva: blockId=${row.id}`); }
+    const result = syncRouteReferences(items, oldRoute, newRoute);
+    if (result.changed) await conn.execute('UPDATE site_content_blocks SET items=? WHERE id=?', [JSON.stringify(result.value), row.id]);
+  }
+}
+async function syncSettingsRouteReferences(conn, oldRoute, newRoute) {
+  const [rows] = await conn.query('SELECT `key`,`value` FROM site_settings WHERE `key`=? LIMIT 1 FOR UPDATE', ['defaultCta']);
+  const row = rows[0];
+  if (!row) return;
+  let value;
+  try { value = typeof row.value === 'string' ? JSON.parse(row.value) : row.value; } catch { throw validationError('Hibás JSON a defaultCta site_settings értékben, route szinkron megszakítva.'); }
+  const result = syncRouteReferences(value, oldRoute, newRoute);
+  if (result.changed) await conn.execute('UPDATE site_settings SET `value`=? WHERE `key`=?', [JSON.stringify(result.value), 'defaultCta']);
+}
+async function syncPersistedRouteReferences(conn, oldRoute, newRoute) {
+  if (oldRoute === newRoute) return;
+  await syncContentBlockRouteReferences(conn, oldRoute, newRoute);
+  await syncSettingsRouteReferences(conn, oldRoute, newRoute);
+}
+
 export function createAdminRepository(pool) {
   return {
 
@@ -143,7 +195,7 @@ export function createAdminRepository(pool) {
     async createPage(p) { const route = normalizeRoute(p.route || p.slug || p.title); if (route === '/') throw validationError('Adj meg érvényes URL-t.'); const [existing] = await pool.query('SELECT id FROM site_pages WHERE route=? LIMIT 1', [route]); if (existing[0]) throw validationError('Ez az URL már létezik.'); const slug = route.replace(/^\//, '').replace(/\/$/, '') || 'home'; const hero = normalizeHeroDisplay(p); const heroVideo = await validateVideoConfigForSave(pool, p.hero_video, 'hero'); const [r] = await pool.execute('INSERT INTO site_pages (route, slug, type, title, seo_title, seo_description, hero_eyebrow, hero_title, hero_description, hero_asset, hero_video, hero_height, hero_image_fit, hero_image_position_x, hero_image_position_y, hero_image_position_mobile_x, hero_image_position_mobile_y, hero_overlay_strength, hero_image_scale, status, sort_order) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', [route, slug, p.type || 'content_page', p.title, p.seo_title || p.title, p.seo_description || '', p.hero_eyebrow || '', p.hero_title || p.title, p.hero_description || '', p.hero_asset || '', heroVideo ? JSON.stringify(heroVideo) : null, hero.hero_height, hero.hero_image_fit, hero.hero_image_position_x, hero.hero_image_position_y, hero.hero_image_position_mobile_x, hero.hero_image_position_mobile_y, hero.hero_overlay_strength, hero.hero_image_scale, p.status || 'draft', Number(p.sort_order || 999)]); return { id: r.insertId, route, slug }; },
     async page(id) { const [p] = await pool.query('SELECT * FROM site_pages WHERE id=?', [id]); if (!p[0]) return null; const [b] = await pool.query('SELECT * FROM site_content_blocks WHERE page_id=? ORDER BY sort_order,id', [id]); return { page: p[0], blocks: b, navigationUsages: await this.listPageNavigationUsages(id) }; },
     async listPageNavigationUsages(pageId) { const [rows] = await pool.query(`SELECT n.id, n.title, n.href, n.status, n.sort_order, n.target_type, n.target_page_id, n.title_override, p.title AS target_title FROM site_navigation_items n LEFT JOIN site_pages p ON p.id=n.target_page_id WHERE n.target_type='page' AND n.target_page_id=? AND n.status<>'archived' ORDER BY n.sort_order,n.id`, [pageId]); return rows.map((row) => ({ id: row.id, title: row.title_override || row.title || row.target_title || `#${row.id}`, status: row.status, sort_order: row.sort_order, target_type: row.target_type, target_page_id: row.target_page_id })); },
-    async updatePage(id, p) { const conn = await pool.getConnection(); try { await conn.beginTransaction(); const [pages] = await conn.query('SELECT * FROM site_pages WHERE id=? LIMIT 1 FOR UPDATE', [id]); const currentPage = pages[0]; if (!currentPage) throw new Error(`Page not found: ${id}`); const merged = { ...currentPage, ...p }; const route = normalizeRoute(merged.route); const isExistingHome = currentPage.route === '/' || currentPage.type === 'home'; if (route === '/' && !isExistingHome) throw validationError('Adj meg érvényes URL-t.'); const [dupe] = await conn.query('SELECT id FROM site_pages WHERE route=? AND id<>? LIMIT 1', [route, id]); if (dupe[0]) throw validationError('Ez az URL már létezik.'); const [usageRows] = await conn.query(`SELECT n.id, n.title, n.href, n.status, n.sort_order, n.target_type, n.target_page_id, n.title_override, p.title AS target_title FROM site_navigation_items n LEFT JOIN site_pages p ON p.id=n.target_page_id WHERE n.target_type='page' AND n.target_page_id=? ORDER BY n.sort_order,n.id FOR UPDATE`, [id]); const usages = usageRows.filter((row) => row.status !== 'archived').map((row) => ({ id: row.id, title: row.title_override || row.title || row.target_title || `#${row.id}`, status: row.status, sort_order: row.sort_order, target_type: row.target_type, target_page_id: row.target_page_id })); const statusChanged = String(currentPage.status) !== String(merged.status); if (statusChanged && activePageUsageBlockers(usages, merged.status).length) throw pageInUseError(usages, merged.status); const slug = route === '/' ? 'home' : (merged.slug || route.replace(/^\//, '').replace(/\/$/, '') || 'home'); const hero = normalizeHeroDisplay(merged); const heroVideo = await validateVideoConfigForSave(conn, merged.hero_video, 'hero'); const [r] = await conn.execute('UPDATE site_pages SET route=?, slug=?, type=?, title=?, seo_title=?, seo_description=?, hero_eyebrow=?, hero_title=?, hero_description=?, hero_asset=?, hero_video=?, hero_height=?, hero_image_fit=?, hero_image_position_x=?, hero_image_position_y=?, hero_image_position_mobile_x=?, hero_image_position_mobile_y=?, hero_overlay_strength=?, hero_image_scale=?, status=?, sort_order=? WHERE id=?', [route, slug, merged.type, merged.title, merged.seo_title, merged.seo_description, merged.hero_eyebrow, merged.hero_title, merged.hero_description, merged.hero_asset, heroVideo ? JSON.stringify(heroVideo) : null, hero.hero_height, hero.hero_image_fit, hero.hero_image_position_x, hero.hero_image_position_y, hero.hero_image_position_mobile_x, hero.hero_image_position_mobile_y, hero.hero_overlay_strength, hero.hero_image_scale, merged.status, Number(merged.sort_order || 0), id]); if (r.affectedRows === 0) throw new Error(`Page not found: ${id}`); await conn.execute("UPDATE site_navigation_items SET href=?, title=COALESCE(title_override, ?) WHERE target_type='page' AND target_page_id=?", [route, merged.title, id]); await conn.commit(); } catch (error) { await conn.rollback(); if (error.code === 'ER_DUP_ENTRY') throw navigationConflictError('DUPLICATE_NAVIGATION_HREF', 'Az új oldal URL ütközne egy meglévő menüpont linkjével.'); throw error; } finally { conn.release(); } },
+    async updatePage(id, p) { const conn = await pool.getConnection(); try { await conn.beginTransaction(); const [pages] = await conn.query('SELECT * FROM site_pages WHERE id=? LIMIT 1 FOR UPDATE', [id]); const currentPage = pages[0]; if (!currentPage) throw new Error(`Page not found: ${id}`); const previousRoute = normalizeRoute(currentPage.route); const merged = { ...currentPage, ...p }; const route = normalizeRoute(merged.route); const isExistingHome = currentPage.route === '/' || currentPage.type === 'home'; if (route === '/' && !isExistingHome) throw validationError('Adj meg érvényes URL-t.'); const [dupe] = await conn.query('SELECT id FROM site_pages WHERE route=? AND id<>? LIMIT 1', [route, id]); if (dupe[0]) throw validationError('Ez az URL már létezik.'); const [usageRows] = await conn.query(`SELECT n.id, n.title, n.href, n.status, n.sort_order, n.target_type, n.target_page_id, n.title_override, p.title AS target_title FROM site_navigation_items n LEFT JOIN site_pages p ON p.id=n.target_page_id WHERE n.target_type='page' AND n.target_page_id=? ORDER BY n.sort_order,n.id FOR UPDATE`, [id]); const usages = usageRows.filter((row) => row.status !== 'archived').map((row) => ({ id: row.id, title: row.title_override || row.title || row.target_title || `#${row.id}`, status: row.status, sort_order: row.sort_order, target_type: row.target_type, target_page_id: row.target_page_id })); const statusChanged = String(currentPage.status) !== String(merged.status); if (statusChanged && activePageUsageBlockers(usages, merged.status).length) throw pageInUseError(usages, merged.status); const slug = route === '/' ? 'home' : (merged.slug || route.replace(/^\//, '').replace(/\/$/, '') || 'home'); const hero = normalizeHeroDisplay(merged); const heroVideo = await validateVideoConfigForSave(conn, merged.hero_video, 'hero'); const [r] = await conn.execute('UPDATE site_pages SET route=?, slug=?, type=?, title=?, seo_title=?, seo_description=?, hero_eyebrow=?, hero_title=?, hero_description=?, hero_asset=?, hero_video=?, hero_height=?, hero_image_fit=?, hero_image_position_x=?, hero_image_position_y=?, hero_image_position_mobile_x=?, hero_image_position_mobile_y=?, hero_overlay_strength=?, hero_image_scale=?, status=?, sort_order=? WHERE id=?', [route, slug, merged.type, merged.title, merged.seo_title, merged.seo_description, merged.hero_eyebrow, merged.hero_title, merged.hero_description, merged.hero_asset, heroVideo ? JSON.stringify(heroVideo) : null, hero.hero_height, hero.hero_image_fit, hero.hero_image_position_x, hero.hero_image_position_y, hero.hero_image_position_mobile_x, hero.hero_image_position_mobile_y, hero.hero_overlay_strength, hero.hero_image_scale, merged.status, Number(merged.sort_order || 0), id]); if (r.affectedRows === 0) throw new Error(`Page not found: ${id}`); await conn.execute("UPDATE site_navigation_items SET href=?, title=COALESCE(title_override, ?) WHERE target_type='page' AND target_page_id=?", [route, merged.title, id]); await syncPersistedRouteReferences(conn, previousRoute, route); await conn.commit(); } catch (error) { await conn.rollback(); if (error.code === 'ER_DUP_ENTRY') throw navigationConflictError('DUPLICATE_NAVIGATION_HREF', 'Az új oldal URL ütközne egy meglévő menüpont linkjével.'); throw error; } finally { conn.release(); } },
     async upsertBlock(p) {
       const items = normalizeBlockItems(p.type, parseJsonItems(p.items));
       if (p.type === 'video') {

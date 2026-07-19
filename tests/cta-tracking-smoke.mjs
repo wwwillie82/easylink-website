@@ -18,7 +18,7 @@ assert.equal(normalized.contact.country, 'Magyarország');
 assert.equal(parseSiteSettingsRows([{ key: 'contact', value: JSON.stringify({ email: 'info@example.com', city: 'Budapest' }) }]).contact.city, 'Budapest');
 assert.throws(() => normalizeSiteSettings({ contact: { email: 'bad' } }), /email/);
 assert.throws(() => normalizeSiteSettings({ contact: { phone: 'alert(1)' } }), /telefon/);
-assert.throws(() => normalizeSiteSettings({ contact: { city: '<b>x</b>' } }), /kapcsolati/);
+assert.throws(() => normalizeSiteSettings({ contact: { city: '<b>x</b>' } }), /Hibás mezőérték/);
 assert.equal(normalizeSiteSettings({ contact: { email: '', phone: '' } }).contact.email, '');
 
 assert.equal(safeContactIntro('Email: hello@easylink.hu'), '');
@@ -60,18 +60,26 @@ const readPool = settingsPool([
 let repository = createAdminRepository(readPool);
 const loadedSettings = await repository.getSiteSettings();
 assert.deepEqual(loadedSettings.analytics, existingAnalytics);
-assert.deepEqual(loadedSettings.legalDocuments, existingLegalDocuments);
+assert.equal(loadedSettings.legalDocuments.termsPdfPath, existingLegalDocuments.termsPdfPath);
+assert.equal(loadedSettings.legalDocuments.privacyPdfPath, existingLegalDocuments.privacyPdfPath);
+assert.equal(loadedSettings.legalDocuments.cookiePdfPath, existingLegalDocuments.cookiePdfPath);
+assert.equal(loadedSettings.legalDocuments.items.length, 3);
+assert.deepEqual(loadedSettings.legalDocuments.items.map((item) => item.type), ['terms', 'privacy', 'cookie']);
 assert.deepEqual(loadedSettings.contact, existingContact);
-assert.deepEqual(readPool.queries.find((entry) => entry.sql.includes('site_settings')).params, ['analytics', 'legalDocuments', 'contact']);
+assert.deepEqual(readPool.queries.find((entry) => entry.sql.includes('site_settings')).params, ['analytics', 'legalDocuments', 'contact', 'brand', 'social', 'defaultCta', 'searchVisibility']);
 
 const writePool = settingsPool();
 repository = createAdminRepository(writePool);
 const savedSettings = await repository.updateSiteSettings({ analytics: existingAnalytics, legalDocuments: existingLegalDocuments, contact: existingContact });
 assert.deepEqual(savedSettings.analytics, existingAnalytics);
-assert.deepEqual(savedSettings.legalDocuments, existingLegalDocuments);
+assert.equal(savedSettings.legalDocuments.termsPdfPath, existingLegalDocuments.termsPdfPath);
+assert.equal(savedSettings.legalDocuments.privacyPdfPath, existingLegalDocuments.privacyPdfPath);
+assert.equal(savedSettings.legalDocuments.cookiePdfPath, existingLegalDocuments.cookiePdfPath);
+assert.equal(savedSettings.legalDocuments.items.length, 3);
+assert.deepEqual(savedSettings.legalDocuments.items.map((item) => item.type), ['terms', 'privacy', 'cookie']);
 assert.deepEqual(savedSettings.contact, existingContact);
 const writtenKeys = writePool.writes.filter((entry) => entry.type === 'execute').map((entry) => entry.params[0]);
-assert.deepEqual(writtenKeys, ['analytics', 'legalDocuments', 'contact']);
+assert.deepEqual(writtenKeys, ['analytics', 'legalDocuments', 'contact', 'brand', 'social', 'defaultCta', 'searchVisibility']);
 assert.equal(writePool.writes.some((entry) => entry.type === 'commit'), true);
 assert.equal(writePool.writes.some((entry) => entry.type === 'rollback'), false);
 
@@ -106,7 +114,11 @@ try {
   assert.equal(response.status, 200);
   let body = await response.json();
   assert.deepEqual(body.data.analytics, existingAnalytics);
-  assert.deepEqual(body.data.legalDocuments, existingLegalDocuments);
+  assert.equal(body.data.legalDocuments.termsPdfPath, existingLegalDocuments.termsPdfPath);
+  assert.equal(body.data.legalDocuments.privacyPdfPath, existingLegalDocuments.privacyPdfPath);
+  assert.equal(body.data.legalDocuments.cookiePdfPath, existingLegalDocuments.cookiePdfPath);
+  assert.equal(body.data.legalDocuments.items.length, 3);
+  assert.deepEqual(body.data.legalDocuments.items.map((item) => item.type), ['terms', 'privacy', 'cookie']);
   assert.deepEqual(body.data.contact, existingContact);
 
   const updatedContact = { ...existingContact, email: 'sales@example.com', city: 'Győr' };
@@ -118,7 +130,11 @@ try {
   assert.equal(response.status, 200);
   body = await response.json();
   assert.deepEqual(body.data.analytics, existingAnalytics);
-  assert.deepEqual(body.data.legalDocuments, existingLegalDocuments);
+  assert.equal(body.data.legalDocuments.termsPdfPath, existingLegalDocuments.termsPdfPath);
+  assert.equal(body.data.legalDocuments.privacyPdfPath, existingLegalDocuments.privacyPdfPath);
+  assert.equal(body.data.legalDocuments.cookiePdfPath, existingLegalDocuments.cookiePdfPath);
+  assert.equal(body.data.legalDocuments.items.length, 3);
+  assert.deepEqual(body.data.legalDocuments.items.map((item) => item.type), ['terms', 'privacy', 'cookie']);
   assert.deepEqual(body.data.contact, updatedContact);
 
   for (const contact of [{ ...updatedContact, email: 'bad' }, { ...updatedContact, phone: 'alert(1)' }]) {
@@ -135,7 +151,7 @@ try {
 }
 
 const footerSource = readFileSync('src/components/Footer.astro', 'utf8');
-const contactPageSource = readFileSync('src/pages/kapcsolat/index.astro', 'utf8');
+const contactPageSource = readFileSync('src/components/page-renderers/ContactRenderer.astro', 'utf8');
 assert.match(footerSource, /publicSettings\.contact/);
 assert.match(contactPageSource, /safeContactIntro\(ctaBlock\?\.body\)/);
 assert.match(contactPageSource, /href=\{deployUrl\}[^>]*data-easylink-cta="demo"[^>]*>Demót kérek<\/a>/);
@@ -145,7 +161,7 @@ assert.doesNotMatch(contactPageSource, /Email: hello@easylink\.hu/);
 
 const layoutSource = readFileSync('src/layouts/BaseLayout.astro', 'utf8');
 assert.match(layoutSource, /<Ga4Analytics[\s\S]*<CtaTracking \/>/);
-for (const file of ['src/components/Header.astro', 'src/components/Hero.astro', 'src/components/CTASection.astro', 'src/components/Footer.astro', 'src/pages/kapcsolat/index.astro']) {
+for (const file of ['src/components/Header.astro', 'src/components/Hero.astro', 'src/components/CTASection.astro', 'src/components/Footer.astro', 'src/components/page-renderers/ContactRenderer.astro']) {
   assert.match(readFileSync(file, 'utf8'), /data-easylink-cta/);
 }
 const contentBlocksSource = readFileSync('src/components/ContentBlocks.astro', 'utf8');

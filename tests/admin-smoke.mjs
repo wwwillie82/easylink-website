@@ -767,14 +767,15 @@ const seededText = JSON.stringify(staticPagesData);
 for (const phrase of ['Mitől függhet az ár?', 'Demó alapján pontosítunk', 'Miben tudunk segíteni?', 'Nem még egy táblázat', 'Nem késznek állított ígéretek', 'Megoldás lista', 'Célcsoportok']) assert.ok(seededText.includes(phrase), `missing seeded phrase: ${phrase}`);
 const seededTypes = new Set(staticPagesData.flatMap((page) => page.blocks.map((block) => block.type)));
 for (const type of ['text', 'feature-list', 'cards', 'cta']) assert.ok(seededTypes.has(type), `missing seeded block type ${type}`);
-for (const file of ['src/pages/index.astro','src/pages/arak/index.astro','src/pages/kapcsolat/index.astro','src/pages/integraciok/index.astro','src/pages/megoldasaink/index.astro','src/pages/kinek-szol/index.astro']) {
-  const source = readFileSync(file, 'utf8');
-  assert.match(source, /getPublicPageState/);
-  assert.match(source, /hiddenByDb/);
-  assert.match(source, /Astro.response.status = 404/);
-  if (file === 'src/pages/index.astro') assert.doesNotMatch(source, /<ContentBlocks\b/);
-  else assert.match(source, /ContentBlocks|remainingBlocks/);
-}
+const dynamicCatchAllSource = readFileSync('src/pages/[...slug].astro', 'utf8');
+assert.match(dynamicCatchAllSource, /listPublishedPublicPages/);
+assert.match(dynamicCatchAllSource, /getPublicPageRenderer/);
+const homeSource = readFileSync('src/pages/index.astro', 'utf8');
+assert.match(homeSource, /getPublicPageState/);
+assert.match(homeSource, /hiddenByDb/);
+assert.match(homeSource, /getPublicRouteIndex/);
+assert.match(homeSource, /Astro.response.status = 404/);
+assert.doesNotMatch(homeSource, /<ContentBlocks\b/);
 const staleKeys = staleSeedKeys([
   { block_key: '/arak/:text:0' },
   { block_key: '/arak/:feature-list:0' },

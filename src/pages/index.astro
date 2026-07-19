@@ -9,9 +9,21 @@ import CTASection from '@/components/CTASection.astro';
 import Footer from '@/components/Footer.astro';
 import { publishedSolutions } from '@/content/solutions';
 import { publishedAudiences } from '@/content/audiences';
-import { getPublicPageState } from '@/lib/content/provider';
+import { getPublicPageState, getPublicRouteIndex } from '@/lib/content/provider';
+import { firstPageByType, resolveListingCards } from '@/lib/content/public-pages';
+import { assertRootHomePage } from '@/lib/content/root-invariant.mjs';
 const pageState = await getPublicPageState('/');
 const homePage = pageState.page;
+const { mode, routeIndex } = await getPublicRouteIndex();
+if (!homePage && !pageState.hiddenByDb && mode === 'db-authoritative') throw new Error('Hiányzó published home oldal DB authoritative módban: route=/ type=home');
+if (homePage) assertRootHomePage(homePage, 'Főoldal build context');
+const solutionsIndexPage = firstPageByType(routeIndex, 'solutions_index');
+const audiencesIndexPage = firstPageByType(routeIndex, 'audiences_index');
+if (!solutionsIndexPage && mode === 'db-authoritative') throw new Error('Hiányzó published solutions_index oldal a főoldali linkekhez.');
+if (!audiencesIndexPage && mode === 'db-authoritative') throw new Error('Hiányzó published audiences_index oldal a főoldali linkekhez.');
+const homeRouteContext = homePage ?? { title: 'Home', route: '/', type: 'home', status: 'published', blocks: [] };
+const homeSolutionCards = resolveListingCards({ items: publishedSolutions.slice(0, 3), detailType: 'solution_detail', index: routeIndex, sourcePage: homeRouteContext, blockLabel: 'home-solutions', mode, source: 'golden' });
+const homeAudienceCards = resolveListingCards({ items: publishedAudiences, detailType: 'audience_detail', index: routeIndex, sourcePage: homeRouteContext, blockLabel: 'home-audiences', mode, source: 'golden' });
 if (pageState.hiddenByDb) Astro.response.status = 404;
 ---
 
@@ -40,8 +52,8 @@ if (pageState.hiddenByDb) Astro.response.status = 404;
       <div class="container">
         <span class="eyebrow">Megoldásaink</span>
         <h2>Egy rendszer a napi működés kulcspontjaira.</h2>
-        <ListingCards items={publishedSolutions.slice(0, 3)} basePath="/megoldasaink/" />
-        <p class="more"><a class="button button-secondary" href="/megoldasaink/">Összes megoldás</a></p>
+        <ListingCards items={homeSolutionCards} />
+        {solutionsIndexPage && <p class="more"><a class="button button-secondary" href={solutionsIndexPage.route}>Összes megoldás</a></p>}
       </div>
     </section>
 
@@ -52,7 +64,7 @@ if (pageState.hiddenByDb) Astro.response.status = 404;
       <div class="container">
         <span class="eyebrow">Kinek szól?</span>
         <h2>Hoteleknek, vendéglátóhelyeknek és szolgáltató vállalkozásoknak.</h2>
-        <ListingCards items={publishedAudiences} basePath="/kinek-szol/" />
+        <ListingCards items={homeAudienceCards} />
       </div>
     </section>
 

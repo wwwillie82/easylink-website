@@ -88,7 +88,16 @@ function makePool() {
       if (sql.startsWith('UPDATE site_pages SET')) { state.pages[0].hero_video = params[10]; return [{ affectedRows: 1 }, null]; }
       return [{ affectedRows: 1, insertId: 2 }, null];
     },
-    getConnection() { throw new Error('not used'); },
+    async getConnection() {
+      return {
+        query: (...args) => this.query(...args),
+        execute: (...args) => this.execute(...args),
+        beginTransaction: async () => {},
+        commit: async () => {},
+        rollback: async () => {},
+        release: () => {},
+      };
+    },
   };
 }
 const pool = makePool();
@@ -110,10 +119,13 @@ await repo.updatePage(1, { hero_video: '' });
 assert.equal(pool.state.pages[0].hero_video, null);
 
 async function files(dir) { const out = []; for (const ent of await readdir(dir, { withFileTypes: true })) { const full = path.join(dir, ent.name); if (ent.isDirectory()) out.push(...await files(full)); else if (full.endsWith('.astro')) out.push(full); } return out; }
-const heroFiles = [];
-for (const file of await files('src/pages')) { const src = await readFile(file, 'utf8'); if (src.includes('<PageHero')) heroFiles.push(file); }
-assert.deepEqual(heroFiles.sort(), ['src/pages/[...slug].astro','src/pages/arak/index.astro','src/pages/integraciok/index.astro','src/pages/kapcsolat/index.astro','src/pages/kinek-szol/[slug].astro','src/pages/kinek-szol/index.astro','src/pages/megoldasaink/[slug].astro','src/pages/megoldasaink/index.astro'].sort());
-for (const file of heroFiles) { const src = await readFile(file, 'utf8'); assert.match(src, /video=\{(?:page\??\.|item\.)heroVideo\}/, `${file} must pass heroVideo`); }
+const pageSources = await Promise.all((await files('src/pages')).map(async (file) => [file, await readFile(file, 'utf8')]));
+assert.equal(pageSources.some(([file, src]) => file === 'src/pages/[...slug].astro' && src.includes('getPublicPageRenderer')), true, 'catch-all must dispatch through the public renderer registry');
+assert.equal(pageSources.some(([, src]) => src.includes('<PageHero')), false, 'route entry points must not render PageHero directly');
+const rendererHeroFiles = [];
+for (const file of await files('src/components/page-renderers')) { const src = await readFile(file, 'utf8'); if (src.includes('<PageHero')) rendererHeroFiles.push(file); }
+assert.deepEqual(rendererHeroFiles.sort(), ['src/components/page-renderers/ContentPageRenderer.astro','src/components/page-renderers/SolutionsIndexRenderer.astro','src/components/page-renderers/SolutionDetailRenderer.astro','src/components/page-renderers/AudiencesIndexRenderer.astro','src/components/page-renderers/AudienceDetailRenderer.astro','src/components/page-renderers/IntegrationsRenderer.astro','src/components/page-renderers/PricingRenderer.astro','src/components/page-renderers/ContactRenderer.astro'].sort());
+for (const file of rendererHeroFiles) { const src = await readFile(file, 'utf8'); assert.match(src, /video=\{page\??\.heroVideo\}/, `${file} must pass heroVideo`); }
 const videoMediaSource = await readFile('src/components/VideoMedia.astro', 'utf8');
 assert.match(await readFile('src/lib/content/video-client.mjs', 'utf8'), /prefers-reduced-motion: reduce/);
 assert.match(videoMediaSource, /src=\{youtubeState.initialSrc\}/);
