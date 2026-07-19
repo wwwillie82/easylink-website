@@ -136,6 +136,26 @@ assert.doesNotMatch(JSON.stringify(await applyDb.listBlocks(40)), /\b\d+[ .]?Ft\
 let pricingBlocks = await applyDb.listBlocks(40);
 const pricingCta = pricingBlocks.find((b) => b.block_key === '/arak/:cta:2');
 assert.ok(pricingCta, 'pricing CTA should be adopted with its stable block_key');
+
+const rolelessPricingItems = JSON.parse(pricingCta.items);
+delete rolelessPricingItems[0].presentationRole;
+delete rolelessPricingItems[0].role;
+rolelessPricingItems[0] = { ...rolelessPricingItems[0], eyebrow: 'Roleless eyebrow', secondaryLabel: 'Roleless second', secondaryUrl: '/roleless-second/', extra: 'keep-roleless' };
+await applyDb.updateBlock(pricingCta.id, { ...pricingCta, title: 'Roleless user title', body: 'Roleless user body', items: rolelessPricingItems });
+const rolelessPricingDry = await diffManifest(manifest, applyDb, { route: '/arak/' });
+assert.ok(rolelessPricingDry[0].actions.some((a) => a.action === 'update' && a.blockId === pricingCta.id), 'full but roleless pricing CTA must be updated');
+await applyManifest(manifest, applyDb, { route: '/arak/' });
+const normalizedPricingCta = (await applyDb.listBlocks(40)).find((b) => b.id === pricingCta.id);
+const normalizedPricingItems = JSON.parse(normalizedPricingCta.items);
+assert.equal(normalizedPricingCta.title, 'Roleless user title');
+assert.equal(normalizedPricingCta.body, 'Roleless user body');
+assert.equal(normalizedPricingItems[0].label, rolelessPricingItems[0].label);
+assert.equal(normalizedPricingItems[0].url, rolelessPricingItems[0].url);
+assert.equal(normalizedPricingItems[0].extra, 'keep-roleless');
+assert.equal(normalizedPricingItems[0].presentationRole, 'pricing-cta');
+const rolelessSecondDry = await diffManifest(manifest, applyDb, { route: '/arak/' });
+assert.ok(rolelessSecondDry[0].actions.some((a) => a.action === 'keep' && a.blockId === pricingCta.id), 'second pricing dry-run after role normalization must keep');
+
 const customizedPricingItems = JSON.parse(pricingCta.items);
 customizedPricingItems[0] = { ...customizedPricingItems[0], eyebrow: 'Saját eyebrow', label: 'Saját demó', url: '/sajat/', secondaryLabel: 'Saját második', secondaryUrl: '/sajat-masodik/', extra: 'keep' };
 await applyDb.updateBlock(pricingCta.id, { ...pricingCta, title: 'Saját CTA cím', body: 'Saját CTA leírás', items: customizedPricingItems });
@@ -155,7 +175,7 @@ assert.match(JSON.stringify(await applyDb.listBlocks(2)), /Pénzügy és száml�
 await applyManifest(manifest, applyDb, { route: '/kinek-szol/' });
 assert.match(JSON.stringify(await applyDb.listBlocks(12)), /Hoteleknek és szálláshelyeknek/);
 await applyManifest(manifest, applyDb, { route: '/megoldasaink/penzugy-szamlazas/' });
-assert.equal(applyDb.state.snapshots.length, 7);
+assert.equal(applyDb.state.snapshots.length, 8);
 assert.equal(applyDb.state.snapshots.at(-1).status, 'success');
 assert.equal(applyDb.state.snapshots.at(-1).is_current, 0);
 assert.match(applyDb.state.snapshots.at(-1).label, /^golden-adopt-before:\/megoldasaink\/penzugy-szamlazas\/$/);
@@ -184,18 +204,33 @@ const ctaDry = await diffCtaDefaults(ctaDb);
 process.env.PUBLIC_DEPLOY_URL = oldDeployUrl;
 assert.ok(ctaDry.some((d) => d.route === '/megoldasaink/' && d.action === 'insert'));
 assert.match(JSON.stringify(ctaDry.find((d) => d.route === '/megoldasaink/').target), /https:\/\/custom\.deploy\.test/);
-assert.ok(ctaDry.some((d) => d.route === '/kinek-szol/' && d.action === 'reactivate' && d.blockId === 102));
+assert.ok(ctaDry.some((d) => d.route === '/kinek-szol/' && d.action === 'suppressed-archived' && d.blockId === 102));
 assert.ok(!ctaDry.some((d) => d.route === '/arak/'), 'pricing route already has its own DB CTA and must not receive default CTASection backfill');
 await applyCtaDefaults(ctaDb);
 assert.equal(ctaDb.state.snapshots.at(-1).label, 'cta-defaults-adopt-before:all-non-home');
 assert.ok(ctaDb.state.blocks.some((b) => b.block_key === 'golden:cta-section' && b.page_id === 2));
-assert.equal(ctaDb.state.blocks.find((b) => b.id === 102).status, 'published');
+assert.equal(ctaDb.state.blocks.find((b) => b.id === 102).status, 'archived');
 await applyManifest(manifest, ctaDb, { route: '/megoldasaink/' });
 assert.equal(ctaDb.state.blocks.filter((b) => b.page_id === 2 && b.block_key === 'golden:cta-section').length, 1);
 assert.equal(ctaDb.state.blocks.find((b) => b.page_id === 2 && b.block_key === 'golden:cta-section').status, 'published');
 const afterRouteApply = clone(ctaDb.state.blocks);
 const ctaSecond = await applyCtaDefaults(ctaDb);
-assert.ok(ctaSecond.every((d) => d.action === 'keep'), 'second CTA defaults apply must be no-op after route adopt');
+assert.ok(ctaSecond.every((d) => ['keep','suppressed-archived'].includes(d.action)), 'second CTA defaults apply must be no-op after route adopt');
 assert.deepEqual(ctaDb.state.blocks, afterRouteApply, 'CTA defaults apply must not duplicate blocks after route adopt');
+
+const currentShapePages = [
+  { id: 1, route: '/', type: 'home', title: 'Home', status: 'published' },
+  { id: 2, route: '/arak/', type: 'pricing', title: 'Árak', status: 'published' },
+  ...Array.from({ length: 14 }, (_, i) => ({ id: i + 10, route: `/current-${i + 1}/`, type: i === 13 ? 'content_page' : 'solution_detail', title: `Current ${i + 1}`, status: i === 13 ? 'draft' : 'published' })),
+];
+const currentShapeDb = {
+  async listNonHomePages() { return currentShapePages.filter((p) => p.route !== '/' && p.type !== 'home' && p.status !== 'archived').map(clone); },
+  async listBlocks(_pageId) { return []; },
+  async getDefaultCta() { return { eyebrow: 'Következő lépés', title: 'Készen állsz könnyedebben vezetni a céged?', description: 'Kérj demót vagy próbáld ki ingyen a konfigurált Deploy felületen.', primaryLabel: 'Demót kérnék', primaryUrl: 'https://deploy.easylink.hu', secondaryLabel: 'Próbáld ki ingyen', secondaryUrl: 'https://deploy.easylink.hu' }; },
+};
+const currentShapeCtaDry = await diffCtaDefaults(currentShapeDb);
+assert.equal(currentShapeCtaDry.filter((d) => d.action === 'insert').length, 14, 'current DB-shape fixture must produce exactly 14 generic CTA inserts');
+assert.ok(!currentShapeCtaDry.some((d) => d.route === '/' || d.route === '/arak/'), 'home and pricing must be skipped in current DB-shape fixture');
+
 
 console.log('Content adopt golden smoke passed: manifest routes, rollback-compatible snapshot, non-published safety, golden pénzügy content, dry-run safety, guarded apply, idempotency, protected groups.');

@@ -1,4 +1,5 @@
-export const GOLDEN_CTA_KEY = 'golden:cta-section';
+import { GOLDEN_CTA_KEY, isCanonicalCtaSection, isPricingCta, blockHasExplicitRole } from './cta-contract.mjs';
+export { GOLDEN_CTA_KEY };
 
 export const legacyRoleByKey = Object.freeze({
   '/megoldasaink/:cards:0': ['golden-cards'],
@@ -30,9 +31,11 @@ const keyOf = (block) => block?.blockKey ?? block?.block_key ?? '';
 const itemsOf = (block) => Array.isArray(block?.items) ? block.items : [];
 
 export function blockHasRole(block, role) {
+  if (role === 'cta-section') return isCanonicalCtaSection(block);
+  if (role === 'pricing-cta') return isPricingCta(block);
   const key = keyOf(block);
   const legacyRoles = legacyRoleByKey[key] ?? Object.entries(legacyRoleByKey).find(([legacyKey]) => key.endsWith(legacyKey))?.[1];
-  return key.includes(`:${role}`) || legacyRoles?.includes(role) || itemsOf(block).some((item) => item && typeof item === 'object' && (item.presentationRole === role || item.role === role));
+  return key.includes(`:${role}`) || legacyRoles?.includes(role) || blockHasExplicitRole(block, role);
 }
 
 export function blockFixedRole(block) {
@@ -41,7 +44,14 @@ export function blockFixedRole(block) {
 
 export function findRoleBlock(blocks, role, fallback) {
   const list = blocks ?? [];
-  return list.find((block) => blockHasRole(block, role)) ?? (fallback ? list.find(fallback) : undefined);
+  const explicit = list.filter((block) => blockHasRole(block, role));
+  if (role === 'cta-section') {
+    const keys = new Set(explicit.map((block) => block?.blockKey ?? block?.block_key ?? ''));
+    if (keys.size > 1) throw new Error('CTA_INTEGRITY_ERROR: multiple cta-section blocks on one page');
+    return explicit.find((block) => block.status !== 'archived' && block.status !== 'draft');
+  }
+  if (role === 'pricing-cta') return explicit.find((block) => block.status !== 'archived' && block.status !== 'draft');
+  return explicit[0] ?? (fallback ? list.find(fallback) : undefined);
 }
 
 export function withoutBlocks(blocks, consumed) {
