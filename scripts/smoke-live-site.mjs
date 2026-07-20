@@ -1,4 +1,6 @@
 import { staticPagesData } from '../src/lib/content/static-seed-data.mjs';
+import { resolvePageCta, resolvePageCtaBlock } from '../src/lib/content/page-cta-contract.mjs';
+import { PUBLIC_SMOKE_METADATA_PATH, publicRendererPageCtaRole } from '../src/lib/content/smoke-metadata.mjs';
 
 const requiredContentRoutes = new Set(['/', '/megoldasaink/', '/kinek-szol/', '/integraciok/', '/arak/', '/kapcsolat/']);
 const explicitRequiredRoutes = [...requiredContentRoutes];
@@ -51,15 +53,13 @@ export function buildLiveSmokePlan() {
     { route: '/', checks: [
       expected('home.hero.title', 'easyLink ERP'),
       expected('home.hero.subtitle', 'Cégvezetés, könnyedén.'),
-      expected('home.hero.secondaryCta', 'Próbáld ki ingyen'),
-      expected('home.hero.primaryCta', 'Demót kérek'),
       expected('home.hero.benefit', 'Átlátható működés'),
     ] },
     { route: '/megoldasaink/', checks: [expected('solutions.heading', 'Megoldásaink'), expected('solutions.card', 'Pénzügy és számlázás')] },
     { route: '/kinek-szol/', checks: [expected('audiences.heading', 'Kinek szól?'), expected('audiences.card', 'Hoteleknek és szálláshelyeknek')] },
     { route: '/integraciok/', checks: [expected('integrations.heading', 'Csomópontok'), expected('integrations.card', 'NAV Online Számla')] },
     { route: '/arak/', checks: [expected('pricing.grid', 'Mitől függhet az ár?'), expected('pricing.cta', 'Demó alapján pontosítunk')] },
-    { route: '/kapcsolat/', checks: [expected('contact.grid', 'Miben tudunk segíteni?'), expected('contact.demo', 'Demót kérek')] },
+    { route: '/kapcsolat/', checks: [expected('contact.grid', 'Miben tudunk segíteni?')] },
   ];
 
   return { routes: [...routeSet].sort(), contentChecks };
@@ -77,19 +77,75 @@ async function fetchText(url) {
   }
 }
 
+function getAttribute(tag, name) {
+  const pattern = new RegExp(`${name}=["']([^"']*)["']`, 'i');
+  return decodeHtmlEntities(tag.match(pattern)?.[1] || '');
+}
+
+function findAnchorByCtaId(html, ctaId) {
+  const anchors = html.match(/<a\b[^>]*>[\s\S]*?<\/a>/gi) || [];
+  return anchors.find((anchor) => getAttribute(anchor, 'data-easylink-cta-id') === ctaId) || '';
+}
+
+function anchorText(anchor) {
+  return normalizeHtmlForSearch(anchor);
+}
+
+export function assertAnchor(html, route, ctaId, expectedLabel, expectedUrl, failures) {
+  const anchor = findAnchorByCtaId(html, ctaId);
+  if (!anchor) {
+    failures.push(`${route}: missing CTA anchor ${ctaId}`);
+    return;
+  }
+  const actualLabel = anchorText(anchor);
+  const actualUrl = getAttribute(anchor, 'href');
+  if (actualLabel !== normalizeWhitespace(expectedLabel)) failures.push(`${route}: ${ctaId} label mismatch: expected "${expectedLabel}", got "${actualLabel}"`);
+  if (actualUrl !== expectedUrl) failures.push(`${route}: ${ctaId} URL mismatch: expected "${expectedUrl}", got "${actualUrl}"`);
+}
+
+export function assertPageCtaContent(route, html, resolvedCta, failures) {
+  const ctaSections = countMatches(html, /<section\b[^>]*class=["'][^"']*\bcta\b[^"']*["'][^>]*>/gi);
+  if (!resolvedCta?.shouldRender) {
+    if (ctaSections !== 0) failures.push(`${route}: hidden page CTA must not render CTASection markup, got ${ctaSections}`);
+    return;
+  }
+  if (ctaSections !== 1) failures.push(`${route}: expected exactly one page CTA section, got ${ctaSections}`);
+  const normalizedHtml = normalizeHtmlForSearch(html);
+  const content = resolvedCta.content || {};
+  for (const [field, value] of Object.entries({ eyebrow: content.eyebrow, title: content.title, description: content.description })) {
+    if (value && !normalizedHtml.includes(normalizeWhitespace(value))) failures.push(`${route}: missing expected ${resolvedCta.mode} page CTA ${field}: ${value}`);
+  }
+  assertAnchor(html, route, 'cta-section-primary', content.primaryLabel, content.primaryUrl, failures);
+  if (content.secondaryLabel && content.secondaryUrl) assertAnchor(html, route, 'cta-section-secondary', content.secondaryLabel, content.secondaryUrl, failures);
+  else if (findAnchorByCtaId(html, 'cta-section-secondary')) failures.push(`${route}: unexpected page CTA secondary anchor`);
+  if (route === '/arak/' && /content-card type-cta|type-cta content-card|Felhívás/i.test(html)) failures.push('/arak/: pricing page CTA must not render as generic ContentBlocks type-cta card');
+}
+
+async function fetchPublicSmokeData(baseUrl) {
+  const url = new URL(PUBLIC_SMOKE_METADATA_PATH, baseUrl).toString();
+  const { response, text } = await fetchText(url);
+  if (response.status !== 200) throw new Error(`${PUBLIC_SMOKE_METADATA_PATH}: expected HTTP 200, got HTTP ${response.status}`);
+  let payload;
+  try { payload = JSON.parse(text); } catch (error) { throw new Error(`${PUBLIC_SMOKE_METADATA_PATH}: invalid JSON: ${error.message}`); }
+  const data = payload?.data || payload;
+  if (!data?.defaultCta || !data?.pages) throw new Error(`${PUBLIC_SMOKE_METADATA_PATH}: missing defaultCta/pages payload`);
+  return data;
+}
+
+export function routeCtaExpectations(pages, defaultCta) {
+  const byRoute = new Map();
+  for (const page of pages || []) {
+    const role = page.ctaRole || publicRendererPageCtaRole(page);
+    const block = page.ctaBlock ?? resolvePageCtaBlock(page.blocks || [], { role });
+    byRoute.set(page.route, resolvePageCta(block, defaultCta));
+  }
+  return byRoute;
+}
 
 function countMatches(value, pattern) {
   return (value.match(pattern) || []).length;
 }
 
-function assertPageCtaMarkup(route, html, failures) {
-  if (!['/', '/arak/', '/kapcsolat/'].includes(route)) return;
-  const ctaSections = countMatches(html, /<section\b[^>]*class=["'][^"']*\bcta\b[^"']*["'][^>]*>/gi);
-  if (ctaSections !== 1) failures.push(`${route}: expected exactly one page CTA section, got ${ctaSections}`);
-  if (!/data-easylink-cta-id=["']cta-section-primary["']/i.test(html)) failures.push(`${route}: missing page CTA primary tracking markup`);
-  if (!/data-easylink-cta-id=["']cta-section-secondary["']/i.test(html)) failures.push(`${route}: missing page CTA secondary tracking markup`);
-  if (route === '/arak/' && /content-card type-cta|type-cta content-card|Felhívás/i.test(html)) failures.push('/arak/: pricing page CTA must not render as generic ContentBlocks type-cta card');
-}
 
 function assertContains(normalizedHtml, route, check, failures) {
   if (!normalizedHtml.includes(check.value)) {
@@ -100,6 +156,10 @@ function assertContains(normalizedHtml, route, check, failures) {
 async function run(baseUrl) {
   const { routes, contentChecks } = buildLiveSmokePlan();
   const failures = [];
+  let publicData = { defaultCta: {}, pages: [] };
+  try { publicData = await fetchPublicSmokeData(baseUrl); } catch (error) { failures.push(error.message); }
+  const ctaByRoute = routeCtaExpectations(publicData.pages, publicData.defaultCta);
+  const homeCta = publicData.defaultCta;
 
   for (const route of routes) {
     const url = new URL(route, baseUrl).toString();
@@ -129,7 +189,12 @@ async function run(baseUrl) {
       if (!/<meta\s+[^>]*name=["']robots["'][^>]*content=["']noindex,nofollow["']/i.test(rawHtml)) {
         failures.push(`${route}: missing expected content from layout.meta.robots: noindex,nofollow`);
       }
-      assertPageCtaMarkup(route, rawHtml, failures);
+      if (route === '/') {
+        assertAnchor(rawHtml, route, 'site-header-demo', homeCta.primaryLabel, homeCta.primaryUrl, failures);
+        assertAnchor(rawHtml, route, 'home-hero-demo', homeCta.primaryLabel, homeCta.primaryUrl, failures);
+        if (homeCta.secondaryLabel && homeCta.secondaryUrl) assertAnchor(rawHtml, route, 'home-hero-trial', homeCta.secondaryLabel, homeCta.secondaryUrl, failures);
+      }
+      if (ctaByRoute.has(route)) assertPageCtaContent(route, rawHtml, ctaByRoute.get(route), failures);
       const normalizedHtml = normalizeHtmlForSearch(text);
       for (const check of checks) assertContains(normalizedHtml, route, check, failures);
     } catch (error) {
@@ -145,6 +210,7 @@ async function run(baseUrl) {
   console.log(`Live site smoke passed for ${baseUrl}`);
   console.log(`HTTP routes checked: ${routes.join(', ')}`);
   console.log(`Content routes checked: ${contentChecks.map(({ route }) => route).join(', ')}`);
+  console.log(`Public defaultCta source: ${PUBLIC_SMOKE_METADATA_PATH}`);
 }
 
 const isMain = import.meta.url === `file://${process.argv[1]}`;
