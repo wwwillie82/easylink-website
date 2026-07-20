@@ -246,8 +246,8 @@ const publicAppliedPricing = { ...appliedPricingBlock, blockKey: appliedPricingB
 assert.deepEqual(pageCtaRoles(publicAppliedPricing), ['pricing-cta'], 'pricing special apply must keep exactly pricing-cta identity');
 assert.equal(resolvePageCtaBlock([publicAppliedPricing], { role: 'pricing-cta' }), publicAppliedPricing);
 const normalizedAppliedPricing = normalizePageCtaBlock(publicAppliedPricing, await ctaDb.getDefaultCta());
-assert.equal(normalizedAppliedPricing.items[0].label, 'Pricing elsődleges');
-assert.equal(normalizedAppliedPricing.items[0].url, '/pricing-demo/');
+assert.equal(normalizedAppliedPricing.items[0].label, 'Demót kérnék');
+assert.equal(normalizedAppliedPricing.items[0].url, '/db-demo/');
 assert.equal(normalizedAppliedPricing.items[0].secondaryLabel, 'Próbáld ki ingyenesen');
 assert.equal(normalizedAppliedPricing.items[0].secondaryUrl, '/db-trial/');
 assert.ok(ctaUpdated.some((d) => d.route === '/' && d.action === 'keep-special'));

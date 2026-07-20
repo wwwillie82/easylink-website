@@ -4,14 +4,13 @@ import PageHero from '@/components/PageHero.astro';
 import CTASection from '@/components/CTASection.astro';
 import ContentBlocks from '@/components/ContentBlocks.astro';
 import { findRoleBlock, withoutBlocks } from '@/lib/content/blockRoles';
-import { getPublicSiteSettings } from '@/lib/content/settings';
-import { normalizePageCtaBlock, resolvePageCtaBlock } from '@/lib/content/pageCta';
+import { resolvePageCtaBlock } from '@/lib/content/pageCta';
 type Props = PublicPageRendererProps;
 const { page } = Astro.props;
 const featureBlock = findRoleBlock(page?.blocks, 'pricing-features', (block) => block.type === 'feature-list');
 const textBlock = findRoleBlock(page?.blocks, 'pricing-explainer', (block) => block.type === 'text');
 const rawCtaBlock = resolvePageCtaBlock(page?.blocks, { role: 'pricing-cta' });
-const ctaBlock = normalizePageCtaBlock(rawCtaBlock, (await getPublicSiteSettings()).defaultCta);
+const ctaBlock = rawCtaBlock;
 const priceFeatures = featureBlock?.items?.length ? featureBlock.items : ['Választott moduloktól: pénzügy, CRM, dokumentumkezelés, kontrolling vagy AI irány.', 'Cégmérettől, felhasználói köröktől és adminisztrációs összetettségtől.', 'Előkészített vagy később bizonyított integrációktól.', 'Bevezetési, adat-előkészítési és támogatási igényektől.'];
 const remainingBlocks = withoutBlocks(page?.blocks, [featureBlock, textBlock, rawCtaBlock]);
 ---

@@ -1,10 +1,11 @@
 import crypto from 'node:crypto';
+import { isRecognizedPageCta, normalizeCtaMode, pageCtaRole, pageCtaRoles } from '../content/page-cta-contract.mjs';
 import { normalizeBlockItems, parseJsonItems } from './validation.mjs';
 import { imageMimeTypes, normalizeVideoConfig, videoMimeTypes } from '../content/video.mjs';
 import { normalizeSiteSettings, parseSiteSettingsRows } from './settings.mjs';
 import { canonicalCtaBlockFromDefault } from '../content/cta-contract.mjs';
 import { mediaConfig } from './media-storage.mjs';
-import { isValidHttpExternalUrl, normalizeNavigationTargetFields, normalizeNavigationTargetType, positiveNavigationPageId, resolveNavigationItem } from '../content/internal-links.mjs';
+import { isInternalRouteCandidate, isValidHttpExternalUrl, normalizeNavigationTargetFields, normalizeNavigationTargetType, positiveNavigationPageId, resolveNavigationItem } from '../content/internal-links.mjs';
 import { activePageUsageBlockers, pageInUseError } from '../content/reference-validation.mjs';
 
 function normalizeRoute(value) { const raw = String(value || '').trim().toLowerCase().replace(/[^a-z0-9áéíóöőúüű\/-]+/g, '-'); const withStart = raw.startsWith('/') ? raw : `/${raw}`; return withStart.endsWith('/') ? withStart : `${withStart}/`; }
@@ -185,6 +186,35 @@ async function syncPersistedRouteReferences(conn, oldRoute, newRoute) {
   await syncSettingsRouteReferences(conn, oldRoute, newRoute);
 }
 
+
+function validateCtaBlockForSave(p, items, existingBlock = null) {
+  const submittedCandidate = { ...p, items };
+  const existingIsPageCta = existingBlock ? isRecognizedPageCta(existingBlock) : false;
+  const submittedIsPageCta = isRecognizedPageCta(submittedCandidate);
+  if (existingBlock && !existingIsPageCta && submittedIsPageCta) throw validationError('Manual inline CTA nem alakítható page CTA-vá.');
+  const pageCta = existingBlock ? existingIsPageCta : submittedIsPageCta;
+  if (!pageCta) return;
+  if (existingBlock && String(p.type || existingBlock.type) !== 'cta') throw validationError('Page CTA blokk típusa nem módosítható.');
+  p.type = 'cta';
+  const first = items[0] && typeof items[0] === 'object' && !Array.isArray(items[0]) ? items[0] : {};
+  const existingRole = existingIsPageCta ? pageCtaRole(existingBlock) : '';
+  const submittedRoles = pageCtaRoles(submittedCandidate);
+  if (submittedRoles.length > 1) throw validationError('Több page CTA role nem menthető egy CTA blokkra.');
+  if (existingRole && submittedRoles.length && submittedRoles[0] !== existingRole) throw validationError('Page CTA role nem módosítható.');
+  if (existingRole && existingRole !== 'home-legacy-cta') first.presentationRole = existingRole;
+  if ('ctaMode' in first && first.ctaMode !== undefined && first.ctaMode !== null && String(first.ctaMode).trim() && !['global', 'custom', 'hidden'].includes(String(first.ctaMode).trim())) throw validationError('Ismeretlen CTA mód.');
+  first.ctaMode = normalizeCtaMode(first.ctaMode);
+  const required = (v) => String(v ?? '').trim().length > 0;
+  const safeUrl = (value) => {
+    const raw = String(value ?? '').trim();
+    if (!raw) return true;
+    return isInternalRouteCandidate(raw) || isValidHttpExternalUrl(raw) || raw.startsWith('mailto:') || raw.startsWith('tel:');
+  };
+  if (!safeUrl(first.url) || !safeUrl(first.secondaryUrl)) throw validationError('A CTA link csak biztonságos belső vagy http(s) URL lehet.');
+  if (first.ctaMode === 'custom' && (!required(p.title) || !required(first.label) || !required(first.url))) throw validationError('Egyedi CTA módban a cím, elsődleges gomb felirat és cél kötelező.');
+  if (!items[0]) items[0] = first;
+}
+
 export function createAdminRepository(pool) {
   return {
 
@@ -198,7 +228,11 @@ export function createAdminRepository(pool) {
     async listPageNavigationUsages(pageId) { const [rows] = await pool.query(`SELECT n.id, n.title, n.href, n.status, n.sort_order, n.target_type, n.target_page_id, n.title_override, p.title AS target_title FROM site_navigation_items n LEFT JOIN site_pages p ON p.id=n.target_page_id WHERE n.target_type='page' AND n.target_page_id=? AND n.status<>'archived' ORDER BY n.sort_order,n.id`, [pageId]); return rows.map((row) => ({ id: row.id, title: row.title_override || row.title || row.target_title || `#${row.id}`, status: row.status, sort_order: row.sort_order, target_type: row.target_type, target_page_id: row.target_page_id })); },
     async updatePage(id, p) { const conn = await pool.getConnection(); try { await conn.beginTransaction(); const [pages] = await conn.query('SELECT * FROM site_pages WHERE id=? LIMIT 1 FOR UPDATE', [id]); const currentPage = pages[0]; if (!currentPage) throw new Error(`Page not found: ${id}`); const previousRoute = normalizeRoute(currentPage.route); const merged = { ...currentPage, ...p }; const route = normalizeRoute(merged.route); const isExistingHome = currentPage.route === '/' || currentPage.type === 'home'; if (route === '/' && !isExistingHome) throw validationError('Adj meg érvényes URL-t.'); const [dupe] = await conn.query('SELECT id FROM site_pages WHERE route=? AND id<>? LIMIT 1', [route, id]); if (dupe[0]) throw validationError('Ez az URL már létezik.'); const [usageRows] = await conn.query(`SELECT n.id, n.title, n.href, n.status, n.sort_order, n.target_type, n.target_page_id, n.title_override, p.title AS target_title FROM site_navigation_items n LEFT JOIN site_pages p ON p.id=n.target_page_id WHERE n.target_type='page' AND n.target_page_id=? ORDER BY n.sort_order,n.id FOR UPDATE`, [id]); const usages = usageRows.filter((row) => row.status !== 'archived').map((row) => ({ id: row.id, title: row.title_override || row.title || row.target_title || `#${row.id}`, status: row.status, sort_order: row.sort_order, target_type: row.target_type, target_page_id: row.target_page_id })); const statusChanged = String(currentPage.status) !== String(merged.status); if (statusChanged && activePageUsageBlockers(usages, merged.status).length) throw pageInUseError(usages, merged.status); const slug = route === '/' ? 'home' : (merged.slug || route.replace(/^\//, '').replace(/\/$/, '') || 'home'); const hero = normalizeHeroDisplay(merged); const heroVideo = await validateVideoConfigForSave(conn, merged.hero_video, 'hero'); const [r] = await conn.execute('UPDATE site_pages SET route=?, slug=?, type=?, title=?, seo_title=?, seo_description=?, hero_eyebrow=?, hero_title=?, hero_description=?, hero_asset=?, hero_video=?, hero_height=?, hero_image_fit=?, hero_image_position_x=?, hero_image_position_y=?, hero_image_position_mobile_x=?, hero_image_position_mobile_y=?, hero_overlay_strength=?, hero_image_scale=?, status=?, sort_order=? WHERE id=?', [route, slug, merged.type, merged.title, merged.seo_title, merged.seo_description, merged.hero_eyebrow, merged.hero_title, merged.hero_description, merged.hero_asset, heroVideo ? JSON.stringify(heroVideo) : null, hero.hero_height, hero.hero_image_fit, hero.hero_image_position_x, hero.hero_image_position_y, hero.hero_image_position_mobile_x, hero.hero_image_position_mobile_y, hero.hero_overlay_strength, hero.hero_image_scale, merged.status, Number(merged.sort_order || 0), id]); if (r.affectedRows === 0) throw new Error(`Page not found: ${id}`); await conn.execute("UPDATE site_navigation_items SET href=?, title=COALESCE(title_override, ?) WHERE target_type='page' AND target_page_id=?", [route, merged.title, id]); await syncPersistedRouteReferences(conn, previousRoute, route); await conn.commit(); } catch (error) { await conn.rollback(); if (error.code === 'ER_DUP_ENTRY') throw navigationConflictError('DUPLICATE_NAVIGATION_HREF', 'Az új oldal URL ütközne egy meglévő menüpont linkjével.'); throw error; } finally { conn.release(); } },
     async upsertBlock(p) {
+      let existingBlock = null;
+      if (p.id) { const [rows] = await pool.query('SELECT * FROM site_content_blocks WHERE id=? LIMIT 1', [p.id]); existingBlock = rows[0] || null; }
       const items = normalizeBlockItems(p.type, parseJsonItems(p.items));
+      validateCtaBlockForSave(p, items, existingBlock);
+      if (isRecognizedPageCta(existingBlock ? { ...p, block_key: existingBlock.block_key, type: existingBlock.type, items } : { ...p, items })) p.status = 'published';
       if (p.type === 'video') {
         const cfg = items[0];
         if (cfg.sourceType === 'media') await requireReadyMedia(pool, cfg.mediaPath, 'video');

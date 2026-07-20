@@ -6,7 +6,12 @@ export const PAGE_CTA_ROLES = Object.freeze([CTA_SECTION_ROLE, PRICING_CTA_ROLE,
 const keyOf = (block) => block?.blockKey ?? block?.block_key ?? '';
 const hasText = (value) => String(value ?? '').trim().length > 0;
 const fillIfBlank = (value, fallback) => hasText(value) ? value : fallback;
-const isActive = (block) => block?.status !== 'archived' && block?.status !== 'draft';
+export const PAGE_CTA_MODES = Object.freeze(['global', 'custom', 'hidden']);
+export function normalizeCtaMode(value) { const raw = String(value ?? '').trim(); return raw && PAGE_CTA_MODES.includes(raw) ? raw : 'global'; }
+function firstCtaItem(block) { const first = blockItems(block)[0]; return first && typeof first === 'object' && !Array.isArray(first) ? first : {}; }
+function integrityError(message, details) { const error = new Error(`CTA_INTEGRITY_ERROR: ${message}`); error.code = 'CTA_INTEGRITY_ERROR'; error.status = 409; error.details = details; return error; }
+export function ctaModeOf(block) { const current = firstCtaItem(block); if (current.ctaMode === undefined || current.ctaMode === null || String(current.ctaMode).trim() === '') return 'global'; const mode = String(current.ctaMode).trim(); if (!PAGE_CTA_MODES.includes(mode)) throw integrityError('invalid CTA mode', { key: keyOf(block), mode }); return mode; }
+const isActive = (block) => block?.status !== 'archived';
 
 export function isHomeLegacyCta(block) {
   return keyOf(block) === HOME_LEGACY_CTA_KEY;
@@ -47,20 +52,25 @@ export function withoutPageCtaBlocks(blocks = []) {
   return blocks.filter((block) => !isRecognizedPageCta(block));
 }
 
-export function normalizePageCtaBlock(block, defaultCta) {
-  if (!block) return block;
+export function resolvePageCta(block, defaultCta) {
+  const mode = normalizeCtaMode(block ? ctaModeOf(block) : 'global');
   const defaults = normalizeDefaultCta(defaultCta || {});
   const items = blockItems(block);
-  const current = items[0] && typeof items[0] === 'object' ? items[0] : {};
+  const current = firstCtaItem(block);
   const role = pageCtaRole(block) || CTA_SECTION_ROLE;
-  const normalizedFirst = {
-    ...current,
-    eyebrow: fillIfBlank(current.eyebrow, defaults.eyebrow),
-    label: fillIfBlank(current.label, defaults.primaryLabel),
-    url: fillIfBlank(current.url, defaults.primaryUrl),
-    secondaryLabel: fillIfBlank(current.secondaryLabel, defaults.secondaryLabel),
-    secondaryUrl: fillIfBlank(current.secondaryUrl, defaults.secondaryUrl),
-    ...(role === 'home-legacy-cta' ? {} : { presentationRole: fillIfBlank(current.presentationRole, role) }),
-  };
-  return { ...block, items: [normalizedFirst, ...items.slice(1)] };
+  if (mode === 'hidden') return { mode, shouldRender: false, content: null, meta: { role, tracking: current }, rawBlock: block || null };
+  const content = mode === 'global' ? { eyebrow: defaults.eyebrow, title: defaults.title, description: defaults.description, primaryLabel: defaults.primaryLabel, primaryUrl: defaults.primaryUrl, secondaryLabel: defaults.secondaryLabel, secondaryUrl: defaults.secondaryUrl } : { eyebrow: current.eyebrow || '', title: block?.title || '', description: block?.body || '', primaryLabel: current.label || '', primaryUrl: current.url || '', secondaryLabel: current.secondaryLabel || '', secondaryUrl: current.secondaryUrl || '' };
+  if (mode === 'custom' && (!hasText(content.title) || !hasText(content.primaryLabel) || !hasText(content.primaryUrl))) throw integrityError('custom CTA missing required fields', { key: keyOf(block), mode });
+  return { mode, shouldRender: true, content, meta: { role, tracking: current }, rawBlock: block || null };
 }
+
+export function resolvedCtaToBlock(resolved) {
+  if (!resolved?.shouldRender) return null;
+  const c = resolved.content || {};
+  const tracking = resolved.meta?.tracking || {};
+  const item = { ...tracking, eyebrow: c.eyebrow || '', label: c.primaryLabel || '', url: c.primaryUrl || '', secondaryLabel: c.secondaryLabel || '', secondaryUrl: c.secondaryUrl || '', ctaMode: resolved.mode };
+  if (resolved.meta?.role && resolved.meta.role !== 'home-legacy-cta') item.presentationRole = fillIfBlank(item.presentationRole, resolved.meta.role);
+  return { ...(resolved.rawBlock || {}), title: c.title || '', body: c.description || '', items: [item], resolvedPageCta: resolved };
+}
+
+export function normalizePageCtaBlock(block, defaultCta) { return resolvedCtaToBlock(resolvePageCta(block, defaultCta)); }
