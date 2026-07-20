@@ -1,9 +1,31 @@
 export const HOME_LEGACY_CTA_KEY: '/:cta:4';
 export const PAGE_CTA_ROLES: readonly string[];
+export const PAGE_CTA_MODES: readonly ['global', 'custom', 'hidden'];
+export type PageCtaMode = typeof PAGE_CTA_MODES[number];
+export type PageCtaContent = {
+  eyebrow: string;
+  title: string;
+  description: string;
+  primaryLabel: string;
+  primaryUrl: string;
+  secondaryLabel: string;
+  secondaryUrl: string;
+};
+export type ResolvedPageCta<T = Record<string, unknown>> = {
+  mode: PageCtaMode;
+  shouldRender: boolean;
+  content: PageCtaContent | null;
+  meta: { role?: string; tracking?: Record<string, unknown> };
+  rawBlock: T | null;
+};
+export function normalizeCtaMode(value: unknown): PageCtaMode;
+export function ctaModeOf(block: { blockKey?: string; block_key?: string; items?: unknown } | undefined): PageCtaMode;
 export function isHomeLegacyCta(block: { blockKey?: string; block_key?: string } | undefined): boolean;
 export function isRecognizedPageCta(block: { blockKey?: string; block_key?: string; items?: unknown } | undefined): boolean;
 export function pageCtaRoles(block: { blockKey?: string; block_key?: string; items?: unknown } | undefined): string[];
 export function pageCtaRole(block: { blockKey?: string; block_key?: string; items?: unknown } | undefined): string | undefined;
 export function resolvePageCtaBlock<T extends { blockKey?: string; block_key?: string; items?: unknown; status?: string }>(blocks?: T[], opts?: { role?: string }): T | undefined;
 export function withoutPageCtaBlocks<T extends { blockKey?: string; block_key?: string; items?: unknown }>(blocks?: T[]): T[];
-export function normalizePageCtaBlock<T extends { items?: unknown }>(block: T | undefined, defaultCta?: Record<string, unknown>): T | undefined;
+export function resolvePageCta<T extends { blockKey?: string; block_key?: string; items?: unknown; title?: string; body?: string }>(block: T | null | undefined, defaultCta?: Record<string, unknown>): ResolvedPageCta<T>;
+export function resolvedCtaToBlock<T extends Record<string, unknown>>(resolved: ResolvedPageCta<T> | null | undefined): (T & { title: string; body: string; items: Record<string, unknown>[]; resolvedPageCta: ResolvedPageCta<T> }) | null;
+export function normalizePageCtaBlock<T extends { items?: unknown }>(block: T | null | undefined, defaultCta?: Record<string, unknown>): (T & { items: Record<string, unknown>[]; resolvedPageCta: ResolvedPageCta<T> }) | null;

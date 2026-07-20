@@ -115,7 +115,9 @@ export function createAdminServer({ repo, env = process.env, publishService } = 
         let payload;
         try { payload = await body(req); parseJsonItems(payload.items); }
         catch (error) { return apiError(res, 400, error.code || 'INVALID_BLOCK_JSON', error.message || 'Hibás JSON.'); }
-        const data = await repo.upsertBlock(payload);
+        let data;
+        try { data = await repo.upsertBlock(payload); }
+        catch (error) { if (error.status === 400 || error.code === 'VALIDATION_ERROR') return apiError(res, 400, 'INVALID_BLOCK', error.message); throw error; }
         return json(res, 200, { ok: true, data, publish: await publishAfterSave(user, `Blokk mentés: ${payload.page_id}`) });
       }
       if (url.pathname.startsWith('/api/admin/blocks/') && req.method === 'DELETE') { await repo.deleteBlock(url.pathname.split('/').pop()); return json(res, 200, { ok: true, publish: await publishAfterSave(user, `Blokk inaktiválás`) }); }

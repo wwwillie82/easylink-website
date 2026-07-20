@@ -4,7 +4,8 @@ import type { SitePage } from '@/lib/content/static';
 type Props = { page?: SitePage; hero?: Partial<Pick<SitePage, 'heroEyebrow' | 'heroTitle' | 'heroDescription' | 'heroAsset' | 'heroHeight' | 'heroImageFit' | 'heroImagePositionX' | 'heroImagePositionY' | 'heroImagePositionMobileX' | 'heroImagePositionMobileY' | 'heroOverlayStrength' | 'heroImageScale'>> };
 const { page, hero } = Astro.props;
 const heroData = { ...page, ...hero };
-const deployUrl = import.meta.env.PUBLIC_DEPLOY_URL ?? 'https://deploy.easylink.hu';
+import { getPublicSiteSettings } from '@/lib/content/settings';
+const heroCta = (await getPublicSiteSettings()).defaultCta;
 
 
 const heightPadding = { compact: 'clamp(28px, 3.4vw, 44px) 0 clamp(18px, 2.4vw, 28px)', normal: 'clamp(38px, 4.6vw, 62px) 0 clamp(22px, 2.8vw, 34px)', tall: 'clamp(72px, 8vw, 120px) 0 clamp(28px, 3.2vw, 42px)', xlarge: 'clamp(96px, 11vw, 160px) 0 clamp(34px, 4vw, 54px)' };
@@ -59,8 +60,8 @@ const benefits = [
         {heroData?.heroDescription || 'Felejtsd el a táblázatokat! Olyan ügyviteli rendszert adunk a kezedbe, amivel egyetlen, átlátható felületen irányíthatod a számlázást, az adminisztrációt és az ügyfélnyilvántartást.'}
       </p>
       <div class="actions">
-        <a class="button button-primary" href={deployUrl} data-easylink-cta="demo" data-easylink-cta-id="home-hero-demo" data-easylink-cta-slot="hero">Demót kérek</a>
-        <a class="button button-secondary" href={deployUrl} data-easylink-cta="trial" data-easylink-cta-id="home-hero-trial" data-easylink-cta-slot="hero">Próbáld ki ingyen</a>
+        <a class="button button-primary" href={heroCta.primaryUrl} data-easylink-cta="demo" data-easylink-cta-id="home-hero-demo" data-easylink-cta-slot="hero">{heroCta.primaryLabel}</a>
+        {heroCta.secondaryLabel && heroCta.secondaryUrl && <a class="button button-secondary" href={heroCta.secondaryUrl} data-easylink-cta="trial" data-easylink-cta-id="home-hero-trial" data-easylink-cta-slot="hero">{heroCta.secondaryLabel}</a>}
       </div>
     </div>
     <div class="hero-visual" aria-hidden="true"></div>

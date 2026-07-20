@@ -23,7 +23,7 @@ for (const marker of order) {
 }
 
 const hero = await readFile('src/components/Hero.astro', 'utf8');
-for (const phrase of ['easyLink ERP', 'Cégvezetés, könnyedén.', 'Próbáld ki ingyen', 'Átlátható működés', 'hero-bg-flow-03.webp']) assert.match(hero, new RegExp(phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+for (const phrase of ['easyLink ERP', 'Cégvezetés, könnyedén.', 'heroCta.secondaryLabel', 'Átlátható működés', 'hero-bg-flow-03.webp']) assert.match(hero, new RegExp(phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
 assert.doesNotMatch(hero, /PageHero/);
 for (const token of ['heroAsset', 'heroHeight', 'heroImageFit', 'heroImagePositionX', 'heroImagePositionY', 'heroImagePositionMobileX', 'heroImagePositionMobileY', 'heroOverlayStrength', 'heroImageScale']) {
   assert.match(home, new RegExp(token));

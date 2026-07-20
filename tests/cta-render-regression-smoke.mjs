@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
-import { pageCtaRoles, resolvePageCtaBlock, withoutPageCtaBlocks, isRecognizedPageCta, normalizePageCtaBlock } from '../src/lib/content/page-cta-contract.mjs';
+import { pageCtaRoles, resolvePageCtaBlock, withoutPageCtaBlocks, isRecognizedPageCta, normalizePageCtaBlock, resolvePageCta } from '../src/lib/content/page-cta-contract.mjs';
 
 const defaults = { eyebrow: 'Kapcsolódjunk', title: 'Default', description: 'Default body', primaryLabel: 'Default primary', primaryUrl: '/default/', secondaryLabel: 'Próbáld ki ingyen', secondaryUrl: 'https://deploy.easylink.hu' };
 const pricing = { blockKey: '/arak/:cta:2', type: 'cta', title: 'Árak CTA', body: 'Árak body', items: [{ presentationRole: 'pricing-cta', label: 'Demót kérek', url: '/kapcsolat/' }] };
@@ -68,4 +68,17 @@ assert.match(homeSource, /<Hero[\s\S]*<ListingCards[\s\S]*<AiAssistantPreview[\s
 const contentBlocks = await readFile('src/components/ContentBlocks.astro', 'utf8');
 assert.match(contentBlocks, /blocks\.filter\(\(block\) => !isRecognizedPageCta\(block\)\)\.map/, 'ContentBlocks must defensively skip recognized page CTAs');
 assert.match(contentBlocks, /content-card type-cta/, 'ContentBlocks must still support arbitrary manual inline type=cta cards');
+
+const modeDefaults = { eyebrow: 'GLOBAL EYEBROW', title: 'GLOBAL CTA TITLE', description: 'GLOBAL BODY', primaryLabel: 'GLOBAL PRIMARY', primaryUrl: '/global/', secondaryLabel: 'GLOBAL SECONDARY', secondaryUrl: '/global-secondary/' };
+const localBlock = { blockKey: 'golden:cta-section', type: 'cta', title: 'LOCAL CTA TITLE', body: 'LOCAL BODY', items: [{ presentationRole: 'cta-section', ctaMode: 'custom', eyebrow: 'LOCAL EYEBROW', label: 'LOCAL PRIMARY', url: '/local/', secondaryLabel: 'LOCAL SECONDARY', secondaryUrl: '/local-secondary/' }] };
+assert.equal(resolvePageCta(null, modeDefaults).mode, 'global', 'missing CTA block resolves as global');
+assert.equal(resolvePageCta(null, modeDefaults).content.title, 'GLOBAL CTA TITLE', 'missing CTA block renders global content');
+assert.equal(resolvePageCta({ ...localBlock, items: [{ ...localBlock.items[0], ctaMode: 'global' }] }, modeDefaults).content.title, 'GLOBAL CTA TITLE', 'global mode ignores local title');
+assert.equal(resolvePageCta(localBlock, modeDefaults).content.title, 'LOCAL CTA TITLE', 'custom mode uses local title');
+assert.equal(resolvePageCta({ ...localBlock, items: [{ ...localBlock.items[0], ctaMode: 'hidden' }] }, modeDefaults).shouldRender, false, 'hidden mode does not render');
+assert.throws(() => resolvePageCta({ ...localBlock, items: [{ ...localBlock.items[0], ctaMode: 'bogus' }] }, modeDefaults), (error) => error?.code === 'CTA_INTEGRITY_ERROR', 'explicit invalid mode fails integrity');
+assert.equal(resolvePageCta({ ...localBlock, items: [{ ...localBlock.items[0], ctaMode: undefined }] }, modeDefaults).mode, 'global', 'legacy missing mode is global');
+assert.doesNotMatch(homeSource, /normalizePageCtaBlock/, 'home must pass raw CTA block without pre-normalizing');
+assert.doesNotMatch(pricingSource, /normalizePageCtaBlock/, 'pricing must pass raw CTA block without pre-normalizing');
+
 console.log('CTA render regression smoke passed');

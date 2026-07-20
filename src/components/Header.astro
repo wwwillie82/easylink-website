@@ -1,11 +1,11 @@
 ---
-import { deployUrl } from '@/content/siteNavigation';
 import { listNavigation } from '@/lib/content/provider';
 import { getPublicSiteSettings } from '@/lib/content/settings';
 
 const siteNavigation = await listNavigation();
 const publicSettings = await getPublicSiteSettings();
 const brand = publicSettings.brand;
+const headerCta = publicSettings.defaultCta;
 ---
 <header class="site-header">
   <div class="container nav-wrap">
@@ -34,12 +34,12 @@ const brand = publicSettings.brand;
 
     <a
       class="button button-primary nav-cta"
-      href={deployUrl}
+      href={headerCta.primaryUrl}
       data-easylink-cta="demo"
       data-easylink-cta-id="site-header-demo"
       data-easylink-cta-slot="header"
     >
-      Demót kérek
+      {headerCta.primaryLabel}
     </a>
   </div>
 </header>

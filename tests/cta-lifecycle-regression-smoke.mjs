@@ -27,6 +27,43 @@ assert.match(html, /data-template-create="true"/);
 assert.match(html, /name="block_key" value="golden:cta-section"/);
 assert.match(pageEditorJs(55), /forceTemplateCreate/);
 
+assert.match(html, /CTA megjelenési mód/);
+assert.match(html, /value="global" data-cta-mode checked/);
+assert.match(html, /Globális CTA használata/);
+assert.match(html, /Egyedi CTA használata/);
+assert.match(html, /CTA kikapcsolása ezen az oldalon/);
+assert.match(html, /data-page-cta-form="true"/);
+assert.doesNotMatch(html.match(/data-page-section="page-cta"[\s\S]*?<\/section>/)?.[0] || '', /data-move-block|name="status"[^>]*select|data-delete|<select name="type"/);
+assert.match(pageEditorJs(55), /syncPageCtaUi/);
+assert.match(pageEditorJs(55), /copyPageCtaFields/);
+
+const archivedHtml = pageForm({ page, defaultCta: dbDefault, navigationUsages: [], blocks: [
+  { id: 88, page_id: 55, block_key: 'golden:cta-section', type: 'cta', title: 'Archived local title', body: 'Archived local body', items: JSON.stringify([{ presentationRole: 'cta-section', ctaMode: 'custom', label: 'Archived label', url: '/archived/' }]), status: 'archived', sort_order: 900 },
+] });
+assert.match(archivedHtml, /name="id" value="88"/, 'archived CTA admin form must update existing id');
+assert.match(archivedHtml, /Archived local title/, 'archived CTA local title is preserved in editor');
+assert.match(archivedHtml, /value="global" data-cta-mode checked/, 'archived CTA opens in global admin mode');
+assert.doesNotMatch(archivedHtml, /data-template-create="true"/, 'archived CTA must not render as a new template insert');
+const activePlusArchived = pageForm({ page, defaultCta: dbDefault, navigationUsages: [], blocks: [
+  { id: 89, page_id: 55, block_key: 'golden:cta-section', type: 'cta', title: 'Active', body: '', items: JSON.stringify([{ presentationRole: 'cta-section', ctaMode: 'global' }]), status: 'published', sort_order: 900 },
+  { id: 90, page_id: 55, block_key: 'manual:old-cta', type: 'cta', title: 'Archived', body: '', items: JSON.stringify([{ presentationRole: 'cta-section', ctaMode: 'global' }]), status: 'archived', sort_order: 901 },
+] });
+assert.match(activePlusArchived, /name="id" value="89"/, 'active CTA remains the managed block when archived recognized also exists');
+assert.doesNotMatch(activePlusArchived, /name="id" value="90"/);
+
+const archivedPricingHtml = pageForm({ page: { ...page, type: 'pricing' }, defaultCta: dbDefault, navigationUsages: [], blocks: [
+  { id: 93, page_id: 55, block_key: '/arak/:cta:2', type: 'cta', title: 'Archived pricing', body: '', items: JSON.stringify([{ presentationRole: 'pricing-cta', ctaMode: 'custom', label: 'Pricing label', url: '/pricing/' }]), status: 'archived', sort_order: 900 },
+] });
+assert.match(archivedPricingHtml, /name="id" value="93"/, 'archived pricing CTA admin form must update existing id');
+assert.match(archivedPricingHtml, /pricing-cta/, 'archived pricing role remains in items payload');
+
+assert.throws(() => pageForm({ page, defaultCta: dbDefault, navigationUsages: [], blocks: [
+  { id: 91, page_id: 55, block_key: 'golden:cta-section', type: 'cta', items: JSON.stringify([{ presentationRole: 'cta-section' }]), status: 'archived', sort_order: 900 },
+  { id: 92, page_id: 55, block_key: 'manual:old-cta', type: 'cta', items: JSON.stringify([{ presentationRole: 'cta-section' }]), status: 'archived', sort_order: 901 },
+] }), (error) => error?.code === 'CTA_INTEGRITY_ERROR', 'multiple archived recognized CTAs must fail integrity');
+
+
+
 assert.throws(() => pageForm({ page, defaultCta: dbDefault, navigationUsages: [], blocks: [
   { id: 1, page_id: 55, block_key: 'golden:cta-section', type: 'cta', items: JSON.stringify([{ presentationRole: 'cta-section' }]), status: 'published', sort_order: 900 },
   { id: 2, page_id: 55, block_key: 'manual:cta-section-copy', type: 'cta', items: JSON.stringify([{ presentationRole: 'cta-section' }]), status: 'draft', sort_order: 901 },
@@ -78,17 +115,17 @@ assert.match(repo, /rollback\(\)/);
   let reloads = 0;
   const fetchCalls = [];
   const msg = { innerHTML: '', textContent: '', querySelector() { return null; }, insertAdjacentHTML(_p, h) { this.innerHTML += h; }, appendChild(node) { this.lastChild = node; this.textContent = node.textContent; } };
-  const makeInput = (value = '') => ({ value, disabled: false, checked: false, matches(sel) { return sel === '[name=type]' && this.name === 'type'; }, addEventListener() {}, dispatchEvent() {} });
+  const makeInput = (value = '') => ({ value, disabled: false, checked: false, hidden: false, dataset: {}, classList: { toggle() {} }, matches(sel) { return (sel === '[name=type]' && this.name === 'type') || (sel === '[data-cta-mode]' && this.dataset.ctaMode); }, addEventListener() {}, dispatchEvent() {}, querySelectorAll() { return []; }, removeAttribute() {}, setAttribute() {} });
   function makeForm({ template = false, id = '', title = 'CTA' } = {}) {
     const submit = { disabled: false, type: 'submit' };
     const fields = {
       id: makeInput(id), page_id: makeInput('77'), block_key: makeInput(template ? 'golden:cta-section' : 'manual:existing'), type: makeInput('cta'), title: makeInput(title), body: makeInput('Body'), items: makeInput(JSON.stringify([{ eyebrow: 'E', label: 'L', url: '/u/', secondaryLabel: 'S', secondaryUrl: '/s/', presentationRole: template ? 'cta-section' : undefined }])), sort_order: makeInput(template ? '900' : '10'), status: makeInput('published'),
       ctaEyebrow: makeInput('E'), ctaLabel: makeInput('L'), ctaUrl: makeInput('/u/'), ctaSecondaryLabel: makeInput('S'), ctaSecondaryUrl: makeInput('/s/'), blockType: makeInput('cta'),
     };
-    fields.type.name = 'type';
-    const panels = ['common','cta'].map((panel) => ({ dataset: { panel }, hidden: false, classList: { toggle() {} }, removeAttribute() {}, setAttribute() {}, querySelectorAll() { return []; } }));
+    fields.type.name = 'type'; fields.modeGlobal = makeInput('global'); fields.modeGlobal.checked = true; fields.modeGlobal.dataset.ctaMode = 'true'; fields.modeCustom = makeInput('custom'); fields.modeCustom.dataset.ctaMode = 'true'; fields.modeHidden = makeInput('hidden'); fields.modeHidden.dataset.ctaMode = 'true'; fields.pageCtaTitle = makeInput(title); fields.pageCtaBody = makeInput('Body');
+    const local = { hidden: false, classList: { toggle() {} }, removeAttribute() {}, setAttribute() {}, querySelectorAll() { return [fields.pageCtaTitle, fields.pageCtaBody, fields.ctaEyebrow, fields.ctaLabel, fields.ctaUrl, fields.ctaSecondaryLabel, fields.ctaSecondaryUrl]; } }; const preview = { hidden: false, classList: { toggle() {} }, removeAttribute() {}, setAttribute() {}, querySelectorAll() { return []; } }; const warning = { hidden: false, classList: { toggle() {} }, removeAttribute() {}, setAttribute() {}, querySelectorAll() { return []; } }; const panels = ['common','cta'].map((panel) => ({ dataset: { panel }, hidden: false, classList: { toggle() {} }, removeAttribute() {}, setAttribute() {}, querySelectorAll() { return []; } }));
     return {
-      dataset: { templateCreate: template ? 'true' : undefined, initialBlockType: 'cta', itemsTouched: 'false' }, submit, fields, onsubmit: null, onclick: null,
+      dataset: { templateCreate: template ? 'true' : undefined, initialBlockType: 'cta', itemsTouched: 'true', pageCtaForm: 'true' }, submit, fields, onsubmit: null, onclick: null,
       addEventListener(type, fn) { events[(template ? 'template' : 'existing') + ':' + type] = fn; },
       dispatchEvent() {},
       querySelector(selector) {
@@ -97,6 +134,10 @@ assert.match(repo, /rollback\(\)/);
         if (selector === 'input[name="items"]') return fields.items;
         if (selector.startsWith('[data-panel=')) return { dataset: { panel: selector.slice(13, -2) }, hidden: false, classList: { toggle() {} }, removeAttribute() {}, setAttribute() {}, querySelectorAll() { return []; } };
         if (selector === '[data-block-type]') return fields.blockType;
+        if (selector === '[data-page-cta-editor]') return { dataset: { defaultCta: JSON.stringify(dbDefault) }, querySelector(sel) { if (sel === '[data-cta-global-preview]') return preview; if (sel === '[data-cta-hidden-warning]') return warning; if (sel === '[data-cta-local-fields]') return local; return null; } };
+        if (selector === '[data-cta-mode]:checked') return fields.modeHidden.checked ? fields.modeHidden : fields.modeCustom.checked ? fields.modeCustom : fields.modeGlobal;
+        if (selector === '[data-page-cta-title]') return fields.pageCtaTitle;
+        if (selector === '[data-page-cta-body]') return fields.pageCtaBody;
         if (selector === '[data-cta-eyebrow]') return fields.ctaEyebrow;
         if (selector === '[data-cta-label]') return fields.ctaLabel;
         if (selector === '[data-cta-url]') return fields.ctaUrl;
@@ -133,10 +174,27 @@ assert.match(repo, /rollback\(\)/);
   await templateForm.onsubmit({ preventDefault() {} });
   assert.equal(fetchCalls.length, 1, 'template submit performs exactly one POST');
   assert.equal(fetchCalls[0].url, '/api/admin/blocks');
-  assert.equal(JSON.parse(fetchCalls[0].options.body).block_key, 'golden:cta-section');
+  const firstPayload = JSON.parse(fetchCalls[0].options.body);
+  assert.equal(firstPayload.block_key, 'golden:cta-section');
+  assert.equal(firstPayload.title, 'CTA');
+  assert.equal(firstPayload.body, 'Body');
+  assert.equal(JSON.parse(firstPayload.items)[0].ctaMode, 'global');
   assert.equal(reloads, 1, 'template create reloads after successful insert');
   await templateForm.onsubmit({ preventDefault() {} });
   assert.equal(fetchCalls.length, 1, 'reload path prevents second insert in current UI lifecycle');
+  existingForm.submit.disabled = false; existingForm.fields.modeGlobal.checked = false; existingForm.fields.modeCustom.checked = true; existingForm.fields.pageCtaTitle.value = 'Custom title'; existingForm.fields.pageCtaBody.value = 'Custom body'; existingForm.fields.ctaLabel.value = 'Custom primary'; existingForm.fields.ctaUrl.value = '/custom/';
+  await existingForm.onsubmit({ preventDefault() {} });
+  const customPayload = JSON.parse(fetchCalls.at(-1).options.body);
+  assert.equal(customPayload.title, 'Custom title');
+  assert.equal(customPayload.body, 'Custom body');
+  assert.equal(JSON.parse(customPayload.items)[0].label, 'Custom primary');
+  existingForm.submit.disabled = false; existingForm.fields.modeCustom.checked = false; existingForm.fields.modeHidden.checked = true;
+  await existingForm.onsubmit({ preventDefault() {} });
+  const hiddenPayload = JSON.parse(fetchCalls.at(-1).options.body);
+  assert.equal(hiddenPayload.title, 'Custom title');
+  assert.equal(hiddenPayload.body, 'Custom body');
+  assert.equal(hiddenPayload.status, 'published');
+  assert.equal(JSON.parse(hiddenPayload.items)[0].ctaMode, 'hidden');
 }
 
 
