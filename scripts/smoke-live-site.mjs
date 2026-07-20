@@ -77,6 +77,20 @@ async function fetchText(url) {
   }
 }
 
+
+function countMatches(value, pattern) {
+  return (value.match(pattern) || []).length;
+}
+
+function assertPageCtaMarkup(route, html, failures) {
+  if (!['/', '/arak/', '/kapcsolat/'].includes(route)) return;
+  const ctaSections = countMatches(html, /<section\b[^>]*class=["'][^"']*\bcta\b[^"']*["'][^>]*>/gi);
+  if (ctaSections !== 1) failures.push(`${route}: expected exactly one page CTA section, got ${ctaSections}`);
+  if (!/data-easylink-cta-id=["']cta-section-primary["']/i.test(html)) failures.push(`${route}: missing page CTA primary tracking markup`);
+  if (!/data-easylink-cta-id=["']cta-section-secondary["']/i.test(html)) failures.push(`${route}: missing page CTA secondary tracking markup`);
+  if (route === '/arak/' && /content-card type-cta|type-cta content-card|Felhívás/i.test(html)) failures.push('/arak/: pricing page CTA must not render as generic ContentBlocks type-cta card');
+}
+
 function assertContains(normalizedHtml, route, check, failures) {
   if (!normalizedHtml.includes(check.value)) {
     failures.push(`${route}: missing expected content from ${check.field}: ${check.value}`);
@@ -115,6 +129,7 @@ async function run(baseUrl) {
       if (!/<meta\s+[^>]*name=["']robots["'][^>]*content=["']noindex,nofollow["']/i.test(rawHtml)) {
         failures.push(`${route}: missing expected content from layout.meta.robots: noindex,nofollow`);
       }
+      assertPageCtaMarkup(route, rawHtml, failures);
       const normalizedHtml = normalizeHtmlForSearch(text);
       for (const check of checks) assertContains(normalizedHtml, route, check, failures);
     } catch (error) {

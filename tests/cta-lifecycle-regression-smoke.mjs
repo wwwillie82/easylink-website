@@ -8,7 +8,7 @@ import { isCanonicalCtaSection, isPricingCta, assertSingleCanonicalCta } from '.
 
 const home = readFileSync('src/pages/index.astro', 'utf8');
 assert.match(home, /homeCtaBlock/);
-assert.match(home, /blockKey \?\? block\.block_key\) === '\/:cta:4'/);
+assert.match(home, /resolvePageCtaBlock\(homePage\?\.blocks, \{ role: 'home-legacy-cta' \}\)/);
 assert.match(home, /<CTASection block=\{homeCtaBlock\} \/>/);
 assert.doesNotMatch(home, /<CTASection\s*\/>/);
 

@@ -4,13 +4,16 @@ import PageHero from '@/components/PageHero.astro';
 import CTASection from '@/components/CTASection.astro';
 import ContentBlocks from '@/components/ContentBlocks.astro';
 import { findRoleBlock, withoutBlocks } from '@/lib/content/blockRoles';
+import { getPublicSiteSettings } from '@/lib/content/settings';
+import { normalizePageCtaBlock, resolvePageCtaBlock } from '@/lib/content/pageCta';
 type Props = PublicPageRendererProps;
 const { page } = Astro.props;
 const featureBlock = findRoleBlock(page?.blocks, 'pricing-features', (block) => block.type === 'feature-list');
 const textBlock = findRoleBlock(page?.blocks, 'pricing-explainer', (block) => block.type === 'text');
-const ctaBlock = findRoleBlock(page?.blocks, 'pricing-cta');
+const rawCtaBlock = resolvePageCtaBlock(page?.blocks, { role: 'pricing-cta' });
+const ctaBlock = normalizePageCtaBlock(rawCtaBlock, (await getPublicSiteSettings()).defaultCta);
 const priceFeatures = featureBlock?.items?.length ? featureBlock.items : ['Választott moduloktól: pénzügy, CRM, dokumentumkezelés, kontrolling vagy AI irány.', 'Cégmérettől, felhasználói köröktől és adminisztrációs összetettségtől.', 'Előkészített vagy később bizonyított integrációktól.', 'Bevezetési, adat-előkészítési és támogatási igényektől.'];
-const remainingBlocks = withoutBlocks(page?.blocks, [featureBlock, textBlock, ctaBlock]);
+const remainingBlocks = withoutBlocks(page?.blocks, [featureBlock, textBlock, rawCtaBlock]);
 ---
 <PageHero eyebrow={page?.heroEyebrow ?? "arak"} title={page?.heroTitle ?? "Áraink"} description={page?.heroDescription ?? "Konkrét csomagárakat még nem publikálunk, és ezen az oldalon nem készül kalkulátor. A cél egy érthető public előkészítő oldal demó CTA-val."} asset={page?.heroAsset || undefined} height={page?.heroHeight} imageFit={page?.heroImageFit} imagePositionX={page?.heroImagePositionX} imagePositionY={page?.heroImagePositionY} imagePositionMobileX={page?.heroImagePositionMobileX} imagePositionMobileY={page?.heroImagePositionMobileY} overlayStrength={page?.heroOverlayStrength} imageScale={page?.heroImageScale} video={page?.heroVideo} />
 <section class="section light"><div class="container price-grid"><article class="card polished"><h2>{featureBlock?.title ?? 'Mitől függhet az ár?'}</h2><ul>{priceFeatures.map((item) => <li>{item}</li>)}</ul></article><article class="card polished placeholder"><span class="eyebrow">Ajánlatkérés</span><h2>{textBlock?.title ?? 'Demó alapján pontosítunk'}</h2><p>{textBlock?.body ?? 'A public oldalon nem közlünk csomagárat. Demó során a modulokat, a cégméretet és az integrációs előkészítést együtt mérjük fel.'}</p></article></div></section>

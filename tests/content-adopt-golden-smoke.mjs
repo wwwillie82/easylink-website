@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { buildGoldenManifest, diffManifest, applyManifest, parseArgs, diffCtaDefaults, applyCtaDefaults } from '../scripts/content-adopt-golden.mjs';
+import { normalizePageCtaBlock, pageCtaRoles, resolvePageCtaBlock } from '../src/lib/content/page-cta-contract.mjs';
 
 const manifest = await buildGoldenManifest();
 const routes = manifest.map((e) => e.route);
@@ -87,8 +88,11 @@ function createFixtureDb() {
       { id: 99, page_id: 3, type: 'text', title: 'Régi teszt blokk', body: 'dummy test content', items: null, sort_order: 99, status: 'published' },
       { id: 101, page_id: 30, type: 'text', title: 'TELEX KÁRTYA', body: 'placeholder integration', items: null, sort_order: 10, status: 'published' },
       { id: 102, page_id: 12, block_key: 'golden:cta-section', type: 'cta', title: 'Archived CTA', body: 'Old', items: JSON.stringify([{ presentationRole: 'cta-section', label: 'Old' }]), sort_order: 900, status: 'archived' },
+      { id: 110, page_id: 1, block_key: '/:cta:4', type: 'cta', title: 'Home saját cím', body: 'Home saját body', items: JSON.stringify([{ eyebrow: '', label: ' ', url: '', secondaryLabel: ' ', secondaryUrl: null, custom: 'keep-home' }]), sort_order: 50, status: 'published' },
+      { id: 111, page_id: 40, block_key: '/arak/:cta:2', type: 'cta', title: 'Pricing saját cím', body: 'Pricing saját body', items: JSON.stringify([{ presentationRole: 'pricing-cta', eyebrow: '', label: 'Pricing elsődleges', url: '/pricing-demo/', secondaryLabel: '   ', secondaryUrl: '', custom: 'keep-pricing' }]), sort_order: 30, status: 'published' },
     ],
     nextBlockId: 200,
+    updateCalls: [],
   };
   const adapter = {
     state,
@@ -96,11 +100,12 @@ function createFixtureDb() {
     async listBlocks(pageId) { return state.blocks.filter((b) => String(b.page_id) === String(pageId)).sort((a,b)=>a.sort_order-b.sort_order||a.id-b.id).map(clone); },
     async listNonHomePages() { return state.pages.filter((p) => p.route !== '/' && p.type !== 'home' && p.status !== 'archived').map(clone); },
     async updatePageFields(id, page) { Object.assign(state.pages.find((p) => p.id === id), { title: page.title, seo_title: page.seoTitle, seo_description: page.seoDescription, hero_title: page.heroTitle }); },
-    async updateBlock(id, block) { const current = state.blocks.find((b) => b.id === id); Object.assign(current, { block_key: block.block_key || current.block_key, type: block.type, title: block.title, body: block.body ?? null, items: block.items === undefined ? null : JSON.stringify(block.items), sort_order: block.sort_order, status: block.status }); },
+    async updateBlock(id, block) { state.updateCalls.push({ id, block: clone(block) }); const current = state.blocks.find((b) => b.id === id); Object.assign(current, { block_key: block.block_key || current.block_key, type: block.type, title: block.title, body: block.body ?? null, items: block.items === undefined ? null : JSON.stringify(block.items), sort_order: block.sort_order, status: block.status }); },
     async insertBlock(pageId, block) { state.blocks.push({ id: state.nextBlockId++, page_id: pageId, block_key: block.block_key, type: block.type, title: block.title, body: block.body ?? null, items: block.items === undefined ? null : JSON.stringify(block.items), sort_order: block.sort_order, status: block.status }); },
     async archiveBlock(id) { state.blocks.find((b) => b.id === id).status = 'archived'; },
     async createAuditSnapshot(label) { state.snapshots.push({ label, status: 'success', is_current: 0, content_json: { pages: clone(state.pages), blocks: clone(state.blocks), navigation: [], settings: [], media: [] } }); },
-    async transaction(fn) { return fn(adapter); },
+    async getDefaultCta() { return { eyebrow: 'DB eyebrow', title: 'DB title', description: 'DB body', primaryLabel: 'Demót kérnék', primaryUrl: '/db-demo/', secondaryLabel: 'Próbáld ki ingyenesen', secondaryUrl: '/db-trial/' }; },
+    async transaction(fn) { const before = clone(state); try { return await fn(adapter); } catch (error) { Object.keys(state).forEach((key) => delete state[key]); Object.assign(state, before); throw error; } },
   };
   return adapter;
 }
@@ -204,11 +209,49 @@ process.env.PUBLIC_DEPLOY_URL = 'https://custom.deploy.test';
 const ctaDry = await diffCtaDefaults(ctaDb);
 process.env.PUBLIC_DEPLOY_URL = oldDeployUrl;
 assert.ok(ctaDry.some((d) => d.route === '/megoldasaink/' && d.action === 'insert'), 'existing non-CTA block with items=\'null\' must not block CTA insert');
-assert.match(JSON.stringify(ctaDry.find((d) => d.route === '/megoldasaink/').target), /https:\/\/custom\.deploy\.test/);
+assert.match(JSON.stringify(ctaDry.find((d) => d.route === '/megoldasaink/').target), /Demót kérnék|Próbáld ki ingyenesen/);
 assert.ok(ctaDry.some((d) => d.route === '/kinek-szol/' && d.action === 'suppressed-archived' && d.blockId === 102));
-assert.ok(!ctaDry.some((d) => d.route === '/arak/'), 'pricing route already has its own DB CTA and must not receive default CTASection backfill');
-await applyCtaDefaults(ctaDb);
+assert.ok(ctaDry.some((d) => d.route === '/' && d.action === 'update-special' && d.blockId === 110), 'home special CTA must dry-run update when secondary fields are blank');
+assert.ok(ctaDry.some((d) => d.route === '/arak/' && d.action === 'update-special' && d.blockId === 111), 'pricing special CTA must dry-run update when secondary fields are blank');
+const ctaUpdated = await applyCtaDefaults(ctaDb);
 assert.equal(ctaDb.state.snapshots.at(-1).label, 'cta-defaults-adopt-before:all-non-home');
+assert.equal(ctaDb.state.updateCalls.filter((call) => [110, 111].includes(call.id)).length, 2, 'update-special apply must update home and pricing exactly once');
+const appliedHome = JSON.parse(ctaDb.state.blocks.find((b) => b.id === 110).items)[0];
+const appliedPricing = JSON.parse(ctaDb.state.blocks.find((b) => b.id === 111).items)[0];
+assert.equal(ctaDb.state.blocks.find((b) => b.id === 110).block_key, '/:cta:4');
+assert.equal(ctaDb.state.blocks.find((b) => b.id === 111).block_key, '/arak/:cta:2');
+assert.equal(appliedHome.label, 'Demót kérnék');
+assert.equal(appliedHome.url, '/db-demo/');
+assert.equal(appliedHome.secondaryLabel, 'Próbáld ki ingyenesen');
+assert.equal(appliedHome.secondaryUrl, '/db-trial/');
+assert.equal(appliedHome.eyebrow, 'DB eyebrow');
+assert.equal(appliedHome.custom, 'keep-home');
+const appliedHomeBlock = ctaDb.state.blocks.find((b) => b.id === 110);
+const publicAppliedHome = { ...appliedHomeBlock, blockKey: appliedHomeBlock.block_key, items: JSON.parse(appliedHomeBlock.items) };
+assert.deepEqual(pageCtaRoles(publicAppliedHome), ['home-legacy-cta'], 'home special apply must leave /:cta:4 as the only page CTA identity');
+assert.equal(resolvePageCtaBlock([publicAppliedHome], { role: 'home-legacy-cta' }), publicAppliedHome);
+const normalizedAppliedHome = normalizePageCtaBlock(publicAppliedHome, await ctaDb.getDefaultCta());
+assert.equal(normalizedAppliedHome.items[0].label, 'Demót kérnék');
+assert.equal(normalizedAppliedHome.items[0].url, '/db-demo/');
+assert.equal(normalizedAppliedHome.items[0].secondaryLabel, 'Próbáld ki ingyenesen');
+assert.equal(normalizedAppliedHome.items[0].secondaryUrl, '/db-trial/');
+assert.equal(appliedPricing.label, 'Pricing elsődleges');
+assert.equal(appliedPricing.url, '/pricing-demo/');
+assert.equal(appliedPricing.eyebrow, 'DB eyebrow');
+assert.equal(appliedPricing.secondaryLabel, 'Próbáld ki ingyenesen');
+assert.equal(appliedPricing.secondaryUrl, '/db-trial/');
+assert.equal(appliedPricing.custom, 'keep-pricing');
+const appliedPricingBlock = ctaDb.state.blocks.find((b) => b.id === 111);
+const publicAppliedPricing = { ...appliedPricingBlock, blockKey: appliedPricingBlock.block_key, items: JSON.parse(appliedPricingBlock.items) };
+assert.deepEqual(pageCtaRoles(publicAppliedPricing), ['pricing-cta'], 'pricing special apply must keep exactly pricing-cta identity');
+assert.equal(resolvePageCtaBlock([publicAppliedPricing], { role: 'pricing-cta' }), publicAppliedPricing);
+const normalizedAppliedPricing = normalizePageCtaBlock(publicAppliedPricing, await ctaDb.getDefaultCta());
+assert.equal(normalizedAppliedPricing.items[0].label, 'Pricing elsődleges');
+assert.equal(normalizedAppliedPricing.items[0].url, '/pricing-demo/');
+assert.equal(normalizedAppliedPricing.items[0].secondaryLabel, 'Próbáld ki ingyenesen');
+assert.equal(normalizedAppliedPricing.items[0].secondaryUrl, '/db-trial/');
+assert.ok(ctaUpdated.some((d) => d.route === '/' && d.action === 'keep-special'));
+assert.ok(ctaUpdated.some((d) => d.route === '/arak/' && d.action === 'keep-special'));
 assert.ok(ctaDb.state.blocks.some((b) => b.block_key === 'golden:cta-section' && b.page_id === 2));
 assert.equal(ctaDb.state.blocks.find((b) => b.id === 102).status, 'archived');
 await applyManifest(manifest, ctaDb, { route: '/megoldasaink/' });
@@ -216,8 +259,16 @@ assert.equal(ctaDb.state.blocks.filter((b) => b.page_id === 2 && b.block_key ===
 assert.equal(ctaDb.state.blocks.find((b) => b.page_id === 2 && b.block_key === 'golden:cta-section').status, 'published');
 const afterRouteApply = clone(ctaDb.state.blocks);
 const ctaSecond = await applyCtaDefaults(ctaDb);
-assert.ok(ctaSecond.every((d) => ['keep','suppressed-archived'].includes(d.action)), 'second CTA defaults apply must be no-op after route adopt');
+assert.ok(ctaSecond.every((d) => ['keep','keep-special','suppressed-archived'].includes(d.action)), 'second CTA defaults apply must be no-op after route adopt');
 assert.deepEqual(ctaDb.state.blocks, afterRouteApply, 'CTA defaults apply must not duplicate blocks after route adopt');
+const updateCallsBeforeSecondApply = ctaDb.state.updateCalls.length;
+await applyCtaDefaults(ctaDb);
+assert.equal(ctaDb.state.updateCalls.length, updateCallsBeforeSecondApply, 'second special apply must not update complete home/pricing CTAs again');
+const rollbackDb = createFixtureDb();
+rollbackDb.updateBlock = async (id, block) => { rollbackDb.state.updateCalls.push({ id, block: clone(block) }); throw new Error('forced update failure'); };
+const rollbackBefore = clone(rollbackDb.state);
+await assert.rejects(() => applyCtaDefaults(rollbackDb), /forced update failure/);
+assert.deepEqual(rollbackDb.state, rollbackBefore, 'update-special failure must roll back the entire CTA defaults transaction');
 
 const currentShapePages = [
   { id: 1, route: '/', type: 'home', title: 'Home', status: 'published' },

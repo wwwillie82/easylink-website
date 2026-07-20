@@ -12,3 +12,5 @@ export function isCanonicalCtaSection(block: CtaBlock | undefined): boolean;
 export function isPricingCta(block: CtaBlock | undefined): boolean;
 export function assertSingleCanonicalCta<T extends CtaBlock>(blocks?: T[]): T | null;
 export function mergePricingCtaDefaults(existingBlock: CtaBlock, targetBlock: CtaBlock): CtaBlock;
+
+export function mergeSpecialCtaDefaults(existingBlock: CtaBlock, defaultCta: Record<string, unknown> | undefined, role: string): CtaBlock;

@@ -174,7 +174,7 @@ for (const file of ['src/components/page-renderers/SolutionDetailRenderer.astro'
 const pricingIndex = await readFile('src/components/page-renderers/PricingRenderer.astro', 'utf8');
 assert.match(pricingIndex, /findRoleBlock\(page\?\.blocks, 'pricing-features'/);
 assert.match(pricingIndex, /findRoleBlock\(page\?\.blocks, 'pricing-explainer'/);
-assert.match(pricingIndex, /findRoleBlock\(page\?\.blocks, 'pricing-cta'/);
+assert.match(pricingIndex, /resolvePageCtaBlock\(page\?\.blocks, \{ role: 'pricing-cta' \}\)/);
 assert.match(pricingIndex, /<CTASection block=\{ctaBlock\}/);
 assert.match(pricingIndex, /priceFeatures = featureBlock\?\.items\?\.length \? featureBlock.items :/);
 const contactIndex = await readFile('src/components/page-renderers/ContactRenderer.astro', 'utf8');
