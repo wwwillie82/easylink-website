@@ -21,7 +21,7 @@ export function mapPageRow(row: any, blocks: any[] = []): SitePage {
     seoTitle: row.seo_title ?? row.title,
     seoDescription: row.seo_description ?? '',
     heroEyebrow: row.hero_eyebrow ?? '',
-    heroTitle: row.hero_title ?? row.title,
+    heroTitle: row.type === 'home' ? (row.hero_title ?? '') : (row.hero_title ?? row.title),
     heroDescription: row.hero_description ?? '',
     heroAsset: row.hero_asset ?? '',
     heroVideo: safeParseVideoConfig(row.hero_video, { context: 'hero' }) ?? undefined,
@@ -35,7 +35,8 @@ export function mapPageRow(row: any, blocks: any[] = []): SitePage {
     heroImageScale: row.hero_image_scale ?? undefined,
     status: row.status,
     sortOrder: row.sort_order ?? 0,
-    blocks: blocks.map((block) => ({ blockKey: block.block_key, type: block.type, title: block.title, body: block.body ?? undefined, items: parseItems(block.items) } as ContentBlock)),
+    blocks: blocks.map((block) => ({ id: block.id, page_id: block.page_id, pageId: block.page_id, block_key: block.block_key, blockKey: block.block_key, type: block.type, title: block.title, body: block.body ?? undefined, items: parseItems(block.items), status: block.status, sort_order: block.sort_order ?? 0, sortOrder: block.sort_order ?? 0 } as ContentBlock)),
+    allBlockMeta: (row.allBlockMeta ?? []).map((block: any) => ({ id: block.id, page_id: block.page_id, pageId: block.page_id, block_key: block.block_key, blockKey: block.block_key, type: block.type, status: block.status, sort_order: block.sort_order ?? 0, sortOrder: block.sort_order ?? 0 })),
   };
 }
 
@@ -46,6 +47,10 @@ export function createContentRepository(pool: Pool) {
       const page = rows[0];
       if (!page) return null;
       const [blocks] = await pool.query('SELECT * FROM site_content_blocks WHERE page_id = ? AND status = ? ORDER BY sort_order ASC, id ASC', [page.id, 'published']);
+      if (page.route === '/' || page.type === 'home') {
+        const [allBlockMeta] = await pool.query('SELECT id, page_id, block_key, type, status, sort_order FROM site_content_blocks WHERE page_id = ? ORDER BY sort_order ASC, id ASC', [page.id]);
+        return mapPageRow({ ...page, allBlockMeta }, blocks);
+      }
       return mapPageRow(page, blocks);
     },
     async getPageByRoute(route: string) {

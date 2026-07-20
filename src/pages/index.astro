@@ -2,29 +2,20 @@
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import Header from '@/components/Header.astro';
 import Hero from '@/components/Hero.astro';
-import ListingCards from '@/components/ListingCards.astro';
-import AiAssistantPreview from '@/components/AiAssistantPreview.astro';
-import IntegrationsStrip from '@/components/IntegrationsStrip.astro';
 import CTASection from '@/components/CTASection.astro';
 import Footer from '@/components/Footer.astro';
-import { publishedSolutions } from '@/content/solutions';
-import { publishedAudiences } from '@/content/audiences';
+import HomeRenderer from '@/components/home/HomeRenderer.astro';
 import { getPublicPageState, getPublicRouteIndex } from '@/lib/content/provider';
-import { firstPageByType, resolveListingCards } from '@/lib/content/public-pages';
 import { assertRootHomePage } from '@/lib/content/root-invariant.mjs';
 import { resolvePageCtaBlock } from '@/lib/content/pageCta';
+import { normalizeHomePage } from '@/lib/content/home-blocks.mjs';
 const pageState = await getPublicPageState('/');
 const homePage = pageState.page;
 const { mode, routeIndex } = await getPublicRouteIndex();
 if (!homePage && !pageState.hiddenByDb && mode === 'db-authoritative') throw new Error('Hiányzó published home oldal DB authoritative módban: route=/ type=home');
 if (homePage) assertRootHomePage(homePage, 'Főoldal build context');
-const solutionsIndexPage = firstPageByType(routeIndex, 'solutions_index');
-const audiencesIndexPage = firstPageByType(routeIndex, 'audiences_index');
-if (!solutionsIndexPage && mode === 'db-authoritative') throw new Error('Hiányzó published solutions_index oldal a főoldali linkekhez.');
-if (!audiencesIndexPage && mode === 'db-authoritative') throw new Error('Hiányzó published audiences_index oldal a főoldali linkekhez.');
 const homeRouteContext = homePage ?? { title: 'Home', route: '/', type: 'home', status: 'published', blocks: [] };
-const homeSolutionCards = resolveListingCards({ items: publishedSolutions.slice(0, 3), detailType: 'solution_detail', index: routeIndex, sourcePage: homeRouteContext, blockLabel: 'home-solutions', mode, source: 'golden' });
-const homeAudienceCards = resolveListingCards({ items: publishedAudiences, detailType: 'audience_detail', index: routeIndex, sourcePage: homeRouteContext, blockLabel: 'home-audiences', mode, source: 'golden' });
+const normalizedHome = pageState.hiddenByDb ? { heroMeta: { subtitle: '', benefits: [] }, middle: [] } : normalizeHomePage({ page: homeRouteContext, mode, routeIndex });
 const homeCtaBlock = resolvePageCtaBlock(homePage?.blocks, { role: 'home-legacy-cta' });
 if (pageState.hiddenByDb) Astro.response.status = 404;
 ---
@@ -33,54 +24,10 @@ if (pageState.hiddenByDb) Astro.response.status = 404;
   <Header />
   <main>
     {pageState.hiddenByDb ? <section class="section"><div class="container"><h1>Az oldal nem található.</h1></div></section> : <>
-    <Hero page={homePage} hero={{ heroAsset: homePage?.heroAsset, heroHeight: homePage?.heroHeight, heroImageFit: homePage?.heroImageFit, heroImagePositionX: homePage?.heroImagePositionX, heroImagePositionY: homePage?.heroImagePositionY, heroImagePositionMobileX: homePage?.heroImagePositionMobileX, heroImagePositionMobileY: homePage?.heroImagePositionMobileY, heroOverlayStrength: homePage?.heroOverlayStrength, heroImageScale: homePage?.heroImageScale }} />
-
-    <section class="section light intro-section">
-      <div class="container intro-grid">
-        <div>
-          <span class="eyebrow">Public site előkészítés</span>
-          <h2>Nem még egy táblázat, hanem egy átlátható vezetői felület.</h2>
-        </div>
-        <div>
-          <p>
-            Az Easylink a pénzügy, adminisztráció, ügyfélkezelés és vezetői kontroll közös nyelvét készíti elő.
-            A cél: gyorsabb döntés, kevesebb kézi egyeztetés és később AI-val is kérdezhető üzleti adatok.
-          </p>
-        </div>
-      </div>
-    </section>
-
-    <section class="section light">
-      <div class="container">
-        <span class="eyebrow">Megoldásaink</span>
-        <h2>Egy rendszer a napi működés kulcspontjaira.</h2>
-        <ListingCards items={homeSolutionCards} />
-        {solutionsIndexPage && <p class="more"><a class="button button-secondary" href={solutionsIndexPage.route}>Összes megoldás</a></p>}
-      </div>
-    </section>
-
-    <AiAssistantPreview />
-    <IntegrationsStrip />
-
-    <section class="section">
-      <div class="container">
-        <span class="eyebrow">Kinek szól?</span>
-        <h2>Hoteleknek, vendéglátóhelyeknek és szolgáltató vállalkozásoknak.</h2>
-        <ListingCards items={homeAudienceCards} />
-      </div>
-    </section>
-
+    <Hero page={homePage} hero={{ heroAsset: homePage?.heroAsset, heroVideo: homePage?.heroVideo, heroHeight: homePage?.heroHeight, heroImageFit: homePage?.heroImageFit, heroImagePositionX: homePage?.heroImagePositionX, heroImagePositionY: homePage?.heroImagePositionY, heroImagePositionMobileX: homePage?.heroImagePositionMobileX, heroImagePositionMobileY: homePage?.heroImagePositionMobileY, heroOverlayStrength: homePage?.heroOverlayStrength, heroImageScale: homePage?.heroImageScale }} heroMeta={normalizedHome.heroMeta} />
+    <HomeRenderer sections={normalizedHome.middle} />
     <CTASection block={homeCtaBlock} />
     </>}
   </main>
   <Footer />
 </BaseLayout>
-
-<style>
-  .more { margin-top: 28px; }
-  .light { background: var(--color-soft); }
-  h2 { max-width: 900px; }
-  .intro-section { padding-bottom: 18px; }
-  .intro-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 42px; align-items: start; }
-  @media (max-width: 800px) { .intro-grid { grid-template-columns: 1fr; } }
-</style>

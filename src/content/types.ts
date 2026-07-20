@@ -4,7 +4,14 @@ export type VideoConfig = { sourceType: 'media' | 'youtube'; mediaPath?: string;
 
 export type ContentBlock = {
   type: 'text' | 'feature-list' | 'list' | 'cards' | 'card-grid' | 'cta' | 'image-text' | 'faq' | 'ai-preview' | 'network-visual' | 'video' | string;
+  id?: number | string;
+  page_id?: number | string;
+  pageId?: number | string;
+  block_key?: string;
   blockKey?: string;
+  status?: ContentStatus | string;
+  sort_order?: number;
+  sortOrder?: number;
   title: string;
   body?: string;
   items?: Array<string | { title?: string; text?: string; url?: string; label?: string; secondaryLabel?: string; secondaryUrl?: string; eyebrow?: string; presentationRole?: string; role?: string; question?: string; answer?: string; image?: string; position?: 'left' | 'right'; [key: string]: unknown }>;

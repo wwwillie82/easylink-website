@@ -1,8 +1,9 @@
 ---
 import type { SitePage } from '@/lib/content/static';
+import VideoMedia from '@/components/VideoMedia.astro';
 
-type Props = { page?: SitePage; hero?: Partial<Pick<SitePage, 'heroEyebrow' | 'heroTitle' | 'heroDescription' | 'heroAsset' | 'heroHeight' | 'heroImageFit' | 'heroImagePositionX' | 'heroImagePositionY' | 'heroImagePositionMobileX' | 'heroImagePositionMobileY' | 'heroOverlayStrength' | 'heroImageScale'>> };
-const { page, hero } = Astro.props;
+type Props = { page?: SitePage; hero?: Partial<Pick<SitePage, 'heroEyebrow' | 'heroTitle' | 'heroDescription' | 'heroAsset' | 'heroVideo' | 'heroHeight' | 'heroImageFit' | 'heroImagePositionX' | 'heroImagePositionY' | 'heroImagePositionMobileX' | 'heroImagePositionMobileY' | 'heroOverlayStrength' | 'heroImageScale'>>; heroMeta?: { subtitle?: string; benefits?: Array<{ title: string; text?: string }> } };
+const { page, hero, heroMeta = {} } = Astro.props;
 const heroData = { ...page, ...hero };
 import { getPublicSiteSettings } from '@/lib/content/settings';
 const heroCta = (await getPublicSiteSettings()).defaultCta;
@@ -31,8 +32,9 @@ const mx = clampPercent(heroData?.heroImagePositionMobileX, 62);
 const my = clampPercent(heroData?.heroImagePositionMobileY, y);
 const scale = clampScale(heroData?.heroImageScale);
 const [overlayPrimary, overlaySecondary] = overlays[allowedOverlay];
+const videoPosterFit = allowedFit === 'stretch' ? 'fill' : allowedFit;
 const styleVars = [
-  `--home-hero-asset: url('${heroData?.heroAsset || '/assets/nati/hero-bg-flow-03.webp'}')`,
+  `--home-hero-asset: url('${heroData?.heroAsset}')`,
   `--home-hero-padding: ${heightPadding[allowedHeight]}`,
   `--home-hero-bg-size: ${scaledBgSize(allowedFit, scale)}`,
   `--home-hero-bg-position: ${x}% ${y}%`,
@@ -41,23 +43,27 @@ const styleVars = [
   `--home-hero-overlay-secondary: ${overlaySecondary}`,
   `--home-hero-image-scale: ${scale}`,
 ].join('; ');
+const videoLayerVars = [
+  `--video-poster-fit: ${videoPosterFit}`,
+  `--video-poster-position: ${x}% ${y}%`,
+].join('; ');
 
-const benefits = [
-  { title: 'Átlátható működés', text: 'Valós idejű adatok, tiszta kép.' },
-  { title: 'Időmegtakarítás', text: 'Automatizált folyamatok, kevesebb manuális munka.' },
-  { title: 'Biztonság & megbízhatóság', text: 'Magyarországi háttér, stabil rendszer.' },
-];
+const benefits = Array.isArray(heroMeta.benefits) ? heroMeta.benefits : [];
+const subtitle = heroMeta.subtitle || '';
+const video = heroData?.heroVideo || null;
 ---
 
-<section id="top" class="hero" style={styleVars}>
+<section id="top" class:list={["hero", { "has-hero-video": !!video }]} style={styleVars}>
+  {video && <div class="hero-video-layer" style={videoLayerVars}><VideoMedia config={video} mode="background" title={`${heroData?.heroTitle} háttérvideó`} fallback={heroData?.heroAsset} /></div>}
   <div class="hero-bg" aria-hidden="true"></div>
+  {video && <div class="hero-video-overlay" aria-hidden="true"></div>}
   <div class="container hero-grid">
     <div class="hero-copy">
-      <span class="eyebrow">{heroData?.heroEyebrow || 'Easylink ügyvitel + AI'}</span>
-      <h1>{heroData?.heroTitle || 'easyLink ERP'}</h1>
-      <p class="hero-subtitle">Cégvezetés, könnyedén.</p>
+      <span class="eyebrow">{heroData?.heroEyebrow}</span>
+      <h1>{heroData?.heroTitle}</h1>
+      {subtitle && <p class="hero-subtitle">{subtitle}</p>}
       <p class="hero-description">
-        {heroData?.heroDescription || 'Felejtsd el a táblázatokat! Olyan ügyviteli rendszert adunk a kezedbe, amivel egyetlen, átlátható felületen irányíthatod a számlázást, az adminisztrációt és az ügyfélnyilvántartást.'}
+        {heroData?.heroDescription}
       </p>
       <div class="actions">
         <a class="button button-primary" href={heroCta.primaryUrl} data-easylink-cta="demo" data-easylink-cta-id="home-hero-demo" data-easylink-cta-slot="hero">{heroCta.primaryLabel}</a>
@@ -66,14 +72,14 @@ const benefits = [
     </div>
     <div class="hero-visual" aria-hidden="true"></div>
   </div>
-  <div class="container benefit-row" aria-label="Easylink előnyök">
+  {benefits.length > 0 && <div class="container benefit-row" aria-label="Easylink előnyök">
     {benefits.map((benefit) => (
       <article>
         <h2>{benefit.title}</h2>
         <p>{benefit.text}</p>
       </article>
     ))}
-  </div>
+  </div>}
 </section>
 
 <style>
@@ -97,8 +103,31 @@ const benefits = [
     background-position: center, center, var(--home-hero-bg-position);
     background-repeat: no-repeat, no-repeat, no-repeat;
     transform: scale(1.01);
+    z-index: 0;
   }
 
+  .has-hero-video .hero-bg {
+    background-image: var(--home-hero-asset);
+    background-size: var(--home-hero-bg-size);
+    background-position: var(--home-hero-bg-position);
+    background-repeat: no-repeat;
+    opacity: 1;
+  }
+  .hero-video-layer {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    overflow: hidden;
+  }
+  .hero-video-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    background-image:
+      linear-gradient(90deg, var(--home-hero-overlay-primary)),
+      linear-gradient(0deg, var(--home-hero-overlay-secondary));
+    pointer-events: none;
+  }
   .hero::after {
     content: "";
     position: absolute;
@@ -110,7 +139,7 @@ const benefits = [
 
   .hero-grid {
     position: relative;
-    z-index: 1;
+    z-index: 3;
     display: grid;
     grid-template-columns: minmax(520px, 0.98fr) minmax(320px, 1.02fr);
     gap: clamp(24px, 5vw, 68px);
@@ -150,7 +179,7 @@ const benefits = [
 
   .benefit-row {
     position: relative;
-    z-index: 1;
+    z-index: 3;
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 12px;
@@ -176,6 +205,8 @@ const benefits = [
       background-size: cover, var(--home-hero-bg-size);
       background-position: center, var(--home-hero-bg-position-mobile);
     }
+    .has-hero-video .hero-bg { background-position: var(--home-hero-bg-position-mobile); }
+    .hero-video-layer { --video-poster-position: var(--home-hero-bg-position-mobile); }
 
     .hero-grid { grid-template-columns: 1fr; }
     .hero h1 { white-space: normal; }

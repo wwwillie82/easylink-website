@@ -63,7 +63,11 @@ assert.match(contactSource, /resolvePageCtaBlock\(page\?\.blocks, \{ role: 'cta-
 
 const homeSource = await readFile('src/pages/index.astro', 'utf8');
 assert.match(homeSource, /resolvePageCtaBlock\(homePage\?\.blocks, \{ role: 'home-legacy-cta' \}\)/, 'home page must use the /:cta:4 legacy page CTA resolver');
-assert.match(homeSource, /<Hero[\s\S]*<ListingCards[\s\S]*<AiAssistantPreview[\s\S]*<IntegrationsStrip[\s\S]*<ListingCards[\s\S]*<CTASection/, 'home component order must remain unchanged through CTASection');
+assert.match(homeSource, /<Hero[\s\S]*<HomeRenderer[\s\S]*<CTASection/, 'home component order must remain Hero -> HomeRenderer -> CTASection');
+const homeRendererSource = await readFile('src/components/home/HomeRenderer.astro', 'utf8');
+assert.match(homeRendererSource, /<ListingCards items=\{section.cards\}/, 'home middle renderer must render card sections through ListingCards');
+assert.match(homeRendererSource, /<AiAssistantPreview section=\{section\}/, 'home middle renderer must render AI section');
+assert.match(homeRendererSource, /<IntegrationsStrip section=\{section\}/, 'home middle renderer must render integrations section');
 
 const contentBlocks = await readFile('src/components/ContentBlocks.astro', 'utf8');
 assert.match(contentBlocks, /blocks\.filter\(\(block\) => !isRecognizedPageCta\(block\)\)\.map/, 'ContentBlocks must defensively skip recognized page CTAs');

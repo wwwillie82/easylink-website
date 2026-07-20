@@ -2,6 +2,7 @@ import { publishedAudiences, audiences } from '@/content/audiences';
 import { integrations } from '@/content/integrations';
 import { publishedSolutions, solutions } from '@/content/solutions';
 import { siteNavigation } from '@/content/siteNavigation';
+import { canonicalHomeBlockFixture } from '@/lib/content/home-blocks.mjs';
 import type { ContentBlock, ContentStatus, PublicContentItem } from '@/content/types';
 import type { VideoConfig } from '@/content/types';
 
@@ -31,6 +32,7 @@ export type SitePage = {
   status: ContentStatus;
   sortOrder: number;
   blocks: ContentBlock[];
+  allBlockMeta?: Array<{ id?: number | string; page_id?: number | string; pageId?: number | string; block_key?: string; blockKey?: string; type: string; status: ContentStatus | string; sort_order?: number; sortOrder?: number }>;
 };
 
 const detailPage = (section: 'megoldasaink' | 'kinek-szol', type: SitePageType, item: PublicContentItem): SitePage => ({
@@ -52,11 +54,8 @@ const detailPage = (section: 'megoldasaink' | 'kinek-szol', type: SitePageType, 
 export const staticPages: SitePage[] = [
   {
     route: '/', slug: 'home', type: 'home', title: 'Easylink', seoTitle: 'Easylink | Ügyviteli rendszer KKV-knak', seoDescription: 'Modern Easylink public site ügyviteli, integrációs és AI asszisztens iránnyal.', heroEyebrow: 'Easylink ügyvitel + AI', heroTitle: 'easyLink ERP', heroDescription: 'Felejtsd el a táblázatokat! Olyan ügyviteli rendszert adunk a kezedbe, amivel egyetlen, átlátható felületen irányíthatod a számlázást, az adminisztrációt és az ügyfélnyilvántartást.', heroAsset: '/assets/nati/hero-bg-flow-03.webp', status: 'published', sortOrder: 0,
-    blocks: [
-      { type: 'text', title: 'Public site előkészítés', body: 'Nem még egy táblázat, hanem egy átlátható vezetői felület.' },
-      { type: 'feature-list', title: 'Megoldásaink', items: publishedSolutions.slice(0, 3).map((item) => item.title) },
-      { type: 'feature-list', title: 'Kinek szól?', items: publishedAudiences.map((item) => item.title) },
-    ],
+    blocks: canonicalHomeBlockFixture(),
+    allBlockMeta: canonicalHomeBlockFixture().map((block: any) => ({ id: block.id, page_id: block.page_id, pageId: block.pageId, block_key: block.block_key, blockKey: block.blockKey, type: block.type, status: block.status, sort_order: block.sort_order, sortOrder: block.sortOrder })),
   },
   { route: '/megoldasaink/', slug: 'megoldasaink', type: 'solutions_index', title: 'Megoldásaink', seoTitle: 'Megoldásaink | Easylink', seoDescription: 'Easylink ügyviteli megoldások.', heroEyebrow: 'Megoldásaink', heroTitle: 'Egy rendszer a napi működés kulcspontjaira.', heroDescription: 'Válaszd ki, melyik működési területet szeretnéd átláthatóbbá tenni: pénzügy, HR, CRM, dokumentumkezelés, kontrolling vagy AI támogatás.', heroAsset: '/assets/nati/hero-bg-flow-01.webp', status: 'published', sortOrder: 10, blocks: publishedSolutions.map((item) => ({ type: 'feature-list', title: item.title, body: item.shortDescription, items: [item.slug] })) },
   ...solutions.map((item) => detailPage('megoldasaink', 'solution_detail', item)),

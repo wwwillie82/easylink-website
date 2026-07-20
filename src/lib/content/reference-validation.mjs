@@ -1,4 +1,5 @@
 import { isValidHttpExternalUrl, navigationTitleOverride, positiveNavigationPageId } from './internal-links.mjs';
+import { validatePublishedHomeBlocksForSnapshot } from './home-blocks.mjs';
 
 const targetTypes = new Set(['legacy', 'page', 'external']);
 const hasOwn = (obj, key) => Object.prototype.hasOwnProperty.call(obj || {}, key);
@@ -63,6 +64,7 @@ export function validateContentReferences(content = {}) {
     }
     if (type === 'external' && (!isValidHttpExternalUrl(item.href) || hasValue(item.target_page_id) || hasValue(item.title_override))) errors.push({ code: 'NAVIGATION_EXTERNAL_TARGET_INVALID', message: `A publikált külső menüpont célja hibás: ${labelOf(item)}.`, ...errorBase(item) });
   }
+  errors.push(...validatePublishedHomeBlocksForSnapshot(content));
   return { ok: errors.length === 0, errors, warnings };
 }
 export const referenceValidationSummary = (result) => (result?.errors || []).map((e) => `${e.code}: ${e.message}`).join('\n') || 'Tartalmi referenciahiba.';

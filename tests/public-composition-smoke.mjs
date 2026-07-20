@@ -3,28 +3,36 @@ import { readdir, readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 
 const home = await readFile('src/pages/index.astro', 'utf8');
-for (const token of ['Hero', 'ListingCards', 'AiAssistantPreview', 'IntegrationsStrip', 'CTASection']) {
+for (const token of ['Hero', 'HomeRenderer', 'CTASection']) {
   assert.match(home, new RegExp(`import ${token} from`));
-  assert.match(home, new RegExp(`<${token}\\b`));
+  assert.ok(home.includes(`<${token}`));
 }
 assert.doesNotMatch(home, /import PageHero from/);
 assert.doesNotMatch(home, /import ContentBlocks from/);
-assert.doesNotMatch(home, /<PageHero\b[\s\S]*<ContentBlocks\b/);
+assert.doesNotMatch(home, /publishedSolutions|publishedAudiences|resolveListingCards/);
 assert.doesNotMatch(home, /basePath="\/megoldasaink\/"|basePath="\/kinek-szol\/"|href="\/megoldasaink\/"/);
 assert.match(home, /getPublicRouteIndex/);
-assert.match(home, /resolveListingCards/);
-assert.match(home, /href=\{solutionsIndexPage\.route\}/);
-const order = ['<Header', '<Hero', 'intro-section', '<ListingCards', '<AiAssistantPreview', '<IntegrationsStrip', '<ListingCards', '<CTASection', '<Footer'];
+assert.match(home, /normalizeHomePage/);
+const order = ['<Header', '<Hero', '<HomeRenderer', '<CTASection', '<Footer'];
 let cursor = -1;
 for (const marker of order) {
   const next = home.indexOf(marker, cursor + 1);
   assert.ok(next > cursor, `missing or out of order home marker: ${marker}`);
   cursor = next;
 }
+const homeRenderer = await readFile('src/components/home/HomeRenderer.astro', 'utf8');
+for (const token of ['ListingCards', 'AiAssistantPreview', 'IntegrationsStrip']) {
+  assert.match(homeRenderer, new RegExp(`import ${token} from`));
+  assert.ok(homeRenderer.includes(`<${token}`));
+}
+assert.doesNotMatch(homeRenderer, /Összes megoldás/);
 
 const hero = await readFile('src/components/Hero.astro', 'utf8');
-for (const phrase of ['easyLink ERP', 'Cégvezetés, könnyedén.', 'heroCta.secondaryLabel', 'Átlátható működés', 'hero-bg-flow-03.webp']) assert.match(hero, new RegExp(phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+for (const phrase of ['heroCta.secondaryLabel', 'VideoMedia']) assert.match(hero, new RegExp(phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+assert.doesNotMatch(hero, /Easylink ügyvitel \+ AI|easyLink ERP|Felejtsd el a táblázatokat|hero-bg-flow-03\.webp/);
 assert.doesNotMatch(hero, /PageHero/);
+const repositorySource = await readFile('src/lib/db/repository.ts', 'utf8');
+assert.match(repositorySource, /heroTitle: row\.type === 'home' \? \(row\.hero_title \?\? ''\) : \(row\.hero_title \?\? row\.title\)/);
 for (const token of ['heroAsset', 'heroHeight', 'heroImageFit', 'heroImagePositionX', 'heroImagePositionY', 'heroImagePositionMobileX', 'heroImagePositionMobileY', 'heroOverlayStrength', 'heroImageScale']) {
   assert.match(home, new RegExp(token));
   assert.match(hero, new RegExp(token));
