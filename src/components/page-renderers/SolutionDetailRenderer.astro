@@ -5,10 +5,11 @@ import ContentBlocks from '@/components/ContentBlocks.astro';
 import CTASection from '@/components/CTASection.astro';
 import RelatedLinks from '@/components/RelatedLinks.astro';
 import { findRoleBlock, withoutBlocks } from '@/lib/content/blockRoles';
+import { resolvePageCtaBlock } from '@/lib/content/pageCta';
 import { relatedPages } from '@/lib/content/public-pages';
 type Props = PublicPageRendererProps;
 const { page, routeIndex } = Astro.props;
-const ctaSectionBlock = findRoleBlock(page.blocks, 'cta-section', (block) => block.type === 'cta');
+const ctaSectionBlock = resolvePageCtaBlock(page.blocks, { role: 'cta-section' });
 const contentBlocks = withoutBlocks(page.blocks, [ctaSectionBlock]);
 const related = relatedPages(routeIndex, page, 'solution_detail', 3);
 ---

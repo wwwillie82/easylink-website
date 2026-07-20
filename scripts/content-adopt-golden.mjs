@@ -5,7 +5,8 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import ts from 'typescript';
 import { getDatabaseConfig, createPool } from '../src/lib/db/client.mjs';
-import { canonicalCtaBlockFromDefault, isCanonicalCtaSection, assertSingleCanonicalCta, mergePricingCtaDefaults, isPricingCta } from '../src/lib/content/cta-contract.mjs';
+import { canonicalCtaBlockFromDefault, isCanonicalCtaSection, assertSingleCanonicalCta, mergePricingCtaDefaults, mergeSpecialCtaDefaults, isPricingCta } from '../src/lib/content/cta-contract.mjs';
+import { HOME_LEGACY_CTA_KEY } from '../src/lib/content/page-cta-contract.mjs';
 
 const ROOT = path.resolve(new URL('..', import.meta.url).pathname);
 const APPLY_GROUPS = new Set(['solutions', 'audiences', 'integrations', 'pricing', 'contact']);
@@ -170,9 +171,10 @@ const parseItems = (items) => {
   if (typeof items === 'string' && items.trim()) { try { return JSON.parse(items); } catch { return items; } }
   return undefined;
 };
-const pricingCtaHasRequiredFields = (block) => {
+const hasNonBlankText = (value) => String(value ?? '').trim().length > 0;
+const specialCtaHasRequiredFields = (block) => {
   const first = parseItems(block?.items)?.[0];
-  return Boolean(first && typeof first === 'object' && isPricingCta(block) && ['eyebrow','label','url','secondaryLabel','secondaryUrl'].every((key) => Object.prototype.hasOwnProperty.call(first, key)));
+  return Boolean(first && typeof first === 'object' && ['eyebrow','label','url','secondaryLabel','secondaryUrl'].every((key) => hasNonBlankText(first[key])));
 };
 function isCtaSectionBlock(block) { return isCanonicalCtaSection(block); }
 const isRiskyBlock = (block) => RISK_RE.test(`${block.title || ''}\n${block.body || ''}\n${preview(block.items || '')}`);
@@ -194,9 +196,9 @@ export async function diffRoute(entry, db) {
     const exact = publishedBlocks.find((b) => !used.has(b.id) && blockMatches(b, target));
     if (exact) { used.add(exact.id); actions.push({ action: 'keep', blockId: exact.id, targetTitle: target.title }); continue; }
     const keyed = publishedBlocks.find((b) => !used.has(b.id) && sameBlockKey(b, target));
-    if (keyed) { used.add(keyed.id); actions.push(target.block_key === '/arak/:cta:2' && pricingCtaHasRequiredFields(keyed) ? { action: 'keep', blockId: keyed.id, targetTitle: target.title } : { action: 'update', blockId: keyed.id, target }); continue; }
+    if (keyed) { used.add(keyed.id); actions.push(target.block_key === '/arak/:cta:2' && isPricingCta(keyed) && specialCtaHasRequiredFields(keyed) ? { action: 'keep', blockId: keyed.id, targetTitle: target.title } : { action: 'update', blockId: keyed.id, target }); continue; }
     const shaped = publishedBlocks.find((b) => !used.has(b.id) && sameShape(b, target));
-    if (shaped) { used.add(shaped.id); actions.push(target.block_key === '/arak/:cta:2' && pricingCtaHasRequiredFields(shaped) ? { action: 'keep', blockId: shaped.id, targetTitle: target.title } : { action: 'update', blockId: shaped.id, target }); continue; }
+    if (shaped) { used.add(shaped.id); actions.push(target.block_key === '/arak/:cta:2' && isPricingCta(shaped) && specialCtaHasRequiredFields(shaped) ? { action: 'keep', blockId: shaped.id, targetTitle: target.title } : { action: 'update', blockId: shaped.id, target }); continue; }
     actions.push({ action: 'insert', target, reason: nonPublishedBlocks.some((b) => sameBlockKey(b, target) || sameShape(b, target)) ? 'non-published matching block ignored' : undefined });
   }
   for (const block of publishedBlocks) { if (isCtaSectionBlock(block)) { used.add(block.id); actions.push({ action: 'keep-supplemental', blockId: block.id, targetTitle: block.title }); continue; } if (!used.has(block.id)) actions.push({ action: 'archive', blockId: block.id, reason: isRiskyBlock(block) ? 'dangerous/test placeholder marker' : 'extra block not in golden manifest' }); }
@@ -221,6 +223,15 @@ export async function diffCtaDefaults(db) {
   const pages = (await db.listNonHomePages()).filter((page) => page.status !== 'archived' && page.type !== 'pricing' && page.route !== '/arak/');
   const settings = db.getDefaultCta ? await db.getDefaultCta() : undefined;
   const diffs = [];
+  if (db.getPageByRoute) {
+    for (const route of ['/', '/arak/']) {
+      const page = await db.getPageByRoute(route);
+      if (!page || page.status === 'archived') continue;
+      const blocks = await db.listBlocks(page.id);
+      const block = blocks.find((b) => route === '/' ? (b.block_key === HOME_LEGACY_CTA_KEY) : isPricingCta(b));
+      if (block) diffs.push({ route, page: { id: page.id, type: page.type, status: page.status }, action: specialCtaHasRequiredFields(block) ? 'keep-special' : 'update-special', blockId: block.id, target: specialCtaHasRequiredFields(block) ? undefined : mergeSpecialCtaDefaults(block, settings, route === '/' ? undefined : 'pricing-cta') });
+    }
+  }
   for (const page of pages) {
     const blocks = await db.listBlocks(page.id);
     const canonical = assertSingleCanonicalCta(blocks);
@@ -235,7 +246,10 @@ export async function applyCtaDefaults(db) {
   return withTransaction(db, async (tx) => {
     if (tx.createAuditSnapshot) await tx.createAuditSnapshot('cta-defaults-adopt-before:all-non-home');
     const diffs = await diffCtaDefaults(tx);
-    for (const diff of diffs) if (diff.action === 'insert') await tx.insertBlock(diff.page.id, diff.target);
+    for (const diff of diffs) {
+      if (diff.action === 'insert') await tx.insertBlock(diff.page.id, diff.target);
+      if (diff.action === 'update-special') await tx.updateBlock(diff.blockId, diff.target);
+    }
     return diffCtaDefaults(tx);
   });
 }

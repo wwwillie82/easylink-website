@@ -4,6 +4,7 @@ import ListingCards from '@/components/ListingCards.astro';
 import VideoMedia from '@/components/VideoMedia.astro';
 import AiPreviewBlock from '@/components/AiPreviewBlock.astro';
 import NetworkVisualBlock from '@/components/NetworkVisualBlock.astro';
+import { isRecognizedPageCta } from '@/lib/content/pageCta';
 const { blocks = [] } = Astro.props;
 const blockLabels = {
   text: 'Tartalom',
@@ -26,7 +27,7 @@ const safeId = (value) => String(value || '').trim().replace(/[^a-zA-Z0-9_.:-]/g
 ---
 <section class="section light">
   <div class="container blocks">
-    {blocks.map((block) => {
+    {blocks.filter((block) => !isRecognizedPageCta(block)).map((block) => {
       const type = block.type === 'list' ? 'feature-list' : block.type;
       const items = asArray(block.items);
       const eyebrow = block.eyebrow ?? blockLabels[block.type] ?? block.type;

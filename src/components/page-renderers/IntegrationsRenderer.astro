@@ -6,13 +6,14 @@ import ContentBlocks from '@/components/ContentBlocks.astro';
 import CTASection from '@/components/CTASection.astro';
 import { publishedIntegrations } from '@/content/integrations';
 import { findRoleBlock, withoutBlocks } from '@/lib/content/blockRoles';
+import { resolvePageCtaBlock } from '@/lib/content/pageCta';
 type Props = PublicPageRendererProps;
 const { page } = Astro.props;
 const introBlock = findRoleBlock(page?.blocks, 'integrations-intro', (block) => block.type === 'text');
 const importantBlock = findRoleBlock(page?.blocks, 'integrations-important', (block) => block.type === 'text' && block !== introBlock);
 const cardsBlock = findRoleBlock(page?.blocks, 'integrations-cards', (block) => ['cards', 'card-grid'].includes(block.type));
 const integrationCards = cardsBlock?.items?.length ? cardsBlock.items : publishedIntegrations.map((item) => ({ title: item.title, text: item.shortDescription, order: item.order, status: item.status }));
-const ctaSectionBlock = findRoleBlock(page?.blocks, 'cta-section', (block) => block.type === 'cta');
+const ctaSectionBlock = resolvePageCtaBlock(page?.blocks, { role: 'cta-section' });
 const remainingBlocks = withoutBlocks(page?.blocks, [introBlock, cardsBlock, importantBlock, ctaSectionBlock]);
 ---
 <PageHero eyebrow={page?.heroEyebrow ?? "integraciok"} title={page?.heroTitle ?? "Integrációk"} description={page?.heroDescription ?? "Az integrációs registry előkészíti a későbbi partner- és adatkapcsolati tartalmakat. Ahol nincs bizonyított éles kapcsolat, ott integrációs irányként kommunikálunk."} asset={page?.heroAsset || "/assets/nati/hero-bg-flow-02.webp"} height={page?.heroHeight} imageFit={page?.heroImageFit} imagePositionX={page?.heroImagePositionX} imagePositionY={page?.heroImagePositionY} imagePositionMobileX={page?.heroImagePositionMobileX} imagePositionMobileY={page?.heroImagePositionMobileY} overlayStrength={page?.heroOverlayStrength} imageScale={page?.heroImageScale} video={page?.heroVideo} />
