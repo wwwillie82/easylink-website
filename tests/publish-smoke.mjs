@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createPublishService, contentHash, ensureWebrootPermissions, stableJson } from '../src/lib/admin/publish.mjs';
 import { PUBLIC_SMOKE_METADATA_PATH } from '../src/lib/content/smoke-metadata.mjs';
+import { canonicalHomeBlockFixture } from '../src/lib/content/home-blocks.mjs';
 import { publishPanel } from '../src/lib/admin/render.mjs';
 
 
@@ -18,7 +19,32 @@ assert.match(adminPublishSource, /process\.env\.SITE_ADMIN_ENV_FILE/);
 assert.match(adminPublishSource, /required: true/);
 assert.match(adminPublishSource, /process\.env\[match\[1\]\] !== undefined/);
 
-const content = { navigation: [{ id: 1, title: 'A' }], pages: [{ id: 1, route: '/', type: 'home', title: 'Home' }, { id: 2, route: '/arak/', type: 'pricing', title: 'Árak' }], blocks: [], settings: [{ key: 'legalDocuments', value: JSON.stringify({ termsPdfPath: '/assets/site-media/2026/07/terms-a1b2c3d4.pdf' }) }], media: [
+const homeBlockRows = canonicalHomeBlockFixture().map((block, index) => {
+  const items = structuredClone(block.items);
+  if (block.blockKey === 'home:solutions') {
+    items[0] = { kind: 'card', target_type: 'page', target_page_id: 3, title_override: null, text_override: 'Pénzügy text', linkLabel: 'Részletek →', badge: 1 };
+    items[1] = { kind: 'card', target_type: 'page', target_page_id: 4, title_override: null, text_override: 'HR text', linkLabel: 'Részletek →', badge: 2 };
+    items[2] = { kind: 'card', target_type: 'page', target_page_id: 5, title_override: null, text_override: 'CRM text', linkLabel: 'Részletek →', badge: 3 };
+    items[3] = { kind: 'section-action', target_type: 'page', target_page_id: 2, title_override: 'Összes megoldás' };
+  }
+  if (block.blockKey === 'home:audiences') {
+    items[0] = { kind: 'card', target_type: 'page', target_page_id: 21, title_override: null, text_override: 'Hotel text', linkLabel: 'Részletek →', badge: 1 };
+    items[1] = { kind: 'card', target_type: 'page', target_page_id: 22, title_override: null, text_override: 'Vendéglátó text', linkLabel: 'Részletek →', badge: 2 };
+    items[2] = { kind: 'card', target_type: 'page', target_page_id: 23, title_override: null, text_override: 'Szolgáltató text', linkLabel: 'Részletek →', badge: 3 };
+  }
+  return { id: index + 10, page_id: 1, block_key: block.blockKey, type: block.type, title: block.title, body: block.body, items: JSON.stringify(items), sort_order: block.sortOrder, status: 'published' };
+});
+const content = { navigation: [{ id: 1, title: 'A' }], pages: [
+  { id: 1, route: '/', type: 'home', title: 'Home', status: 'published', hero_eyebrow: 'Home eyebrow', hero_title: 'Home title', hero_description: 'Home desc', hero_asset: '/assets/site-media/2026/07/kep-a1b2c3d4.png' },
+  { id: 2, route: '/megoldasaink/', type: 'solutions_index', title: 'Megoldásaink', status: 'published' },
+  { id: 3, route: '/megoldasaink/penzugy-szamlazas/', type: 'solution_detail', title: 'Pénzügy', status: 'published', seo_description: 'Pénzügy seo' },
+  { id: 4, route: '/megoldasaink/hr-munkaugy/', type: 'solution_detail', title: 'HR', status: 'published', seo_description: 'HR seo' },
+  { id: 5, route: '/megoldasaink/crm-ugyfelkezeles/', type: 'solution_detail', title: 'CRM', status: 'published', seo_description: 'CRM seo' },
+  { id: 21, route: '/kinek-szol/hotelek-szallashelyek/', type: 'audience_detail', title: 'Hotelek', status: 'published', seo_description: 'Hotel seo' },
+  { id: 22, route: '/kinek-szol/vendeglatohelyek/', type: 'audience_detail', title: 'Vendéglátó', status: 'published', seo_description: 'Vendéglátó seo' },
+  { id: 23, route: '/kinek-szol/szolgaltato-vallalkozasok/', type: 'audience_detail', title: 'Szolgáltató', status: 'published', seo_description: 'Szolgáltató seo' },
+  { id: 30, route: '/arak/', type: 'pricing', title: 'Árak', status: 'published' },
+], blocks: homeBlockRows, settings: [{ key: 'legalDocuments', value: JSON.stringify({ termsPdfPath: '/assets/site-media/2026/07/terms-a1b2c3d4.pdf' }) }], media: [
   { path: '/assets/site-media/2026/07/kep-a1b2c3d4.png', status: 'active', type: 'image/png' },
   { path: '/assets/site-media/2026/07/video-a1b2c3d4.mp4', status: 'active', processing_status: 'ready', type: 'video/mp4' },
   { path: '/assets/site-media/2026/07/terms-a1b2c3d4.pdf', status: 'active', processing_status: 'ready', type: 'application/pdf' },
@@ -51,9 +77,11 @@ const repo = {
   async prunePublishSnapshots(limit) { const success = snapshots.filter((s) => s.status === 'success'); for (const old of success.slice(0, Math.max(0, success.length - limit))) snapshots.splice(snapshots.indexOf(old), 1); },
 };
 async function writeValidRelease(releasePath) {
-  await mkdir(join(releasePath, 'arak'), { recursive: true });
-  await writeFile(join(releasePath, 'index.html'), '<!doctype html><title>Home</title>');
-  await writeFile(join(releasePath, 'arak', 'index.html'), '<!doctype html><title>Árak</title>');
+  for (const page of content.pages.filter((entry) => entry.status === undefined || entry.status === 'published')) {
+    const routePath = page.route === '/' ? '' : page.route.replace(/^\//, '').replace(/\/$/, '');
+    await mkdir(join(releasePath, routePath), { recursive: true });
+    await writeFile(join(releasePath, routePath, 'index.html'), `<!doctype html><title>${page.title}</title>`);
+  }
 }
 let deployedRelease = '';
 const service = createPublishService({ repo, env: { SITE_MEDIA_STORAGE_DIR: mediaStorage }, build: async ({ releasePath }) => { await writeValidRelease(releasePath); return { ok: true, log: 'built' }; }, deploy: async ({ releasePath }) => { deployed += 1; deployedRelease = releasePath; return { ok: true, log: 'deployed' }; } });

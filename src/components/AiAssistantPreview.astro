@@ -1,14 +1,24 @@
+---
+const { section = {} } = Astro.props;
+const eyebrow = section.eyebrow || 'AI asszisztens';
+const heading = section.heading || '';
+const body = section.body || '';
+const sources = Array.isArray(section.sources) ? section.sources : [];
+const messages = Array.isArray(section.messages) ? section.messages : [];
+const userMessages = messages.filter((message) => message.role === 'user');
+const assistantMessages = messages.filter((message) => message.role === 'assistant');
+---
 <section class="section ai">
   <div class="container ai-grid">
     <div class="ai-copy">
-      <span class="eyebrow">AI asszisztens</span>
-      <h2>Kérdezz, és a rendszered válaszol.</h2>
-      <p>Az AI blokk a háttérben látható adatáramlásra épít: pénzügy, CRM és adminisztráció adatai vezetői szintű válaszokká rendeződhetnek.</p>
+      <span class="eyebrow">{eyebrow}</span>
+      <h2>{heading}</h2>
+      <p>{body}</p>
     </div>
     <div class="chat">
-      <div class="source-row"><span>NAV</span><span>CRM</span><span>Banki státusz</span><span>Admin</span></div>
-      <div class="msg user">Mely ügyek igényelnek vezetői figyelmet ezen a héten?</div>
-      <div class="msg bot"><b>Javaslat</b><p>3 pénzügyi és 2 adminisztratív pontnál érdemes utánkövetést előkészíteni.</p></div>
+      <div class="source-row">{sources.map((source) => <span>{source.title}</span>)}</div>
+      {userMessages.map((message) => <div class="msg user">{message.text}</div>)}
+      {assistantMessages.map((message) => <div class="msg bot">{message.title && <b>{message.title}</b>}<p>{message.text}</p></div>)}
     </div>
   </div>
 </section>

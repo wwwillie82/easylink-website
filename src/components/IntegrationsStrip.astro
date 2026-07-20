@@ -1,23 +1,20 @@
 ---
-const integrations = [
-  'NAV Online Számla',
-  'Magyar bankok / PSD2 / Aggreg8',
-  'Hostware',
-  'Számlázz.hu',
-  'Billingo',
-  'Cégjelző',
-];
+const { section = {} } = Astro.props;
+const eyebrow = section.eyebrow || '';
+const heading = section.heading || '';
+const body = section.body || '';
+const nodes = Array.isArray(section.nodes) ? section.nodes : [];
 ---
 
 <section id="integrációk" class="integrations">
   <div class="container flow">
     <div>
-      <span class="eyebrow">Integrációs adatáramlás</span>
-      <h2>Kapcsolódási irányok csomópontokként.</h2>
-      <p>A blokk nem kész runtime integrációkat állít, hanem a későbbi adatkapcsolatok üzleti térképét mutatja.</p>
+      <span class="eyebrow">{eyebrow}</span>
+      <h2>{heading}</h2>
+      <p>{body}</p>
     </div>
     <div class="nodes">
-      {integrations.map((item) => <span>{item}</span>)}
+      {nodes.map((item) => <span>{item.label}</span>)}
     </div>
   </div>
 </section>

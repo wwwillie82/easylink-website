@@ -1,0 +1,41 @@
+---
+import ListingCards from '@/components/ListingCards.astro';
+import AiAssistantPreview from '@/components/AiAssistantPreview.astro';
+import IntegrationsStrip from '@/components/IntegrationsStrip.astro';
+const { sections = [] } = Astro.props;
+---
+{sections.map((section) => {
+  if (section.kind === 'intro') return (
+    <section class="section light intro-section">
+      <div class="container intro-grid">
+        <div>
+          <span class="eyebrow">{section.eyebrow}</span>
+          <h2>{section.heading}</h2>
+        </div>
+        <div><p>{section.body}</p></div>
+      </div>
+    </section>
+  );
+  if (section.kind === 'cards') return (
+    <section class:list={["section", { light: section.key === 'home:solutions' }]}>
+      <div class="container">
+        <span class="eyebrow">{section.eyebrow}</span>
+        <h2>{section.heading}</h2>
+        <ListingCards items={section.cards} />
+        {section.action && <p class="more"><a class="button button-secondary" href={section.action.href}>{section.action.label}</a></p>}
+      </div>
+    </section>
+  );
+  if (section.kind === 'ai-preview') return <AiAssistantPreview section={section} />;
+  if (section.kind === 'network-visual') return <IntegrationsStrip section={section} />;
+  throw new Error(`Ismeretlen home section kind: ${section.kind}`);
+})}
+
+<style>
+  .more { margin-top: 28px; }
+  .light { background: var(--color-soft); }
+  h2 { max-width: 900px; }
+  .intro-section { padding-bottom: 18px; }
+  .intro-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 42px; align-items: start; }
+  @media (max-width: 800px) { .intro-grid { grid-template-columns: 1fr; } }
+</style>

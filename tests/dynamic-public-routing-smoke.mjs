@@ -7,6 +7,7 @@ import ts from 'typescript';
 import { createRequire } from 'node:module';
 const nodeRequire = createRequire(import.meta.url);
 import { validateRelease } from '../src/lib/admin/publish.mjs';
+import { writePublicSmokeMetadata } from '../src/lib/content/smoke-metadata.mjs';
 import { assertRootHomePage, validateRootHomeSnapshot } from '../src/lib/content/root-invariant.mjs';
 
 function loadPublicPagesModule() {
@@ -149,12 +150,14 @@ const content = { pages: [
   { id: 6, route: '/draft-only/', type: 'content_page', title: 'Draft', status: 'draft' },
   { id: 7, route: '/sixth-route/', type: 'content_page', title: 'Sixth', status: 'published' },
 ] };
+await writePublicSmokeMetadata(release, content);
 assert.deepEqual(await validateRelease(release, content), { ok: true });
 assert.equal(existsSync(join(release, 'megoldasaink', 'index.html')), false);
 assert.equal(existsSync(join(release, 'arak', 'index.html')), false);
 assert.equal(existsSync(join(release, 'kapcsolat', 'index.html')), false);
 const missingSixth = await mkdtemp(join(tmpdir(), 'easylink-dynamic-release-missing-'));
 for (const route of ['/', '/megoldasainkok/', '/dijak/', '/elerhetoseg/', '/uzleti-megoldasok/crm-rendszer/']) { const clean = route.replace(/^\/+|\/+$/g, ''); const dir = clean ? join(missingSixth, clean) : missingSixth; await mkdir(dir, { recursive: true }); await writeFile(join(dir, 'index.html'), '<!doctype html>'); }
+await writePublicSmokeMetadata(missingSixth, content);
 const missingResult = await validateRelease(missingSixth, content);
 assert.equal(missingResult.ok, false);
 assert.match(missingResult.error, /Sixth .*sixth-route/);
