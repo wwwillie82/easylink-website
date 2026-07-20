@@ -1,10 +1,11 @@
 import http from 'node:http';
+import path from 'node:path';
 import { createReadStream } from 'node:fs';
 import { open, readFile, stat } from 'node:fs/promises';
 import { authenticate, signSession, sessionCookie, clearSessionCookie, requireAuthFromRequest } from './auth.mjs';
 import { parseJsonItems, validateLoginPayload } from './validation.mjs';
 import { layout, loginHtml, mediaPanel, navHtml, pageForm, pagesTable, publishPanel, settingsPanel } from './render.mjs';
-import { createPublishService, PublishInProgressError } from './publish.mjs';
+import { buildPreviewRelease, createPublishService, PublishInProgressError } from './publish.mjs';
 import { datedMediaTarget, finalizeStagedMediaFile, isVideoType, maxRequestBytes, mediaConfig, mediaValidationError, removeFileQuietly, storagePathForPublicPath, validateMediaFile } from './media-storage.mjs';
 import { parseMediaMultipart } from './multipart-upload.mjs';
 import { isValidHttpExternalUrl, normalizeNavigationTargetType, positiveNavigationPageId } from '../content/internal-links.mjs';
@@ -30,6 +31,13 @@ async function multipart(req, env) {
   return parseMediaMultipart(req, { env, maxBytes });
 }
 async function readHeader(filePath) { const fh = await open(filePath, 'r'); try { const b = Buffer.alloc(64); const { bytesRead } = await fh.read(b, 0, b.length, 0); return b.subarray(0, bytesRead); } finally { await fh.close(); } }
+const previewReleases = new Map();
+function decodePreviewPath(pathname) { try { return decodeURIComponent(String(pathname || '').replace(/^\/+/, '')); } catch { return null; } }
+function safePreviewPath(root, pathname) { const decoded = decodePreviewPath(pathname); if (decoded == null) return { error: 'malformed' }; const rel = decoded || 'index.html'; const withIndex = rel.endsWith('/') ? rel + 'index.html' : (path.extname(rel) ? rel : rel + '/index.html'); const target = path.normalize(path.join(root, withIndex)); if (!target.startsWith(path.normalize(root + path.sep))) return { error: 'traversal' }; return { filePath: target }; }
+function previewPrefix(pageId) { return `/admin/pages/${pageId}/home/preview`; }
+function rewritePreviewUrl(value, prefix) { if (!value || /^(https?:|mailto:|tel:|#)/i.test(value) || !value.startsWith('/')) return value; return `${prefix}${value}`; }
+function rewritePreviewBody(data, type, prefix) { const mime = String(type || '').toLowerCase(); if (!mime.startsWith('text/html') && !mime.startsWith('text/css')) return data; let text = data.toString('utf8'); if (mime.startsWith('text/html')) text = text.replace(/\b(href|src)=(["'])(\/[^"']*)\2/g, (_m, attr, quote, url) => `${attr}=${quote}${rewritePreviewUrl(url, prefix)}${quote}`); if (mime.startsWith('text/css')) text = text.replace(/url\((["']?)(\/[^)'"]+)\1\)/g, (_m, quote, url) => `url(${quote}${rewritePreviewUrl(url, prefix)}${quote})`); return Buffer.from(text, 'utf8'); }
+function contentTypeFor(filePath) { const ext = path.extname(String(filePath || '')).toLowerCase(); if (ext === '.html') return 'text/html; charset=utf-8'; if (ext === '.css') return 'text/css; charset=utf-8'; if (ext === '.js' || ext === '.mjs') return 'application/javascript; charset=utf-8'; if (ext === '.json') return 'application/json; charset=utf-8'; if (ext === '.svg') return 'image/svg+xml'; if (ext === '.webp') return 'image/webp'; if (ext === '.png') return 'image/png'; if (ext === '.jpg' || ext === '.jpeg') return 'image/jpeg'; if (ext === '.mp4') return 'video/mp4'; if (ext === '.woff') return 'font/woff'; if (ext === '.woff2') return 'font/woff2'; if (ext === '.ico') return 'image/x-icon'; return 'application/octet-stream'; }
 function sendFileRange(req, res, filePath, type) { return stat(filePath).then((s) => { const size = s.size; const headers = { 'content-type': type || 'application/octet-stream', 'cache-control': 'private, max-age=60', 'x-content-type-options': 'nosniff', 'accept-ranges': 'bytes' }; const range = req.headers.range; if (!range) { res.writeHead(200, { ...headers, 'content-length': size }); return createReadStream(filePath).pipe(res); } const m = /^bytes=(\d*)-(\d*)$/.exec(String(range)); if (!m) { res.writeHead(416, { ...headers, 'content-range': `bytes */${size}`, 'content-length': 0 }); return res.end(); } let start = m[1] === '' ? 0 : Number(m[1]); let end = m[2] === '' ? size - 1 : Number(m[2]); if (m[1] === '' && m[2] !== '') { const suffix = Number(m[2]); start = Math.max(0, size - suffix); end = size - 1; } if (!Number.isInteger(start) || !Number.isInteger(end) || start < 0 || end < start || start >= size) { res.writeHead(416, { ...headers, 'content-range': `bytes */${size}`, 'content-length': 0 }); return res.end(); } end = Math.min(end, size - 1); res.writeHead(206, { ...headers, 'content-range': `bytes ${start}-${end}/${size}`, 'content-length': end - start + 1 }); return createReadStream(filePath, { start, end }).pipe(res); }); }
 
 function positiveSortOrder(value) {
@@ -103,12 +111,37 @@ export function createAdminServer({ repo, env = process.env, publishService } = 
       if (!user) return url.pathname.startsWith('/api/') ? apiError(res, 401, 'UNAUTHENTICATED', 'Bejelentkezés szükséges.') : redirect(res, '/admin/login');
       if (url.pathname === '/api/admin/session') return json(res, 200, { ok: true, data: { user } });
       if (url.pathname === '/api/admin/pages') { if (req.method === 'POST') { const payload = await body(req); if (!payload.title || !payload.route) return apiError(res, 400, 'INVALID_PAGE', 'Oldalnév és URL szükséges.'); let data; try { data = await repo.createPage(payload); } catch (error) { if (error.status === 400 || error.code === 'VALIDATION_ERROR') return apiError(res, 400, 'INVALID_PAGE', error.message); throw error; } return json(res, 200, { ok: true, data, publish: await publishAfterSave(user, `Oldal létrehozás: ${data.id}`) }); } return json(res, 200, { ok: true, data: await repo.pages() }); }
+
+      if (/\/admin\/pages\/\d+\/home\/preview\/.*(?:%2e|%2f|\.\.)/i.test(req.url || '') || /^\/admin\/pages\/\d+\/home(?!\/preview|$)/.test(url.pathname)) return apiError(res, 400, 'INVALID_PREVIEW_PATH', 'Hibás előnézeti útvonal.');
+      const previewMatch = /^\/admin\/pages\/(\d+)\/home\/preview(?:\/(.*))?$/.exec(url.pathname);
+      if (previewMatch && req.method === 'GET') {
+        const page = await repo.page(previewMatch[1]);
+        if (!page?.page || page.page.route !== '/' || page.page.type !== 'home') return html(res, '<p class="msg err">Nem főoldal.</p>', 404);
+        let releasePath = previewReleases.get(String(previewMatch[1]));
+        if (!releasePath || !previewMatch[2]) {
+          const built = await buildPreviewRelease({ repo, env });
+          if (!built.ok) return html(res, `<p class="msg err">${built.error}</p>`, 500);
+          releasePath = built.releasePath;
+          previewReleases.set(String(previewMatch[1]), releasePath);
+          if (!previewMatch[2]) return redirect(res, `/admin/pages/${previewMatch[1]}/home/preview/index.html`);
+        }
+        const safe = safePreviewPath(releasePath, previewMatch[2] || 'index.html');
+        if (safe.error) return apiError(res, 400, 'INVALID_PREVIEW_PATH', 'Hibás előnézeti útvonal.');
+        const filePath = safe.filePath;
+        try { const type = contentTypeFor(filePath); const raw = await readFile(filePath); const data = rewritePreviewBody(raw, type, previewPrefix(previewMatch[1])); res.writeHead(200, { 'content-type': type, 'cache-control': 'private, no-store', 'x-content-type-options': 'nosniff' }); return res.end(data); }
+        catch { return html(res, '<p class="msg err">Előnézeti fájl nem található.</p>', 404); }
+      }
+      const homeApiMatch = /^\/api\/admin\/pages\/(\d+)\/home$/.exec(url.pathname);
+      if (homeApiMatch && req.method === 'PUT') {
+        try { const data = await repo.updateHomePageAtomic(homeApiMatch[1], await body(req)); return json(res, 200, { ok: true, data, warnings: data.warnings || [] }); }
+        catch (error) { const code = error.code || 'INVALID_HOME'; const status = code === 'HOME_EDIT_CONFLICT' ? 409 : (error.status || 400); return apiError(res, status, code, error.message || 'Hibás főoldal tartalom.', error.details); }
+      }
       if (url.pathname.startsWith('/api/admin/pages/')) {
         const id = url.pathname.split('/').pop();
         const page = await repo.page(id);
         if (!page) return apiError(res, 404, 'PAGE_NOT_FOUND', 'Az oldal nem található.');
         if (req.method === 'GET') return json(res, 200, { ok: true, data: page });
-        try { await repo.updatePage(id, await body(req)); } catch (error) { if (error.code === 'PAGE_IN_USE') return apiError(res, 409, 'PAGE_IN_USE', error.message, error.details); if (error.code === 'DUPLICATE_NAVIGATION_HREF') return apiError(res, 409, 'DUPLICATE_NAVIGATION_HREF', error.message, error.details); if (error.status === 400 || error.code === 'VALIDATION_ERROR') return apiError(res, 400, 'INVALID_PAGE', error.message); throw error; }
+        try { await repo.updatePage(id, await body(req)); } catch (error) { if (error.code === 'HOME_CANONICAL_USE_HOME_EDITOR') return apiError(res, 409, 'HOME_CANONICAL_USE_HOME_EDITOR', error.message); if (error.code === 'PAGE_IN_USE') return apiError(res, 409, 'PAGE_IN_USE', error.message, error.details); if (error.code === 'DUPLICATE_NAVIGATION_HREF') return apiError(res, 409, 'DUPLICATE_NAVIGATION_HREF', error.message, error.details); if (error.status === 400 || error.code === 'VALIDATION_ERROR') return apiError(res, 400, 'INVALID_PAGE', error.message); throw error; }
         return json(res, 200, { ok: true, publish: await publishAfterSave(user, `Oldal mentés: ${id}`) });
       }
       if (url.pathname === '/api/admin/blocks' && req.method === 'POST') {
@@ -117,10 +150,10 @@ export function createAdminServer({ repo, env = process.env, publishService } = 
         catch (error) { return apiError(res, 400, error.code || 'INVALID_BLOCK_JSON', error.message || 'Hibás JSON.'); }
         let data;
         try { data = await repo.upsertBlock(payload); }
-        catch (error) { if (error.status === 400 || error.code === 'VALIDATION_ERROR') return apiError(res, 400, 'INVALID_BLOCK', error.message); throw error; }
+        catch (error) { if (error.code === 'HOME_CANONICAL_USE_HOME_EDITOR') return apiError(res, 409, 'HOME_CANONICAL_USE_HOME_EDITOR', error.message); if (error.status === 400 || error.code === 'VALIDATION_ERROR') return apiError(res, 400, 'INVALID_BLOCK', error.message); throw error; }
         return json(res, 200, { ok: true, data, publish: await publishAfterSave(user, `Blokk mentés: ${payload.page_id}`) });
       }
-      if (url.pathname.startsWith('/api/admin/blocks/') && req.method === 'DELETE') { await repo.deleteBlock(url.pathname.split('/').pop()); return json(res, 200, { ok: true, publish: await publishAfterSave(user, `Blokk inaktiválás`) }); }
+      if (url.pathname.startsWith('/api/admin/blocks/') && req.method === 'DELETE') { try { await repo.deleteBlock(url.pathname.split('/').pop()); return json(res, 200, { ok: true, publish: await publishAfterSave(user, `Blokk inaktiválás`) }); } catch (error) { if (error.code === 'HOME_CANONICAL_USE_HOME_EDITOR') return apiError(res, 409, 'HOME_CANONICAL_USE_HOME_EDITOR', error.message); throw error; } }
       if (url.pathname === '/api/admin/settings') { if (req.method === 'GET') return json(res, 200, { ok: true, data: await repo.getSiteSettings() }); if (req.method === 'PUT' || req.method === 'POST') { try { const data = await repo.updateSiteSettings(await body(req), env); return json(res, 200, { ok: true, data, publish: await publishAfterSave(user, 'Alapadatok mentés') }); } catch (error) { if (error.status === 400 || error.code === 'VALIDATION_ERROR') return apiError(res, 400, 'INVALID_SETTINGS', error.message); throw error; } } }
       if (url.pathname === '/api/admin/navigation') { if (req.method === 'GET') return json(res, 200, { ok: true, data: await repo.nav() }); const pages = await repo.pages(); const valid = validateNavPayload(await body(req), pages); if (!valid.ok) return json(res, valid.error?.code === 'NAVIGATION_TARGET_PAGE_NOT_PUBLISHED' ? 409 : 400, valid); let navigationIds; try { navigationIds = await repo.updateNav(valid.data); } catch (error) { if (error.code === 'NAVIGATION_TARGET_PAGE_NOT_PUBLISHED') return apiError(res, 409, 'NAVIGATION_TARGET_PAGE_NOT_PUBLISHED', error.message, error.details); if (error.status === 400 || error.code === 'VALIDATION_ERROR' || error.code === 'ER_DUP_ENTRY') return apiError(res, 400, navValidationCode(error), error.code === 'ER_DUP_ENTRY' || /Duplikált menüpont link/i.test(String(error.message || '')) ? 'Duplikált menüpont link.' : error.message); throw error; } return json(res, 200, { ok: true, data: { navigationIds }, publish: await publishAfterSave(user, 'Menü mentés') }); }
       if (url.pathname === '/api/admin/media') {

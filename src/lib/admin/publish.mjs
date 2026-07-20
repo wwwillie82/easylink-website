@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import { chmod, mkdir, mkdtemp, readdir, stat } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, readdir, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
@@ -21,7 +21,7 @@ export function contentHash(content) { return crypto.createHash('sha256').update
 
 async function exists(filePath) { try { await stat(filePath); return true; } catch { return false; } }
 
-async function ensureReleasesRoot(releasesRoot) {
+export async function ensureReleasesRoot(releasesRoot) {
   try {
     await mkdir(releasesRoot, { recursive: true });
   } catch (error) {
@@ -75,7 +75,7 @@ export async function validateRelease(releasePath, content = {}) {
   return { ok: true };
 }
 
-function runCommand(command, args, options = {}) {
+export function runCommand(command, args, options = {}) {
   return new Promise((resolve) => {
     const child = spawn(command, args, { ...options, shell: false });
     let out = '';
@@ -86,20 +86,47 @@ function runCommand(command, args, options = {}) {
   });
 }
 
-export function createPublishService({ repo, env = process.env, build, deploy } = {}) {
-  if (!repo) throw new Error('createPublishService requires repo');
-  let locked = false;
+export function createBuildFunctions({ env = process.env, build, deploy } = {}) {
   const buildFn = build || (async ({ releasePath }) => runCommand(env.SITE_PUBLISH_BUILD_COMMAND || 'npm', (env.SITE_PUBLISH_BUILD_ARGS || 'run build').split(/\s+/), { cwd: env.SITE_PUBLISH_REPO_DIR || process.cwd(), env: { ...process.env, ...env, SITE_PUBLISH_OUT_DIR: releasePath, OUT_DIR: releasePath } }));
-  const deployFn = deploy || (async ({ releasePath }) => {
+  const deployFn = deploy || (async ({ releasePath, content }) => {
     const webroot = env.SITE_PUBLISH_WEBROOT;
     if (!webroot) return { ok: true, log: 'SITE_PUBLISH_WEBROOT nincs beállítva, deploy kihagyva.' };
     await mkdir(webroot, { recursive: true });
-    // Best-effort safe deploy for shared hosting: build already happened in a temp release dir;
-    // rsync uses delayed updates so the current webroot is only touched after a complete successful build.
     const result = await runCommand('rsync', ['-a', '--delete', '--delay-updates', `${releasePath}/`, `${webroot}/`]);
     if (result.ok) await ensureWebrootPermissions(webroot);
     return result;
   });
+  return { buildFn, deployFn };
+}
+
+export async function cleanupPreviewReleases(root, keep = 5) {
+  try {
+    const entries = (await readdir(root, { withFileTypes: true })).filter((entry) => entry.isDirectory() && entry.name.startsWith('easylink-preview-'));
+    const dated = await Promise.all(entries.map(async (entry) => { const full = path.join(root, entry.name); const s = await stat(full); return { full, mtimeMs: s.mtimeMs }; }));
+    for (const entry of dated.sort((a, b) => b.mtimeMs - a.mtimeMs).slice(Math.max(0, keep))) await rm(entry.full, { recursive: true, force: true });
+  } catch { /* best-effort preview cleanup */ }
+}
+
+export async function buildPreviewRelease({ repo, env = process.env, build } = {}) {
+  const content = await repo.exportContentSnapshot();
+  const releasesRoot = env.SITE_PREVIEW_RELEASES_DIR || env.SITE_PUBLISH_PREVIEW_DIR || path.join(env.SITE_PUBLISH_RELEASES_DIR || tmpdir(), 'previews');
+  await ensureReleasesRoot(releasesRoot);
+  await cleanupPreviewReleases(releasesRoot, Number(env.SITE_PREVIEW_KEEP || 5));
+  const releasePath = await mkdtemp(path.join(releasesRoot, 'easylink-preview-'));
+  const { buildFn } = createBuildFunctions({ env, build });
+  const built = await buildFn({ releasePath, content, env });
+  if (!built.ok) return { ok: false, error: built.log || 'Preview build hiba.', releasePath };
+  await writePublicSmokeMetadata(releasePath, content);
+  const release = await validateRelease(releasePath, content);
+  if (!release.ok) return { ok: false, error: release.error, releasePath };
+  await copyMediaToRelease({ releasePath, env, media: content.media });
+  return { ok: true, releasePath, content_hash: contentHash(content) };
+}
+
+export function createPublishService({ repo, env = process.env, build, deploy } = {}) {
+  if (!repo) throw new Error('createPublishService requires repo');
+  let locked = false;
+  const { buildFn, deployFn } = createBuildFunctions({ env, build, deploy });
 
   async function publish({ adminId = null, label = null } = {}) {
     if (locked) throw new PublishInProgressError();
