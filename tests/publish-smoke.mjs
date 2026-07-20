@@ -4,6 +4,7 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createPublishService, contentHash, ensureWebrootPermissions, stableJson } from '../src/lib/admin/publish.mjs';
+import { PUBLIC_SMOKE_METADATA_PATH } from '../src/lib/content/smoke-metadata.mjs';
 import { publishPanel } from '../src/lib/admin/render.mjs';
 
 
@@ -69,6 +70,13 @@ assert.equal(existsSync(join(deployedRelease, 'assets', 'site-media', '2026', '0
 assert.equal(existsSync(join(deployedRelease, 'assets', 'site-media', '2026', '07', 'archived-a1b2c3d4.mp4')), false);
 assert.equal(existsSync(join(deployedRelease, 'assets', 'site-media', '2026', '07', 'archived-doc-a1b2c3d4.pdf')), false);
 assert.equal(existsSync(join(deployedRelease, 'assets', 'site-media', '2026', '07', 'orphan-a1b2c3d4.mp4')), false);
+const smokeMetadata = JSON.parse(await readFile(join(deployedRelease, PUBLIC_SMOKE_METADATA_PATH.replace(/^\//, '')), 'utf8'));
+assert.equal(smokeMetadata.source, 'admin-publish-snapshot');
+assert.deepEqual(Object.keys(smokeMetadata).sort(), ['defaultCta', 'pages', 'source', 'version']);
+assert.deepEqual(Object.keys(smokeMetadata.pages[0]).sort(), ['ctaBlock', 'ctaRole', 'route', 'type']);
+assert.equal('blocks' in smokeMetadata.pages[0], false);
+assert.equal('settings' in smokeMetadata, false);
+assert.equal('media' in smokeMetadata, false);
 
 let buildEnvSeen;
 const missingReleasesRoot = join(tmpdir(), `easylink-missing-releases-${Date.now()}-${Math.random().toString(16).slice(2)}`, 'releases');

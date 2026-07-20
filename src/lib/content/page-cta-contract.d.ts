@@ -1,4 +1,5 @@
 export const HOME_LEGACY_CTA_KEY: '/:cta:4';
+export const HOME_LEGACY_CTA_ROLE: 'home-legacy-cta';
 export const PAGE_CTA_ROLES: readonly string[];
 export const PAGE_CTA_MODES: readonly ['global', 'custom', 'hidden'];
 export type PageCtaMode = typeof PAGE_CTA_MODES[number];

@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { copyMediaToRelease } from './media-storage.mjs';
+import { PUBLIC_SMOKE_METADATA_PATH, writePublicSmokeMetadata } from '../content/smoke-metadata.mjs';
 import { validateContentReferences, referenceValidationSummary } from '../content/reference-validation.mjs';
 import { normalizeRootInvariantRoute, validateRootHomeSnapshot } from '../content/root-invariant.mjs';
 
@@ -53,6 +54,7 @@ export async function validateRelease(releasePath, content = {}) {
   const entries = await readdir(releasePath);
   if (entries.length === 0) return { ok: false, error: 'Release könyvtár üres.' };
   if (!(await exists(path.join(releasePath, 'index.html')))) return { ok: false, error: 'Release index.html hiányzik.' };
+  if (!(await exists(path.join(releasePath, PUBLIC_SMOKE_METADATA_PATH.replace(/^\//, ''))))) return { ok: false, error: 'Live smoke metadata hiányzik.' };
   if (Array.isArray(content.pages)) {
     const rootInvariant = validateRootHomeSnapshot(content.pages);
     if (!rootInvariant.ok) return rootInvariant;
@@ -116,6 +118,7 @@ export function createPublishService({ repo, env = process.env, build, deploy } 
       releasePath = await mkdtemp(path.join(releasesRoot, 'easylink-release-'));
       const built = await buildFn({ releasePath, content, env });
       if (!built.ok) { await repo.markPublishFinished(snapshotId, { status: 'failed', build_log_excerpt: built.log }); return { ok: false, status: 'failed', contentSaved: true, liveUnchanged: true, error: built.log || 'Build hiba.' }; }
+      await writePublicSmokeMetadata(releasePath, content);
       const release = await validateRelease(releasePath, content);
       if (!release.ok) { await repo.markPublishFinished(snapshotId, { status: 'failed', build_log_excerpt: release.error, release_path: releasePath }); return { ok: false, status: 'failed', contentSaved: true, liveUnchanged: true, error: release.error }; }
       const mediaCopy = await copyMediaToRelease({ releasePath, env, media: content.media });

@@ -1,7 +1,8 @@
 import { CTA_SECTION_ROLE, PRICING_CTA_ROLE, blockItems, isCanonicalCtaSection, isPricingCta, normalizeDefaultCta } from './cta-contract.mjs';
 
 export const HOME_LEGACY_CTA_KEY = '/:cta:4';
-export const PAGE_CTA_ROLES = Object.freeze([CTA_SECTION_ROLE, PRICING_CTA_ROLE, 'home-legacy-cta']);
+export const HOME_LEGACY_CTA_ROLE = 'home-legacy-cta';
+export const PAGE_CTA_ROLES = Object.freeze([CTA_SECTION_ROLE, PRICING_CTA_ROLE, HOME_LEGACY_CTA_ROLE]);
 
 const keyOf = (block) => block?.blockKey ?? block?.block_key ?? '';
 const hasText = (value) => String(value ?? '').trim().length > 0;
@@ -25,7 +26,7 @@ export function pageCtaRoles(block) {
   return [
     isCanonicalCtaSection(block) ? CTA_SECTION_ROLE : '',
     isPricingCta(block) ? PRICING_CTA_ROLE : '',
-    isHomeLegacyCta(block) ? 'home-legacy-cta' : '',
+    isHomeLegacyCta(block) ? HOME_LEGACY_CTA_ROLE : '',
   ].filter(Boolean);
 }
 
@@ -69,7 +70,7 @@ export function resolvedCtaToBlock(resolved) {
   const c = resolved.content || {};
   const tracking = resolved.meta?.tracking || {};
   const item = { ...tracking, eyebrow: c.eyebrow || '', label: c.primaryLabel || '', url: c.primaryUrl || '', secondaryLabel: c.secondaryLabel || '', secondaryUrl: c.secondaryUrl || '', ctaMode: resolved.mode };
-  if (resolved.meta?.role && resolved.meta.role !== 'home-legacy-cta') item.presentationRole = fillIfBlank(item.presentationRole, resolved.meta.role);
+  if (resolved.meta?.role && resolved.meta.role !== HOME_LEGACY_CTA_ROLE) item.presentationRole = fillIfBlank(item.presentationRole, resolved.meta.role);
   return { ...(resolved.rawBlock || {}), title: c.title || '', body: c.description || '', items: [item], resolvedPageCta: resolved };
 }
 
