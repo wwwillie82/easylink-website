@@ -26,7 +26,9 @@ assert.equal(cfg.objectFit, 'cover');
 for (const bad of ['../x.mp4','/assets/site-media/../x.mp4','/assets/site-media/x.mp4?x=1','https://cdn/x.mp4']) assert.throws(() => assertMediaPath(bad));
 
 const blocks = await readFile('src/lib/admin/render/blocks.mjs','utf8');
-assert.match(blocks, /\['video','Videó blokk'\]/);
+const registry = await readFile('src/lib/content/block-registry.mjs','utf8');
+assert.match(registry, /type: 'video'/);
+assert.match(registry, /label: 'Videó blokk'/);
 assert.match(blocks, /data-media-picker-kind="video"/);
 assert.match(blocks, /data-media-picker-kind="image"/);
 assert.match(blocks, /getVideoRows/);

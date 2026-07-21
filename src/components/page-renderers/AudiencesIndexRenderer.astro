@@ -18,6 +18,6 @@ const remainingBlocks = withoutBlocks(page?.blocks, [cardsBlock, ctaSectionBlock
 ---
 <PageHero eyebrow={page?.heroEyebrow ?? "kinek-szol"} title={page?.heroTitle ?? "Kinek szól?"} description={page?.heroDescription ?? "A public site külön route-okon mutatja be, mely vállalkozásoknak ad könnyebb cégvezetést az Easylink."} asset={page?.heroAsset || undefined} height={page?.heroHeight} imageFit={page?.heroImageFit} imagePositionX={page?.heroImagePositionX} imagePositionY={page?.heroImagePositionY} imagePositionMobileX={page?.heroImagePositionMobileX} imagePositionMobileY={page?.heroImagePositionMobileY} overlayStrength={page?.heroOverlayStrength} imageScale={page?.heroImageScale} video={page?.heroVideo} />
 <section class="section light"><div class="container"><ListingCards items={audienceCards} /></div></section>
-{remainingBlocks.length > 0 && <ContentBlocks blocks={remainingBlocks} />}
+{remainingBlocks.length > 0 && <ContentBlocks blocks={remainingBlocks} routeIndex={routeIndex} />}
 <CTASection block={ctaSectionBlock} />
 <style>.light { background: var(--color-soft); }</style>

@@ -4,18 +4,22 @@ import Header from '@/components/Header.astro';
 import Hero from '@/components/Hero.astro';
 import CTASection from '@/components/CTASection.astro';
 import Footer from '@/components/Footer.astro';
-import HomeRenderer from '@/components/home/HomeRenderer.astro';
+import ContentBlocks from '@/components/ContentBlocks.astro';
 import { getPublicPageState, getPublicRouteIndex } from '@/lib/content/provider';
 import { assertRootHomePage } from '@/lib/content/root-invariant.mjs';
 import { resolvePageCtaBlock } from '@/lib/content/pageCta';
-import { normalizeHomePage } from '@/lib/content/home-blocks.mjs';
+import { normalizeHomePage, homeMiddleContentBlocks, homeContentMode, HOME_HERO_META_KEY } from '@/lib/content/home-blocks.mjs';
 const pageState = await getPublicPageState('/');
 const homePage = pageState.page;
 const { mode, routeIndex } = await getPublicRouteIndex();
 if (!homePage && !pageState.hiddenByDb && mode === 'db-authoritative') throw new Error('Hiányzó published home oldal DB authoritative módban: route=/ type=home');
 if (homePage) assertRootHomePage(homePage, 'Főoldal build context');
 const homeRouteContext = homePage ?? { title: 'Home', route: '/', type: 'home', status: 'published', blocks: [] };
-const normalizedHome = pageState.hiddenByDb ? { heroMeta: { subtitle: '', benefits: [] }, middle: [] } : normalizeHomePage({ page: homeRouteContext, mode, routeIndex });
+const contentMode = pageState.hiddenByDb ? 'empty' : homeContentMode(homeRouteContext.blocks || []);
+const heroMetaBlock = (homeRouteContext.blocks || []).find((block) => (block.blockKey || block.block_key) === HOME_HERO_META_KEY);
+const fallbackHeroMeta = { subtitle: heroMetaBlock?.title || '', benefits: Array.isArray(heroMetaBlock?.items) ? heroMetaBlock.items : [] };
+const normalizedHome = pageState.hiddenByDb ? { heroMeta: { subtitle: '', benefits: [] }, middle: [] } : (contentMode === 'legacy' || contentMode === 'empty' ? normalizeHomePage({ page: homeRouteContext, mode, routeIndex }) : { heroMeta: fallbackHeroMeta, middle: [] });
+const middleBlocks = pageState.hiddenByDb ? [] : homeMiddleContentBlocks({ page: homeRouteContext, mode, routeIndex });
 const homeCtaBlock = resolvePageCtaBlock(homePage?.blocks, { role: 'home-legacy-cta' });
 if (pageState.hiddenByDb) Astro.response.status = 404;
 ---
@@ -25,7 +29,7 @@ if (pageState.hiddenByDb) Astro.response.status = 404;
   <main>
     {pageState.hiddenByDb ? <section class="section"><div class="container"><h1>Az oldal nem található.</h1></div></section> : <>
     <Hero page={homePage} hero={{ heroAsset: homePage?.heroAsset, heroVideo: homePage?.heroVideo, heroHeight: homePage?.heroHeight, heroImageFit: homePage?.heroImageFit, heroImagePositionX: homePage?.heroImagePositionX, heroImagePositionY: homePage?.heroImagePositionY, heroImagePositionMobileX: homePage?.heroImagePositionMobileX, heroImagePositionMobileY: homePage?.heroImagePositionMobileY, heroOverlayStrength: homePage?.heroOverlayStrength, heroImageScale: homePage?.heroImageScale }} heroMeta={normalizedHome.heroMeta} />
-    <HomeRenderer sections={normalizedHome.middle} />
+    <ContentBlocks blocks={middleBlocks} routeIndex={routeIndex} layout="stacked-sections" />
     <CTASection block={homeCtaBlock} />
     </>}
   </main>

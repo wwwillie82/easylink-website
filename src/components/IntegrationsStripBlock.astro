@@ -1,0 +1,28 @@
+---
+const { block = {} } = Astro.props;
+const items = Array.isArray(block.items) ? block.items : [];
+const heading = items.find((item) => item?.kind === 'heading')?.text || items.find((item) => item?.kind === 'heading')?.heading || '';
+const nodes = items.filter((item) => item?.kind === 'node').map((item) => ({ id: item.id || '', label: item.label || item.title || '' })).filter((item) => item.id && item.label);
+---
+<div id="integrációk" class="integrations integrations-strip" data-integrations-strip-block>
+  <div class="flow">
+    <div>
+      <span class="eyebrow">{block.title || ''}</span>
+      <h2>{heading}</h2>
+      {block.body && <p>{block.body}</p>}
+    </div>
+    <div class="nodes">
+      {nodes.map((item) => <span>{item.label}</span>)}
+    </div>
+  </div>
+</div>
+<style>
+  .integrations { color: white; }
+  .flow { display: grid; grid-template-columns: 0.82fr 1.18fr; gap: 36px; align-items: center; }
+  .flow h2 { font-size: clamp(1.8rem, 3.2vw, 3rem); }
+  .flow p { color: rgba(255, 255, 255, 0.72); }
+  .nodes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; position: relative; }
+  .nodes span { min-height: 82px; border: 1px solid rgba(174, 255, 0, 0.28); border-radius: 20px; padding: 16px; display: grid; place-items: center; text-align: center; background: rgba(255, 255, 255, 0.075); backdrop-filter: blur(8px); font-weight: 800; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.055); }
+  @media (max-width: 900px) { .flow { grid-template-columns: 1fr; } .nodes { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 560px) { .nodes { grid-template-columns: 1fr; } }
+</style>

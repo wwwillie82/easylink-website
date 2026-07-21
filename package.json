@@ -39,8 +39,8 @@
     "smoke:menu-a2b": "node tests/menu-a2b-smoke.mjs",
     "smoke:navigation-integrity": "node tests/navigation-integrity-smoke.mjs",
     "smoke:dynamic-public-routing": "node tests/dynamic-public-routing-smoke.mjs",
-    "smoke:home-a4": "node tests/home-blocks-smoke.mjs && node tests/home-card-targets-smoke.mjs && node tests/home-render-smoke.mjs && node tests/home-adopt-smoke.mjs",
-    "smoke:home-a5": "node tests/admin-home-ui-smoke.mjs && node tests/admin-home-api-smoke.mjs && node tests/admin-home-repository-smoke.mjs && node tests/admin-home-preview-smoke.mjs && node tests/home-blocks-smoke.mjs && node tests/home-card-targets-smoke.mjs && node tests/home-render-smoke.mjs && node tests/home-adopt-smoke.mjs"
+    "smoke:home-a4": "node tests/home-blocks-smoke.mjs && node tests/home-card-targets-smoke.mjs && node tests/home-render-smoke.mjs && node tests/home-adopt-smoke.mjs && node tests/block-registry-smoke.mjs && node tests/home-generic-architecture-smoke.mjs && node tests/home-generic-adopt-smoke.mjs",
+    "smoke:home-a5": "node tests/admin-home-ui-smoke.mjs && node tests/admin-home-api-smoke.mjs && node tests/admin-home-repository-smoke.mjs && node tests/admin-home-preview-smoke.mjs && node tests/home-blocks-smoke.mjs && node tests/home-card-targets-smoke.mjs && node tests/home-render-smoke.mjs && node tests/home-adopt-smoke.mjs && node tests/block-registry-smoke.mjs && node tests/home-generic-architecture-smoke.mjs && node tests/home-generic-adopt-smoke.mjs"
   },
   "dependencies": {
     "astro": "7.0.5",

@@ -1,6 +1,8 @@
 import { buildPageIndexById, resolveCardTarget, rawCardTargetType } from './card-targets.mjs';
 import { HOME_LEGACY_CTA_KEY } from './page-cta-contract.mjs';
 import { assertRootHomePage } from './root-invariant.mjs';
+import { normalizeBlockItemsByType } from './block-contracts.mjs';
+import { isSupportedBlockType } from './block-registry.mjs';
 
 export const HOME_HERO_META_KEY = 'home:hero-meta';
 export const HOME_INTRO_KEY = 'home:intro';
@@ -252,7 +254,15 @@ export function validatePublishedHomeBlocksForSnapshot(content = {}) {
   const routeIndex = { pages };
   try {
     assertRootHomePage(home, 'Home snapshot reference validation');
-    normalizeHomePage({ page: canonicalHomePage({ ...home, blocks: published.map((block) => ({ ...block, blockKey: block.block_key, sortOrder: block.sort_order, items: typeof block.items === 'string' && block.items ? JSON.parse(block.items) : (Array.isArray(block.items) ? block.items : []) })), allBlockMeta: homeBlocks.map(homeBlockMeta) }), mode: 'db-authoritative', routeIndex });
+    const parsedPublished = published.map((block) => ({ ...block, blockKey: block.block_key, sortOrder: block.sort_order, items: typeof block.items === 'string' && block.items ? JSON.parse(block.items) : (Array.isArray(block.items) ? block.items : []) }));
+    const parsedAll = homeBlocks.map((block) => ({ ...block, blockKey: block.block_key, sortOrder: block.sort_order, items: typeof block.items === 'string' && block.items ? JSON.parse(block.items) : (Array.isArray(block.items) ? block.items : []) }));
+    const state = homeContentMode(parsedAll);
+    if (state === 'legacy' || state === 'empty') normalizeHomePage({ page: canonicalHomePage({ ...home, blocks: parsedPublished, allBlockMeta: parsedAll.map(homeBlockMeta) }), mode: 'db-authoritative', routeIndex });
+    const middle = homeMiddleContentBlocks({ page: { ...home, blocks: parsedPublished }, mode: 'db-authoritative', routeIndex });
+    for (const block of middle) {
+      if (!isSupportedBlockType(block.type)) throw homeError('HOME_PUBLISHED_UNKNOWN_BLOCK_TYPE', `Ismeretlen published home blokk típus: ${block.type}`, { blockKey: block.block_key || block.blockKey, type: block.type });
+      normalizeBlockItemsByType(block.type, block.items || [], { block, status: 'published', pages, requirePublishedTargets: ['cards','card-grid'].includes(block.type), path: `blocks.${block.block_key || block.id}.items` });
+    }
   }
   catch (error) { errors.push({ code: error.code || 'HOME_CONTENT_INVALID', message: error.message, details: error.details || {} }); }
   return errors;
@@ -260,3 +270,49 @@ export function validatePublishedHomeBlocksForSnapshot(content = {}) {
 
 export function canonicalHomeBlockFixture() { return JSON.parse(JSON.stringify(staticHomeBlocksFixture)); }
 export { rawCardTargetType, HOME_LEGACY_CTA_KEY };
+
+export const genericHomeMiddleTypes = Object.freeze(['text','feature-list','list','cards','card-grid','cta','image-text','video','faq','ai-preview','network-visual','split-text','ai-assistant-preview','integrations-strip']);
+export function isHomeHeroMetaBlock(block = {}) { return blockKeyOf(block) === HOME_HERO_META_KEY; }
+export function isLegacyCanonicalHomeMiddleBlock(block = {}) { const spec = canonicalHomeBlocks[blockKeyOf(block)]; if (!middleHomeBlockKeys.includes(blockKeyOf(block)) || spec?.type !== block?.type) return false; if (block?.type === 'cards' && itemsOf(block)[0]?.version === 2) return false; return true; }
+export function isGenericHomeMiddleBlock(block = {}) { return !isHomeHeroMetaBlock(block) && !isLegacyCanonicalHomeMiddleBlock(block) && genericHomeMiddleTypes.includes(String(block?.type || '')); }
+function legacyCardItemsToV2(items = []) {
+  const cards = [];
+  let action = null;
+  for (const item of items || []) {
+    if (item?.kind === 'section-action') action = { target_type: item.target_type || 'legacy', target_page_id: item.target_page_id, href: item.href || item.url || '', label: item.title_override || item.title || item.label || '' };
+    else cards.push({ target_type: item?.target_type || 'legacy', target_page_id: item?.target_page_id, href: item?.href || item?.url || '', title: item?.title_override || item?.title || '', title_override: item?.title_override || '', text: item?.text_override || item?.text || '', text_override: item?.text_override || '', linkLabel: item?.linkLabel || item?.label || '', badge: item?.badge ?? item?.order ?? '' });
+  }
+  return [{ version: 2, variant: 'default', cards, action }];
+}
+export function legacyHomeBlockToGenericBlock(block = {}) {
+  const key = blockKeyOf(block);
+  const base = { ...block, blockKey: key, block_key: key, sortOrder: sortOrderOf(block), sort_order: sortOrderOf(block), status: block.status || 'published' };
+  if (key === HOME_INTRO_KEY) return { ...base, type: 'split-text', items: [{ version: 1, heading: itemsOf(block)[0]?.heading || itemsOf(block)[0]?.text || '', layout: 'split' }] };
+  if (key === HOME_SOLUTIONS_KEY || key === HOME_AUDIENCES_KEY) return { ...base, type: 'cards', items: legacyCardItemsToV2(itemsOf(block)) };
+  if (key === HOME_AI_KEY) return { ...base, type: 'ai-assistant-preview' };
+  if (key === HOME_INTEGRATIONS_KEY) return { ...base, type: 'integrations-strip' };
+  return base;
+}
+export function homeContentMode(blocks = []) {
+  const publishedMiddle = (blocks || []).filter((block) => block?.status !== 'archived' && !isHomeHeroMetaBlock(block));
+  const legacy = publishedMiddle.filter(isLegacyCanonicalHomeMiddleBlock);
+  const generic = publishedMiddle.filter((block) => !isLegacyCanonicalHomeMiddleBlock(block));
+  if (generic.length && legacy.length) return 'mixed';
+  if (generic.length) return 'generic';
+  if (legacy.length) return 'legacy';
+  return 'empty';
+}
+export function homeMiddleContentBlocks({ page, mode = 'static', routeIndex } = {}) {
+  const blocks = page?.blocks || [];
+  const state = homeContentMode(blocks);
+  const withRouteIndex = (block) => ({ ...block, routeIndex });
+  const middle = blocks
+    .filter((block) => block?.status === 'published' && !isHomeHeroMetaBlock(block) && (block.block_key || block.blockKey) !== HOME_LEGACY_CTA_KEY && block.type !== 'cta')
+    .map((block) => isLegacyCanonicalHomeMiddleBlock(block) ? legacyHomeBlockToGenericBlock(block) : block)
+    .filter((block) => genericHomeMiddleTypes.includes(String(block?.type || '')))
+    .sort((a,b)=>sortOrderOf(a)-sortOrderOf(b)||idOf(a)-idOf(b))
+    .map(withRouteIndex);
+  if (middle.length || state !== 'empty') return middle;
+  if (mode === 'static') return staticHomeBlocksFixture.filter(isLegacyCanonicalHomeMiddleBlock).map((block) => withRouteIndex(legacyHomeBlockToGenericBlock(block)));
+  return [];
+}

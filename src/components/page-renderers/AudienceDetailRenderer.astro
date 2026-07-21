@@ -14,6 +14,6 @@ const contentBlocks = withoutBlocks(page.blocks, [ctaSectionBlock]);
 const related = relatedPages(routeIndex, page, 'audience_detail');
 ---
 <PageHero eyebrow="Kinek szól?" title={page.heroTitle} description={page.heroDescription} variant="detail" asset={page.heroAsset || undefined} height={page.heroHeight} imageFit={page.heroImageFit} imagePositionX={page.heroImagePositionX} imagePositionY={page.heroImagePositionY} imagePositionMobileX={page.heroImagePositionMobileX} imagePositionMobileY={page.heroImagePositionMobileY} overlayStrength={page.heroOverlayStrength} imageScale={page.heroImageScale} video={page.heroVideo} />
-<ContentBlocks blocks={contentBlocks} />
+<ContentBlocks blocks={contentBlocks} routeIndex={routeIndex} />
 <RelatedLinks links={related} />
 <CTASection block={ctaSectionBlock} />

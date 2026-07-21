@@ -9,7 +9,7 @@ import { safeContactIntro } from '@/lib/content/contact.mjs';
 import { findRoleBlock, withoutBlocks } from '@/lib/content/blockRoles';
 import { resolvePageCtaBlock } from '@/lib/content/pageCta';
 type Props = PublicPageRendererProps;
-const { page } = Astro.props;
+const { page, routeIndex } = Astro.props;
 const ctaBlock = findRoleBlock(page?.blocks, 'contact-main', (block) => block.type === 'cta' || block.type === 'text');
 const featureBlock = findRoleBlock(page?.blocks, 'contact-features', (block) => block.type === 'feature-list');
 const contactIntro = safeContactIntro(ctaBlock?.body);
@@ -23,7 +23,7 @@ const remainingBlocks = withoutBlocks(page?.blocks, [ctaBlock, featureBlock, cta
 ---
 <PageHero eyebrow={page?.heroEyebrow ?? "Kapcsolat"} title={page?.heroTitle ?? "Kapcsolódjunk össze."} description={page?.heroDescription ?? "Kérj bemutatót vagy egyeztetést az Easylink bevezetési lehetőségeiről."} asset={page?.heroAsset || undefined} height={page?.heroHeight} imageFit={page?.heroImageFit} imagePositionX={page?.heroImagePositionX} imagePositionY={page?.heroImagePositionY} imagePositionMobileX={page?.heroImagePositionMobileX} imagePositionMobileY={page?.heroImagePositionMobileY} overlayStrength={page?.heroOverlayStrength} imageScale={page?.heroImageScale} video={page?.heroVideo} />
 <section class="section light"><div class="container contact-grid"><article class="card polished contact"><h2>{ctaBlock?.title ?? 'Kapcsolat'}</h2>{contactIntro && <p>{contactIntro}</p>}<div class="contact-values">{emailHref && <a href={emailHref} data-easylink-cta="email" data-easylink-cta-id="contact-page-email" data-easylink-cta-slot="contact-page">{contactSettings.email}</a>}{phoneHref && <a href={phoneHref}>{contactSettings.phone}</a>}{addressLines.length > 0 && <address>{addressLines.map((line) => <span>{line}</span>)}</address>}</div><a class="button button-primary" href={deployUrl} data-easylink-cta="demo" data-easylink-cta-id="contact-page-demo" data-easylink-cta-slot="contact-page">Demót kérek</a></article><article class="card polished contact"><h2>{featureBlock?.title ?? 'Miben tudunk segíteni?'}</h2><ul>{helpItems.map((item) => <li>{item}</li>)}</ul></article></div></section>
-{remainingBlocks.length > 0 && <ContentBlocks blocks={remainingBlocks} />}
+{remainingBlocks.length > 0 && <ContentBlocks blocks={remainingBlocks} routeIndex={routeIndex} />}
 <CTASection block={ctaSectionBlock} />
 <style>
   .light { background: var(--color-soft); }
