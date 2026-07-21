@@ -3,7 +3,8 @@ import { normalizePublicHref, publicHrefRel, publicHrefTarget } from '@/lib/cont
 import { normalizeNetworkVisualItems } from '@/lib/content/network-visual.mjs';
 const { block = {} } = Astro.props;
 const { config, legacyItems, isLegacy } = normalizeNetworkVisualItems(block.items);
-const title = block.title || 'Adatkapcsolati ábra';
+const title = String(block.title || '').trim();
+const eyebrow = String(block.eyebrow || '').trim();
 const stableSource = String(block.id || block.block_key || `${block.type || 'network-visual'}-${block.title || 'block'}-${block.sort_order ?? ''}`);
 const stableId = stableSource.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 72) || 'network-visual';
 const descId = `network-${stableId}-desc`;
@@ -146,11 +147,11 @@ const markerStart = (d) => d === 'backward' || d === 'both' ? `url(#${arrowStart
 const markerEnd = (d) => d === 'forward' || d === 'both' ? `url(#${arrowId})` : undefined;
 ---
 <article class="content-card type-network-visual network-visual-card" data-network-visual-block data-layout={config?.layout || 'legacy'}>
-  <header class="network-header"><span class="eyebrow">ADATKAPCSOLAT</span><h2>{title}</h2>{block.body && <p>{block.body}</p>}</header>
+  {(eyebrow || title || block.body) && <header class="network-header">{eyebrow && <span class="eyebrow">{eyebrow}</span>}{title && <h2>{title}</h2>}{block.body && <p>{block.body}</p>}</header>}
   {isLegacy ? <div class="network-legacy" data-network-legacy-fallback><p>Régi listás formátum</p>{legacyItems.length > 0 && <ul>{legacyItems.map((item) => <li>{item.label}</li>)}</ul>}</div> : nodes.length > 0 && <>
     <figure class="network-svg-wrap">
       <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-labelledby={`${descId}-title ${descId}`} data-network-svg data-network-layout={config.layout}>
-        <title id={`${descId}-title`}>{title}</title><desc id={descId}>{config.layout === 'flow' ? 'Balról jobbra rendezett adatáramlási ábra.' : 'Központi hub köré rendezett kapcsolati ábra.'}</desc>
+        {title && <title id={`${descId}-title`}>{title}</title>}<desc id={descId}>{config.layout === 'flow' ? 'Balról jobbra rendezett adatáramlási ábra.' : 'Központi hub köré rendezett kapcsolati ábra.'}</desc>
         <defs><marker id={arrowId} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="context-stroke" /></marker><marker id={arrowStartId} viewBox="0 0 10 10" refX="1" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M 10 0 L 0 5 L 10 10 z" fill="context-stroke" /></marker></defs>
         {svgEdges.map((e, i) => { const edge = edgePath(e, e.originalIndex ?? i); if (!edge) return null; const labelLines = safeSvgText(e.label) ? splitEdgeLabelLines(safeSvgText(e.label), 15, 2) : []; const labelHeight = labelLines.length ? (edgeLabelPaddingY * 2 + labelLines.length * edgeLabelLineHeight) : 0; return <g class:list={['network-edge', `is-${e.direction}`]} data-edge-direction={e.direction}><path d={edge.d} marker-start={markerStart(e.direction)} marker-end={markerEnd(e.direction)} />{labelLines.length > 0 && <g class="edge-label" aria-hidden="true"><rect x={edge.label.x - edgeLabelBoxWidth / 2} y={edge.label.y - labelHeight / 2} width={edgeLabelBoxWidth} height={labelHeight} rx="14" /><text x={edge.label.x} y={edge.label.y - ((labelLines.length - 1) * edgeLabelLineHeight) / 2}>{labelLines.map((line, index) => <tspan x={edge.label.x} dy={index === 0 ? 0 : edgeLabelLineHeight}>{line}</tspan>)}</text></g>}</g>; })}
         {nodes.map((n) => { const p = pos.get(n.id); if (!p) return null; const href = normalizePublicHref(n.href); const size = nodeSize(n); const lines = splitLabelLines(safeSvgText(n.label), n.kind === 'core' ? 20 : 17, 2); const kind = kindLabel(n.kind); const content = <g class:list={['network-node', `is-${n.kind}`]} tabindex="0" data-node-kind={n.kind}><title>{n.label}</title><rect class="node-card" x={p.x - size.width / 2} y={p.y - size.height / 2} width={size.width} height={size.height} rx={n.kind === 'core' ? 26 : 22} /><text class="node-label" x={p.x} y={p.y - (lines.length > 1 ? 17 : 8)} text-anchor="middle">{lines.map((line, index) => <tspan x={p.x} dy={index === 0 ? 0 : 17}>{line}</tspan>)}</text><text x={p.x} y={p.y + size.height / 2 - 18} text-anchor="middle" class="kind">{kind}</text></g>; return href ? <a href={href} target={publicHrefTarget(href)} rel={publicHrefRel(href)}>{content}</a> : content; })}

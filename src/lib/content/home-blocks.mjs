@@ -1,5 +1,5 @@
 import { buildPageIndexById, resolveCardTarget, rawCardTargetType } from './card-targets.mjs';
-import { HOME_LEGACY_CTA_KEY } from './page-cta-contract.mjs';
+import { HOME_LEGACY_CTA_KEY, isRecognizedPageCta, resolvePageCtaBlock } from './page-cta-contract.mjs';
 import { assertRootHomePage } from './root-invariant.mjs';
 import { normalizeBlockItemsByType } from './block-contracts.mjs';
 import { isSupportedBlockType } from './block-registry.mjs';
@@ -256,7 +256,10 @@ export function validatePublishedHomeBlocksForSnapshot(content = {}) {
     assertRootHomePage(home, 'Home snapshot reference validation');
     const parsedPublished = published.map((block) => ({ ...block, blockKey: block.block_key, sortOrder: block.sort_order, items: typeof block.items === 'string' && block.items ? JSON.parse(block.items) : (Array.isArray(block.items) ? block.items : []) }));
     const parsedAll = homeBlocks.map((block) => ({ ...block, blockKey: block.block_key, sortOrder: block.sort_order, items: typeof block.items === 'string' && block.items ? JSON.parse(block.items) : (Array.isArray(block.items) ? block.items : []) }));
+    resolvePageCtaBlock(parsedAll);
+    const classification = classifyHomeContentBlocks(parsedAll);
     const state = homeContentMode(parsedAll);
+    if (['partial','unknown'].includes(classification.state)) throw homeError('HOME_PUBLISHED_EXTRAS_BLOCKER', 'A főoldal canonical állapota nem élesíthető partial/unknown publikus blokkokkal.', { state: classification.state, blocks: classification.unknown.map(({id,block_key,type,title,sort_order})=>({id,block_key,type,title,sort_order})) });
     if (state === 'legacy' || state === 'empty') normalizeHomePage({ page: canonicalHomePage({ ...home, blocks: parsedPublished, allBlockMeta: parsedAll.map(homeBlockMeta) }), mode: 'db-authoritative', routeIndex });
     const middle = homeMiddleContentBlocks({ page: { ...home, blocks: parsedPublished }, mode: 'db-authoritative', routeIndex });
     for (const block of middle) {
@@ -272,6 +275,7 @@ export function canonicalHomeBlockFixture() { return JSON.parse(JSON.stringify(s
 export { rawCardTargetType, HOME_LEGACY_CTA_KEY };
 
 export const genericHomeMiddleTypes = Object.freeze(['text','feature-list','list','cards','card-grid','cta','image-text','video','faq','ai-preview','network-visual','split-text','ai-assistant-preview','integrations-strip']);
+const genericCanonicalHomeTypes = Object.freeze({ [HOME_INTRO_KEY]: 'split-text', [HOME_SOLUTIONS_KEY]: 'cards', [HOME_AI_KEY]: 'ai-assistant-preview', [HOME_INTEGRATIONS_KEY]: 'integrations-strip', [HOME_AUDIENCES_KEY]: 'cards' });
 export function isHomeHeroMetaBlock(block = {}) { return blockKeyOf(block) === HOME_HERO_META_KEY; }
 export function isLegacyCanonicalHomeMiddleBlock(block = {}) { const spec = canonicalHomeBlocks[blockKeyOf(block)]; if (!middleHomeBlockKeys.includes(blockKeyOf(block)) || spec?.type !== block?.type) return false; if (block?.type === 'cards' && itemsOf(block)[0]?.version === 2) return false; return true; }
 export function isGenericHomeMiddleBlock(block = {}) { return !isHomeHeroMetaBlock(block) && !isLegacyCanonicalHomeMiddleBlock(block) && genericHomeMiddleTypes.includes(String(block?.type || '')); }
@@ -293,21 +297,50 @@ export function legacyHomeBlockToGenericBlock(block = {}) {
   if (key === HOME_INTEGRATIONS_KEY) return { ...base, type: 'integrations-strip' };
   return base;
 }
+export function classifyHomeContentBlocks(blocks = []) {
+  const source = Array.isArray(blocks) ? blocks : [];
+  const rows = source.map((block) => {
+    const key = blockKeyOf(block);
+    let role = 'unknown/invalid';
+    if (isHomeHeroMetaBlock(block)) role = 'hero-meta';
+    else if (isRecognizedPageCta(block)) role = 'recognized page CTA';
+    else if (isLegacyCanonicalHomeMiddleBlock(block)) role = 'canonical legacy middle';
+    else if (middleHomeBlockKeys.includes(key) && genericCanonicalHomeTypes[key] === String(block?.type || '')) role = 'canonical generic middle';
+    else if (middleHomeBlockKeys.includes(key)) role = 'unknown/invalid';
+    else if (block?.status === 'published' && genericHomeMiddleTypes.includes(String(block?.type || ''))) role = 'valid manual generic middle';
+    else if (block?.status === 'draft') role = 'manual draft';
+    else if (block?.status === 'archived') role = 'manual archived';
+    return { ...homeBlockMeta(block), title: block?.title || '', role };
+  });
+  const pub = (role) => rows.filter((b) => b.status === 'published' && b.role === role);
+  const legacy = pub('canonical legacy middle');
+  const generic = pub('canonical generic middle');
+  const validManual = pub('valid manual generic middle');
+  const unknown = rows.filter((b) => b.status === 'published' && b.role === 'unknown/invalid');
+  const hero = rows.some((b) => b.role === 'hero-meta');
+  const hasExactCanonicalSet = (canonicalRows) => middleHomeBlockKeys.every((key) => canonicalRows.filter((row) => row.block_key === key).length === 1) && canonicalRows.length === middleHomeBlockKeys.length;
+  let state = 'partial';
+  if (unknown.length) state = 'unknown';
+  else if (!hero && (legacy.length || generic.length)) state = 'partial';
+  else if (legacy.length && generic.length) state = 'partial';
+  else if (legacy.length) state = hasExactCanonicalSet(legacy) ? (validManual.length ? 'legacy-with-valid-manual' : 'legacy-clean') : 'partial';
+  else if (generic.length) state = hasExactCanonicalSet(generic) ? (validManual.length ? 'generic-with-valid-manual' : 'generic-clean') : 'partial';
+  else state = 'empty';
+  return { state, hero, rows, validManual, extras: validManual, reconcileRequired: [], unknown, legacy, generic };
+}
 export function homeContentMode(blocks = []) {
-  const publishedMiddle = (blocks || []).filter((block) => block?.status !== 'archived' && !isHomeHeroMetaBlock(block));
-  const legacy = publishedMiddle.filter(isLegacyCanonicalHomeMiddleBlock);
-  const generic = publishedMiddle.filter((block) => !isLegacyCanonicalHomeMiddleBlock(block));
-  if (generic.length && legacy.length) return 'mixed';
-  if (generic.length) return 'generic';
-  if (legacy.length) return 'legacy';
-  return 'empty';
+  const state = classifyHomeContentBlocks(blocks).state;
+  if (state.startsWith('generic')) return 'generic';
+  if (state.startsWith('legacy')) return 'legacy';
+  if (state === 'empty') return 'empty';
+  return state;
 }
 export function homeMiddleContentBlocks({ page, mode = 'static', routeIndex } = {}) {
   const blocks = page?.blocks || [];
   const state = homeContentMode(blocks);
   const withRouteIndex = (block) => ({ ...block, routeIndex });
   const middle = blocks
-    .filter((block) => block?.status === 'published' && !isHomeHeroMetaBlock(block) && (block.block_key || block.blockKey) !== HOME_LEGACY_CTA_KEY && block.type !== 'cta')
+    .filter((block) => block?.status === 'published' && !isHomeHeroMetaBlock(block) && !isRecognizedPageCta(block))
     .map((block) => isLegacyCanonicalHomeMiddleBlock(block) ? legacyHomeBlockToGenericBlock(block) : block)
     .filter((block) => genericHomeMiddleTypes.includes(String(block?.type || '')))
     .sort((a,b)=>sortOrderOf(a)-sortOrderOf(b)||idOf(a)-idOf(b))
