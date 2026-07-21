@@ -64,5 +64,6 @@ assert.equal(vm.action.href, '/megoldasaink/');
 assert.equal(vm.action.label, 'Összes megoldás');
 
 const contentBlocks = readFileSync(new URL('../src/components/ContentBlocks.astro', import.meta.url), 'utf8');
+assert.match(contentBlocks, /\.home-content-blocks \.type-cards > \.more \{[^}]*margin-top: 28px;[^}]*\}/s);
 assert.match(contentBlocks, /\.home-content-blocks \.type-cards > \.more \.button-secondary \{[^}]*color: var\(--color-navy\);[^}]*border-color: var\(--color-line\);[^}]*background: var\(--color-white\);[^}]*\}/s);
 console.log('Home solutions cards regression smoke passed.');
