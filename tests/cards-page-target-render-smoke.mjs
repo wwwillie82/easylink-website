@@ -33,4 +33,33 @@ assert.equal(renamed.action.href, '/uj-megoldasok/');
 assert.equal(publicCardsFromItems([{ version: 2, cards: [], action: { label: 'Legacy', target_type: 'legacy', href: '/legacy/' } }], { pages: routeIndex.pages }).action.href, '/legacy/');
 assert.equal(publicCardsFromItems([{ version: 2, cards: [], action: { label: 'External', target_type: 'external', href: 'https://example.com/' } }], { pages: routeIndex.pages }).action.href, 'https://example.com/');
 assert.throws(() => publicCardsFromItems([{ version: 2, cards: [], action: { label: 'Missing', target_type: 'page', target_page_id: 999 } }], { pages: routeIndex.pages }), /nem található|missing/i);
-console.log('Cards page-target render smoke passed: public resolver uses route index without persisting href.');
+
+const fallbackPages = [{ id: 31, route: '/page-card/', title: 'Publikus oldal címe', type: 'solution', status: 'published' }];
+const fallbackItems = [{
+  version: 2,
+  cards: [
+    { target_type: 'page', target_page_id: 31, title: 'Tárolt canonical cím', title_override: '   ', text: 'Page canonical leírás', text_override: '' },
+    { target_type: 'legacy', href: '/legacy-card/', title: 'Legacy canonical cím', title_override: '', text: 'Legacy canonical leírás', text_override: '   ' },
+    { target_type: 'external', href: 'https://example.com/card', title: 'External canonical cím', title_override: '   ', text: 'External canonical leírás', text_override: '' },
+    { target_type: 'page', target_page_id: 31, title: 'Tárolt cím', title_override: 'Override oldal címe', text: 'Tárolt leírás', text_override: 'Override oldal leírása' }
+  ],
+  action: null
+}];
+
+const normalizedFallback = normalizeCardsItems(fallbackItems)[0].cards;
+assert.deepEqual(normalizedFallback.map(({ title, title_override, text, text_override }) => ({ title, title_override, text, text_override })), [
+  { title: 'Tárolt canonical cím', title_override: '', text: 'Page canonical leírás', text_override: '' },
+  { title: 'Legacy canonical cím', title_override: '', text: 'Legacy canonical leírás', text_override: '' },
+  { title: 'External canonical cím', title_override: '', text: 'External canonical leírás', text_override: '' },
+  { title: 'Override oldal címe', title_override: 'Override oldal címe', text: 'Override oldal leírása', text_override: 'Override oldal leírása' }
+]);
+
+const fallbackVm = publicCardsFromItems(fallbackItems, { pages: fallbackPages });
+assert.deepEqual(fallbackVm.cards.map(({ title, text }) => ({ title, text })), [
+  { title: 'Publikus oldal címe', text: 'Page canonical leírás' },
+  { title: 'Legacy canonical cím', text: 'Legacy canonical leírás' },
+  { title: 'External canonical cím', text: 'External canonical leírás' },
+  { title: 'Override oldal címe', text: 'Override oldal leírása' }
+]);
+
+console.log('Cards page-target render smoke passed: public resolver uses route index and empty overrides fall back to canonical fields.');
