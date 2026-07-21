@@ -6,8 +6,8 @@ const heading = first.heading || first.text || block.heading || '';
 <div class="split-text-section" data-split-text-block>
   <div class="split-text-grid">
     <div>
-      <span class="eyebrow">{block.title}</span>
-      <h2>{heading}</h2>
+      {block.title && <span class="eyebrow">{block.title}</span>}
+      {heading && <h2>{heading}</h2>}
     </div>
     <div>{block.body && <p>{block.body}</p>}</div>
   </div>

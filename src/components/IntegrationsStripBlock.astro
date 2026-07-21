@@ -7,8 +7,8 @@ const nodes = items.filter((item) => item?.kind === 'node').map((item) => ({ id:
 <div id="integrációk" class="integrations integrations-strip" data-integrations-strip-block>
   <div class="flow">
     <div>
-      <span class="eyebrow">{block.title || ''}</span>
-      <h2>{heading}</h2>
+      {block.title && <span class="eyebrow">{block.title}</span>}
+      {heading && <h2>{heading}</h2>}
       {block.body && <p>{block.body}</p>}
     </div>
     <div class="nodes">

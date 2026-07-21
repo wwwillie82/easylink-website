@@ -10,14 +10,14 @@ const assistantMessages = messages.filter((message) => message.role === 'assista
 <div class="ai ai-assistant-preview" data-ai-assistant-preview-block>
   <div class="ai-grid">
     <div class="ai-copy">
-      <span class="eyebrow">{block.title || 'AI asszisztens'}</span>
-      <h2>{heading}</h2>
+      {block.title && <span class="eyebrow">{block.title}</span>}
+      {heading && <h2>{heading}</h2>}
       {block.body && <p>{block.body}</p>}
     </div>
     <div class="chat">
       <div class="source-row">{sources.map((source) => <span>{source.title}</span>)}</div>
       {userMessages.map((message) => <div class="msg user">{message.text}</div>)}
-      {assistantMessages.map((message) => <div class="msg bot">{message.title && <b>{message.title}</b>}<p>{message.text}</p></div>)}
+      {assistantMessages.map((message) => <div class="msg bot">{message.title && <b>{message.title}</b>}{message.text && <p>{message.text}</p>}</div>)}
     </div>
   </div>
 </div>

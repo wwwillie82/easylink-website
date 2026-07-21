@@ -12,13 +12,10 @@ import { isRecognizedPageCta } from '@/lib/content/pageCta';
 const { blocks = [], routeIndex = null, layout = 'grid' } = Astro.props;
 const isStackedSections = layout === 'stacked-sections';
 const visibleBlocks = blocks.filter((block) => !isRecognizedPageCta(block));
-const blockLabels = {
-  text: 'Tartalom', 'feature-list': 'Felsorolás', list: 'Felsorolás', cards: 'Kártyák', 'card-grid': 'Kártyák', cta: 'Felhívás', 'image-text': 'Kép és szöveg', faq: 'Gyakori kérdések', 'ai-preview': 'AI és adatkapcsolat', 'network-visual': 'Adatkapcsolat', video: 'Videó', 'split-text': 'Kétoszlopos szöveg', 'ai-assistant-preview': 'AI asszisztens előnézet', 'integrations-strip': 'Integrációs sáv',
-};
 const asArray = (items) => Array.isArray(items) ? items : [];
 const textOf = (item) => typeof item === 'string' ? item : (item?.title ?? item?.text ?? item?.label ?? '');
 const blockType = (block) => block.type === 'list' ? 'feature-list' : block.type;
-const eyebrowFor = (block) => block.eyebrow ?? blockLabels[block.type] ?? block.type;
+const editorialEyebrowFor = (block) => String(block?.eyebrow || '').trim();
 const linkAttrs = (value) => { const href = normalizePublicHref(value); return { href, target: publicHrefTarget(href), rel: publicHrefRel(href) }; };
 const validIntent = (value) => ['demo','trial','email'].includes(String(value || '').trim()) ? String(value).trim() : '';
 const safeId = (value) => String(value || '').trim().replace(/[^a-zA-Z0-9_.:-]/g, '-').slice(0, 80);
@@ -30,29 +27,30 @@ const sectionClassFor = (type) => ['content-block-section', `content-block-secti
     {visibleBlocks.map((block) => {
       const type = blockType(block);
       const items = asArray(block.items);
-      const eyebrow = eyebrowFor(block);
+      const eyebrow = editorialEyebrowFor(block);
       const cardsVm = (type === 'cards' || type === 'card-grid') ? cardsVmFor(items) : null;
       const video = items[0] ?? null;
       const cta = type === 'cta' ? (items[0] ?? {}) : null;
       const ctaLink = cta ? linkAttrs(cta.url) : null;
       const ctaSecondaryLink = cta?.secondaryUrl ? linkAttrs(cta.secondaryUrl) : null;
+      const hasCtaActions = Boolean(ctaLink?.href || ctaSecondaryLink?.href);
       const ctaIntent = cta ? validIntent(cta.analyticsIntent) : '';
       const ctaAnalyticsId = cta ? safeId(cta.analyticsId) : '';
       const ctaSlot = cta ? safeId(cta.analyticsSlot || block.blockKey || block.block_key || 'content-block') : '';
       return <section class:list={sectionClassFor(type)} data-content-block-section={type}>
         <div class="container">
-          {type === 'text' && <article class="content-card type-text"><span class="eyebrow">{eyebrow}</span><h2>{block.title}</h2>{block.body && <p>{block.body}</p>}</article>}
-          {type === 'cta' && <article class="content-card type-cta"><span class="eyebrow">{cta.eyebrow || eyebrow}</span><h2>{block.title}</h2>{block.body && <p>{block.body}</p>}<p class="cta-actions">{ctaLink?.href && <a class="button button-primary" href={ctaLink.href} target={ctaLink.target} rel={ctaLink.rel} data-easylink-cta={ctaIntent || undefined} data-easylink-cta-id={ctaIntent && ctaAnalyticsId ? ctaAnalyticsId : undefined} data-easylink-cta-slot={ctaIntent && ctaAnalyticsId ? ctaSlot : undefined}>{cta.label || 'Tovább'}</a>}{ctaSecondaryLink?.href && <a class="button button-secondary" href={ctaSecondaryLink.href} target={ctaSecondaryLink.target} rel={ctaSecondaryLink.rel}>{cta.secondaryLabel || 'Részletek'}</a>}</p></article>}
-          {(type === 'cards' || type === 'card-grid') && <article class="type-cards"><span class="eyebrow">{eyebrow}</span><h2>{block.title}</h2>{block.body && <p>{block.body}</p>}<ListingCards items={cardsVm.cards} />{cardsVm.action?.href && <p class="more"><a class="button button-secondary" href={cardsVm.action.href}>{cardsVm.action.label}</a></p>}</article>}
+          {type === 'text' && <article class="content-card type-text">{eyebrow && <span class="eyebrow">{eyebrow}</span>}{block.title && <h2>{block.title}</h2>}{block.body && <p>{block.body}</p>}</article>}
+          {type === 'cta' && <article class="content-card type-cta">{(cta.eyebrow || eyebrow) && <span class="eyebrow">{cta.eyebrow || eyebrow}</span>}{block.title && <h2>{block.title}</h2>}{block.body && <p>{block.body}</p>}{hasCtaActions && <p class="cta-actions">{ctaLink?.href && <a class="button button-primary" href={ctaLink.href} target={ctaLink.target} rel={ctaLink.rel} data-easylink-cta={ctaIntent || undefined} data-easylink-cta-id={ctaIntent && ctaAnalyticsId ? ctaAnalyticsId : undefined} data-easylink-cta-slot={ctaIntent && ctaAnalyticsId ? ctaSlot : undefined}>{cta.label || 'Tovább'}</a>}{ctaSecondaryLink?.href && <a class="button button-secondary" href={ctaSecondaryLink.href} target={ctaSecondaryLink.target} rel={ctaSecondaryLink.rel}>{cta.secondaryLabel || 'Részletek'}</a>}</p>}</article>}
+          {(type === 'cards' || type === 'card-grid') && <article class="type-cards">{block.title && <span class="eyebrow">{block.title}</span>}{block.body && <h2>{block.body}</h2>}<ListingCards items={cardsVm.cards} />{cardsVm.action?.href && <p class="more"><a class="button button-secondary" href={cardsVm.action.href}>{cardsVm.action.label}</a></p>}</article>}
           {type === 'split-text' && <SplitTextBlock block={block} />}
           {type === 'ai-assistant-preview' && <AiAssistantPreviewBlock block={block} />}
           {type === 'integrations-strip' && <IntegrationsStripBlock block={block} />}
-          {type === 'image-text' && (() => { const media = items[0] ?? {}; return <article class:list={['content-card', 'type-image-text', media.position === 'left' ? 'image-left' : 'image-right']}><div>{media.image && <img src={media.image} alt={media.alt || ""} loading="lazy" />}</div><div><span class="eyebrow">{eyebrow}</span><h2>{block.title}</h2>{block.body && <p>{block.body}</p>}</div></article>; })()}
+          {type === 'image-text' && (() => { const media = items[0] ?? {}; return <article class:list={['content-card', 'type-image-text', media.position === 'left' ? 'image-left' : 'image-right']}><div>{media.image && <img src={media.image} alt={media.alt || ""} loading="lazy" />}</div><div>{eyebrow && <span class="eyebrow">{eyebrow}</span>}{block.title && <h2>{block.title}</h2>}{block.body && <p>{block.body}</p>}</div></article>; })()}
           {type === 'ai-preview' && <AiPreviewBlock block={block} />}
           {type === 'network-visual' && <NetworkVisualBlock block={block} />}
-          {type === 'video' && <article class="content-card type-video"><span class="eyebrow">{eyebrow}</span><h2>{block.title}</h2>{block.body && <p>{block.body}</p>}<VideoMedia config={video} mode="inline" title={block.title || 'Videó'} /></article>}
-          {type === 'faq' && <article class="content-card type-faq"><span class="eyebrow">{eyebrow}</span><h2>{block.title}</h2>{block.body && <p>{block.body}</p>}{items.map((item) => <details><summary>{item.question || item.title}</summary><p>{item.answer || item.text}</p></details>)}</article>}
-          {type === 'feature-list' && <article class="content-card type-feature-list"><span class="eyebrow">{eyebrow}</span><h2>{block.title}</h2>{block.body && <p>{block.body}</p>}{items.length > 0 && <ul>{items.map((item) => { const href = typeof item === 'object' ? normalizePublicHref(item.url || item.href) : ''; const label = textOf(item); return <li>{href ? <a href={href} target={publicHrefTarget(href)} rel={publicHrefRel(href)}>{label}</a> : label}</li>; })}</ul>}</article>}
+          {type === 'video' && <article class="content-card type-video">{eyebrow && <span class="eyebrow">{eyebrow}</span>}{block.title && <h2>{block.title}</h2>}{block.body && <p>{block.body}</p>}<VideoMedia config={video} mode="inline" title={block.title || 'Videó'} /></article>}
+          {type === 'faq' && <article class="content-card type-faq">{eyebrow && <span class="eyebrow">{eyebrow}</span>}{block.title && <h2>{block.title}</h2>}{block.body && <p>{block.body}</p>}{items.map((item) => <details><summary>{item.question || item.title}</summary>{(item.answer || item.text) && <p>{item.answer || item.text}</p>}</details>)}</article>}
+          {type === 'feature-list' && <article class="content-card type-feature-list">{eyebrow && <span class="eyebrow">{eyebrow}</span>}{block.title && <h2>{block.title}</h2>}{block.body && <p>{block.body}</p>}{items.length > 0 && <ul>{items.map((item) => { const href = typeof item === 'object' ? normalizePublicHref(item.url || item.href) : ''; const label = textOf(item); return <li>{href ? <a href={href} target={publicHrefTarget(href)} rel={publicHrefRel(href)}>{label}</a> : label}</li>; })}</ul>}</article>}
         </div>
       </section>;
     })}
@@ -63,21 +61,21 @@ const sectionClassFor = (type) => ['content-block-section', `content-block-secti
       {visibleBlocks.map((block) => {
         const type = blockType(block);
         const items = asArray(block.items);
-        const eyebrow = eyebrowFor(block);
+        const eyebrow = editorialEyebrowFor(block);
         const video = items[0] ?? null;
-        if (type === 'text') { return <article class="content-card type-text"><span class="eyebrow">{eyebrow}</span><h2>{block.title}</h2>{block.body && <p>{block.body}</p>}</article>; }
-        if (type === 'cta') { const cta = items[0] ?? {}; const link = linkAttrs(cta.url); const intent = validIntent(cta.analyticsIntent); const analyticsId = safeId(cta.analyticsId); const slot = safeId(cta.analyticsSlot || block.blockKey || block.block_key || 'content-block'); return <article class="content-card type-cta"><span class="eyebrow">{eyebrow}</span><h2>{block.title}</h2>{block.body && <p>{block.body}</p>}{link.href && <a class="button button-primary" href={link.href} target={link.target} rel={link.rel} data-easylink-cta={intent || undefined} data-easylink-cta-id={intent && analyticsId ? analyticsId : undefined} data-easylink-cta-slot={intent && analyticsId ? slot : undefined}>{cta.label || 'Tovább'}</a>}</article>; }
-        if (type === 'cards' || type === 'card-grid') { const cardsVm = cardsVmFor(items); return <article class="type-cards"><span class="eyebrow">{eyebrow}</span><h2>{block.title}</h2>{block.body && <p>{block.body}</p>}<ListingCards items={cardsVm.cards} />{cardsVm.action?.href && <p class="more"><a class="button button-secondary" href={cardsVm.action.href}>{cardsVm.action.label}</a></p>}</article>; }
+        if (type === 'text') { return <article class="content-card type-text">{eyebrow && <span class="eyebrow">{eyebrow}</span>}{block.title && <h2>{block.title}</h2>}{block.body && <p>{block.body}</p>}</article>; }
+        if (type === 'cta') { const cta = items[0] ?? {}; const link = linkAttrs(cta.url); const intent = validIntent(cta.analyticsIntent); const analyticsId = safeId(cta.analyticsId); const slot = safeId(cta.analyticsSlot || block.blockKey || block.block_key || 'content-block'); return <article class="content-card type-cta">{eyebrow && <span class="eyebrow">{eyebrow}</span>}{block.title && <h2>{block.title}</h2>}{block.body && <p>{block.body}</p>}{link.href && <a class="button button-primary" href={link.href} target={link.target} rel={link.rel} data-easylink-cta={intent || undefined} data-easylink-cta-id={intent && analyticsId ? analyticsId : undefined} data-easylink-cta-slot={intent && analyticsId ? slot : undefined}>{cta.label || 'Tovább'}</a>}</article>; }
+        if (type === 'cards' || type === 'card-grid') { const cardsVm = cardsVmFor(items); return <article class="type-cards">{eyebrow && <span class="eyebrow">{eyebrow}</span>}{block.title && <h2>{block.title}</h2>}{block.body && <p>{block.body}</p>}<ListingCards items={cardsVm.cards} />{cardsVm.action?.href && <p class="more"><a class="button button-secondary" href={cardsVm.action.href}>{cardsVm.action.label}</a></p>}</article>; }
         if (type === 'split-text') return <article class="content-card"><SplitTextBlock block={block} /></article>;
         if (type === 'ai-assistant-preview') return <article class="type-cards"><AiAssistantPreviewBlock block={block} /></article>;
         if (type === 'integrations-strip') return <article class="type-cards"><IntegrationsStripBlock block={block} /></article>;
-        if (type === 'image-text') { const media = items[0] ?? {}; return <article class:list={['content-card', 'type-image-text', media.position === 'left' ? 'image-left' : 'image-right']}><div>{media.image && <img src={media.image} alt={media.alt || ""} loading="lazy" />}</div><div><span class="eyebrow">{eyebrow}</span><h2>{block.title}</h2>{block.body && <p>{block.body}</p>}</div></article>; }
+        if (type === 'image-text') { const media = items[0] ?? {}; return <article class:list={['content-card', 'type-image-text', media.position === 'left' ? 'image-left' : 'image-right']}><div>{media.image && <img src={media.image} alt={media.alt || ""} loading="lazy" />}</div><div>{eyebrow && <span class="eyebrow">{eyebrow}</span>}{block.title && <h2>{block.title}</h2>}{block.body && <p>{block.body}</p>}</div></article>; }
         if (type === 'ai-preview') return <AiPreviewBlock block={block} />;
         if (type === 'network-visual') return <NetworkVisualBlock block={block} />;
-        if (type === 'video') return <article class="content-card type-video"><span class="eyebrow">{eyebrow}</span><h2>{block.title}</h2>{block.body && <p>{block.body}</p>}<VideoMedia config={video} mode="inline" title={block.title || 'Videó'} /></article>;
-        if (type === 'faq') return <article class="content-card type-faq"><span class="eyebrow">{eyebrow}</span><h2>{block.title}</h2>{block.body && <p>{block.body}</p>}{items.map((item) => <details><summary>{item.question || item.title}</summary><p>{item.answer || item.text}</p></details>)}</article>;
-        if (type === 'feature-list') { return <article class="content-card type-feature-list"><span class="eyebrow">{eyebrow}</span><h2>{block.title}</h2>{block.body && <p>{block.body}</p>}{items.length > 0 && <ul>{items.map((item) => { const href = typeof item === 'object' ? normalizePublicHref(item.url || item.href) : ''; const label = textOf(item); return <li>{href ? <a href={href} target={publicHrefTarget(href)} rel={publicHrefRel(href)}>{label}</a> : label}</li>; })}</ul>}</article>; }
-        return <article class:list={['content-card', `type-${type}`]}><span class="eyebrow">{eyebrow}</span><h2>{block.title}</h2>{block.body && <p>{block.body}</p>}{items.length > 0 && <ul>{items.map((item) => <li>{textOf(item)}</li>)}</ul>}</article>;
+        if (type === 'video') return <article class="content-card type-video">{eyebrow && <span class="eyebrow">{eyebrow}</span>}{block.title && <h2>{block.title}</h2>}{block.body && <p>{block.body}</p>}<VideoMedia config={video} mode="inline" title={block.title || 'Videó'} /></article>;
+        if (type === 'faq') return <article class="content-card type-faq">{eyebrow && <span class="eyebrow">{eyebrow}</span>}{block.title && <h2>{block.title}</h2>}{block.body && <p>{block.body}</p>}{items.map((item) => <details><summary>{item.question || item.title}</summary>{(item.answer || item.text) && <p>{item.answer || item.text}</p>}</details>)}</article>;
+        if (type === 'feature-list') { return <article class="content-card type-feature-list">{eyebrow && <span class="eyebrow">{eyebrow}</span>}{block.title && <h2>{block.title}</h2>}{block.body && <p>{block.body}</p>}{items.length > 0 && <ul>{items.map((item) => { const href = typeof item === 'object' ? normalizePublicHref(item.url || item.href) : ''; const label = textOf(item); return <li>{href ? <a href={href} target={publicHrefTarget(href)} rel={publicHrefRel(href)}>{label}</a> : label}</li>; })}</ul>}</article>; }
+        return <article class:list={['content-card', `type-${type}`]}>{eyebrow && <span class="eyebrow">{eyebrow}</span>}{block.title && <h2>{block.title}</h2>}{block.body && <p>{block.body}</p>}{items.length > 0 && <ul>{items.map((item) => <li>{textOf(item)}</li>)}</ul>}</article>;
       })}
     </div>
   </section>
