@@ -17,7 +17,7 @@ import { blockForm, pageEditorJs, movedBlockOrder, parseItemRowRaw, serializeEdi
 
 
 const editedCard = serializeEditorItems({ type: 'cards', rows: [{ raw: { title: 'Old', text: 'Body', href: '/old', badge: 'Beta', extra: 'keep' }, title: 'New', text: 'Body', url: '/old', linkLabel: '', order: 'Beta' }] });
-assert.deepEqual(editedCard, [{ title: 'New', text: 'Body', href: '/old', badge: 'Beta', extra: 'keep' }]);
+assert.deepEqual(editedCard, [{ version: 2, variant: 'default', cards: [{ target_type: 'legacy', href: '/old', title: 'New', text: 'Body', badge: 'Beta' }], action: null }]);
 const editedCta = serializeEditorItems({ type: 'cta', first: { eyebrow: 'Next', label: 'Old label', url: '/demo', secondaryLabel: 'Try', secondaryUrl: '/try', presentationRole: 'cta-section', role: 'legacy', extra: 'keep' }, rows: { eyebrow: 'Next', label: 'New label', url: '/demo', secondaryLabel: 'Try', secondaryUrl: '/try' } });
 assert.deepEqual(editedCta, [{ eyebrow: 'Next', label: 'New label', url: '/demo', secondaryLabel: 'Try', secondaryUrl: '/try', presentationRole: 'cta-section', role: 'legacy', extra: 'keep' }]);
 const editedImageText = serializeEditorItems({ type: 'image-text', first: { image: '/old.webp', alt: 'Old alt', position: 'left', extra: 'keep' }, rows: { image: '/new.webp', alt: 'Old alt', position: 'left' } });
@@ -729,7 +729,7 @@ try {
   assert.match(pageEditorHtml, /i.disabled=!show/);
   assert.match(pageEditorHtml, /serializeEditorItems\(\{type,rows:/);
   assert.match(pageEditorHtml, /type==='video'\?videoValues/);
-  assert.match(pageEditorHtml, /type==='cta'\|\|type==='image-text'\?panelValues:rowData/);
+  assert.match(pageEditorHtml, /type==='cta'\|\|type==='image-text'\?panelValues:typedRows/);
   assert.match(pageEditorHtml, /function firstItem\(f\)/);
   assert.match(pageEditorHtml, /first:firstItem\(f\)/);
   assert.match(pageEditorHtml, /data-raw-item="\{\}"/);
@@ -776,7 +776,8 @@ assert.match(homeSource, /getPublicPageState/);
 assert.match(homeSource, /hiddenByDb/);
 assert.match(homeSource, /getPublicRouteIndex/);
 assert.match(homeSource, /Astro.response.status = 404/);
-assert.doesNotMatch(homeSource, /<ContentBlocks\b/);
+assert.match(homeSource, /<ContentBlocks\b/);
+assert.match(homeSource, /context="home"/);
 const staleKeys = staleSeedKeys([
   { block_key: '/arak/:text:0' },
   { block_key: '/arak/:feature-list:0' },

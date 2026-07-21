@@ -12,7 +12,8 @@ assert.doesNotMatch(home, /import HomeRenderer from/);
 assert.doesNotMatch(home, /publishedSolutions|publishedAudiences|resolveListingCards/);
 assert.doesNotMatch(home, /basePath="\/megoldasaink\/"|basePath="\/kinek-szol\/"|href="\/megoldasaink\/"/);
 assert.match(home, /getPublicRouteIndex/);
-assert.match(home, /normalizeHomePage/);
+assert.match(home, /homeMiddleContentBlocks/);
+assert.doesNotMatch(home, /normalizeHomePage/);
 const order = ['<Header', '<Hero', '<ContentBlocks', '<CTASection', '<Footer'];
 let cursor = -1;
 for (const marker of order) {
