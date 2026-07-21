@@ -53,7 +53,6 @@ assert.ok(staticCard, 'link nélküli title_override/text_override statikus kár
 assert.equal(staticCard.text_override, 'Link nélküli statikus leírás.');
 assert.equal(Object.hasOwn(staticCard, 'href'), false);
 
-
 const isolatedSerializeEditorItems = new Function(`return (${serializeEditorItems.toString()});`)();
 const isolatedCards = isolatedSerializeEditorItems({ type: 'cards', rows: Object.assign([{ raw: { title_override: '', text_override: '', target_type: 'legacy', href: '/isolated/' }, title: 'Isolated cím', text: 'Isolated leírás', target_type: 'legacy', url: '/isolated/', linkLabel: '', order: '' }], { action: { enabled: false } }) })[0].cards;
 assert.deepEqual(isolatedCards, [{ target_type: 'legacy', href: '/isolated/', title: 'Isolated cím', text: 'Isolated leírás' }]);
@@ -63,7 +62,7 @@ assert.deepEqual(vm.cards.slice(0, 3).map((card) => card.text), descriptions);
 assert.equal(vm.action.href, '/megoldasaink/');
 assert.equal(vm.action.label, 'Összes megoldás');
 
-const contentBlocks = readFileSync(new URL('../src/components/ContentBlocks.astro', import.meta.url), 'utf8');
-assert.match(contentBlocks, /\.home-content-blocks \.type-cards > \.more \{[^}]*margin-top: 28px;[^}]*\}/s);
-assert.match(contentBlocks, /\.home-content-blocks \.type-cards > \.more \.button-secondary \{[^}]*color: var\(--color-navy\);[^}]*border-color: var\(--color-line\);[^}]*background: var\(--color-white\);[^}]*\}/s);
+const cardsBlock = readFileSync(new URL('../src/components/CardsBlock.astro', import.meta.url), 'utf8');
+assert.match(cardsBlock, /\.type-cards--home > \.more \{[^}]*margin-top: 28px;[^}]*\}/s);
+assert.match(cardsBlock, /\.type-cards--home > \.more \.button-secondary \{[^}]*color: var\(--color-navy\);[^}]*border-color: var\(--color-line\);[^}]*background: var\(--color-white\);[^}]*\}/s);
 console.log('Home solutions cards regression smoke passed.');
