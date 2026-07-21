@@ -4,7 +4,7 @@ import PageHero from '@/components/PageHero.astro';
 import ListingCards from '@/components/ListingCards.astro';
 import ContentBlocks from '@/components/ContentBlocks.astro';
 import CTASection from '@/components/CTASection.astro';
-import { publishedIntegrations } from '@/content/integrations';
+import { publicCardsFromItems } from '@/lib/content/block-contracts.mjs';
 import { findRoleBlock, withoutBlocks } from '@/lib/content/blockRoles';
 import { resolvePageCtaBlock } from '@/lib/content/pageCta';
 type Props = PublicPageRendererProps;
@@ -12,16 +12,17 @@ const { page, routeIndex } = Astro.props;
 const introBlock = findRoleBlock(page?.blocks, 'integrations-intro', (block) => block.type === 'text');
 const importantBlock = findRoleBlock(page?.blocks, 'integrations-important', (block) => block.type === 'text' && block !== introBlock);
 const cardsBlock = findRoleBlock(page?.blocks, 'integrations-cards', (block) => ['cards', 'card-grid'].includes(block.type));
-const integrationCards = cardsBlock?.items?.length ? cardsBlock.items : publishedIntegrations.map((item) => ({ title: item.title, text: item.shortDescription, order: item.order, status: item.status }));
+const cardsVm = cardsBlock ? publicCardsFromItems(cardsBlock.items ?? [], { pages: routeIndex?.pages || [] }) : null;
 const ctaSectionBlock = resolvePageCtaBlock(page?.blocks, { role: 'cta-section' });
 const remainingBlocks = withoutBlocks(page?.blocks, [introBlock, cardsBlock, importantBlock, ctaSectionBlock]);
+const hasNetworkContent = Boolean(introBlock || cardsVm?.cards?.length || importantBlock);
 ---
 <PageHero eyebrow={page?.heroEyebrow ?? "integraciok"} title={page?.heroTitle ?? "Integrációk"} description={page?.heroDescription ?? "Az integrációs registry előkészíti a későbbi partner- és adatkapcsolati tartalmakat. Ahol nincs bizonyított éles kapcsolat, ott integrációs irányként kommunikálunk."} asset={page?.heroAsset || "/assets/nati/hero-bg-flow-02.webp"} height={page?.heroHeight} imageFit={page?.heroImageFit} imagePositionX={page?.heroImagePositionX} imagePositionY={page?.heroImagePositionY} imagePositionMobileX={page?.heroImagePositionMobileX} imagePositionMobileY={page?.heroImagePositionMobileY} overlayStrength={page?.heroOverlayStrength} imageScale={page?.heroImageScale} video={page?.heroVideo} />
-<section class="section light network-section">
-  <div class="container intro"><span class="eyebrow">{introBlock?.title ?? 'Csomópontok'}</span><h2>{introBlock?.body ?? 'Nem késznek állított ígéretek, hanem tisztán tagolt integrációs irányok.'}</h2></div>
-  <div class="container"><ListingCards items={integrationCards} /></div>
-  <div class="container"><article class="important card"><span class="eyebrow">{importantBlock?.title ?? 'Fontos keret'}</span><p>{importantBlock?.body ?? 'A public tartalom integrációs irányokat és előkészített kapcsolódásokat mutat be; kész éles kapcsolatot csak bizonyított implementáció után kommunikálunk.'}</p></article></div>
-</section>
+{hasNetworkContent && <section class="section light network-section">
+  {introBlock && <div class="container intro">{introBlock.title && <span class="eyebrow">{introBlock.title}</span>}{introBlock.body && <h2>{introBlock.body}</h2>}</div>}
+  {cardsVm?.cards?.length > 0 && <div class="container"><ListingCards items={cardsVm.cards} /></div>}
+  {importantBlock && <div class="container"><article class="important card">{importantBlock.title && <span class="eyebrow">{importantBlock.title}</span>}{importantBlock.body && <p>{importantBlock.body}</p>}</article></div>}
+</section>}
 {remainingBlocks.length > 0 && <ContentBlocks blocks={remainingBlocks} routeIndex={routeIndex} />}
 <CTASection block={ctaSectionBlock} />
 <style>
