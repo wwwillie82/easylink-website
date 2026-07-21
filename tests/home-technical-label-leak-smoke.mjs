@@ -11,7 +11,8 @@ if (nodeMajor < 22) {
   process.exit(0);
 }
 
-const pagePath = 'src/pages/__home-render-smoke.astro';
+const routeBasename = `home-render-smoke-${process.pid}`;
+const pagePath = `src/pages/${routeBasename}.astro`;
 const outDir = await mkdtemp(join(tmpdir(), 'easylink-home-render-smoke-'));
 const pageSource = `---
 import ContentBlocks from '../components/ContentBlocks.astro';
@@ -34,7 +35,7 @@ try {
   await writeFile(pagePath, pageSource);
   const build = spawnSync(process.execPath, ['./node_modules/astro/bin/astro.mjs', 'build', '--outDir', outDir, '--silent'], { encoding: 'utf8' });
   assert.equal(build.status, 0, build.stderr || build.stdout);
-  const htmlPath = join(outDir, '__home-render-smoke', 'index.html');
+  const htmlPath = join(outDir, routeBasename, 'index.html');
   assert(existsSync(htmlPath), `missing rendered HTML: ${htmlPath}`);
   const html = readFileSync(htmlPath, 'utf8');
   for (const forbidden of ['AI ASSZISZTENS DEMÓ', 'AI üzleti pillanatkép', 'ADATKAPCSOLAT', 'Adatkapcsolati ábra', 'Tartalom', 'Kártyák', 'Felsorolás']) assert(!html.includes(forbidden), forbidden);
