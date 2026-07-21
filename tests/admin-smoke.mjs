@@ -13,6 +13,7 @@ import { createAdminServer } from '../src/lib/admin/server.mjs';
 import { staleSeedKeys } from '../scripts/db-seed.mjs';
 import { settingsSaveOutcome } from '../src/lib/admin/render/settings.mjs';
 import { normalizeSiteSettings } from '../src/lib/admin/settings.mjs';
+import { pageForm } from '../src/lib/admin/render/pages.mjs';
 import { blockForm, pageEditorJs, movedBlockOrder, parseItemRowRaw, serializeEditorItems, sortOrderForMovedBlock, duplicateItemRow } from '../src/lib/admin/render/blocks.mjs';
 
 
@@ -125,6 +126,34 @@ assert.equal(duplicated.fields[3].value, '42%');
 assert.equal(duplicated.fields[4].value, '/risk/');
 assert.equal(duplicated.fields[5].value, '7');
 
+
+const homeAdminHtml = pageForm({
+  page: { id: 10, route: '/', slug: 'home', type: 'home', title: 'Kezdőlap', status: 'published', sort_order: 0, seo_title: 'Home SEO', seo_description: '', hero_eyebrow: '', hero_title: 'Hero', hero_description: '', hero_asset: '' },
+  blocks: [
+    { id: 139, page_id: 10, block_key: 'home:intro', type: 'split-text', title: 'Intro', body: '', items: '[]', status: 'published', sort_order: 100 },
+    { id: 140, page_id: 10, block_key: 'home:solutions', type: 'cards', title: 'Megoldásaink', body: '', items: '[]', status: 'published', sort_order: 110 },
+    { id: 141, page_id: 10, block_key: 'home:ai-assistant', type: 'ai-assistant-preview', title: 'AI', body: '', items: '[]', status: 'published', sort_order: 120 },
+    { id: 142, page_id: 10, block_key: 'home:integrations', type: 'integrations-strip', title: 'Integrációs adatáramlás', body: '', items: '[]', status: 'published', sort_order: 130 },
+    { id: 143, page_id: 10, block_key: 'home:audiences', type: 'cards', title: 'Kinek szól?', body: '', items: '[]', status: 'published', sort_order: 140 },
+    { id: 30, page_id: 10, block_key: 'home:page-cta', type: 'cta', title: 'CTA', body: '', items: '[{"ctaMode":"global"}]', status: 'published', sort_order: 900 },
+    { id: 100, page_id: 10, block_key: 'home:hero-meta', type: 'hero-meta', title: 'Hero meta', body: '', items: '[]', status: 'published', sort_order: 0 },
+    ...[1, 27, 28, 29].map((id) => ({ id, page_id: 10, block_key: `old:${id}`, type: 'text', title: `Old ${id}`, body: '', items: '[]', status: 'archived', sort_order: id })),
+  ],
+  defaultCta: {}, navigationUsages: [], pageTargetPages: [], homeEditor: { editor_revision: 'r', pages: [] },
+});
+assert.equal((homeAdminHtml.match(/Mentés és élesítés/g) || []).length >= 7, true);
+assert.doesNotMatch(homeAdminHtml, /data-home-preview|data-home-publish|>Előnézet<|>Élesítés</);
+assert.doesNotMatch(homeAdminHtml, /Mentés csak admin adatot rögzít|aggregate payloadban mentődnek/);
+for (const id of [1, 27, 28, 29]) assert.doesNotMatch(homeAdminHtml, new RegExp(`data-delete="${id}"|Old ${id}`));
+for (const pair of [['home:intro', 'split-text'], ['home:solutions', 'cards'], ['home:ai-assistant', 'ai-assistant-preview'], ['home:integrations', 'integrations-strip'], ['home:audiences', 'cards']]) {
+  assert.ok(homeAdminHtml.includes(`name="block_key" value="${pair[0]}"`), `${pair[0]} block_key is rendered as hidden contract data`);
+  assert.ok(homeAdminHtml.includes(`option value="${pair[1]}" selected`), `${pair[1]} editor is rendered`);
+}
+const homeEditorRuntime = pageEditorJs(10, { isHome: true });
+assert.match(homeEditorRuntime, /fetch\('\/api\/admin\/blocks'/);
+assert.doesNotMatch(homeEditorRuntime, /homeArchivedBlockIds|saveHomeAggregate|\/api\/admin\/pages\/\$\{pageId\}\/home|button\[type="submit"\]'\)\.forEach\(\(b\)=>b\.remove/);
+assert.doesNotMatch(pageEditorJs(20), /homeArchivedBlockIds|saveHomeAggregate/);
+
 const sessionSecret = 'test-session-secret-long-enough';
 const state = {
   user: { id: 1, email: 'admin@example.com', password_hash: hashPassword('correct-password'), display_name: 'Admin', role: 'admin', status: 'active' },
@@ -140,6 +169,8 @@ const state = {
     { id: 21, page_id: 20, block_key: 'seed:/megoldasaink/:text:1', type: 'text', title: 'Nem renderelt', body: 'Body', items: '[]', status: 'published', sort_order: 2 },
     { id: 22, page_id: 22, block_key: 'seed:/megoldasaink-fallback/:feature-list:0', type: 'feature-list', title: 'Régi nem renderelt feature', body: 'Body', items: '["Régi"]', status: 'published', sort_order: 1 },
     { id: 23, page_id: 23, block_key: 'seed:/integraciok-fallback/:text:0', type: 'text', title: 'Régi nem renderelt integráció szöveg', body: 'Body', items: '[]', status: 'published', sort_order: 1 },
+    { id: 139, page_id: 10, block_key: 'home:intro', type: 'split-text', title: 'Intro', body: 'Body', items: '[]', status: 'published', sort_order: 100 },
+    { id: 100, page_id: 10, block_key: 'home:hero-meta', type: 'hero-meta', title: 'Hero meta', body: '', items: '[]', status: 'published', sort_order: 0 },
     { id: 70, page_id: 70, block_key: 'fixed:a', type: 'text', title: 'fixed A', body: 'Fixed A', items: '[]', status: 'published', sort_order: 10 },
     { id: 71, page_id: 70, block_key: 'free:a', type: 'text', title: 'free A', body: 'Free A', items: '[]', status: 'published', sort_order: 20 },
     { id: 72, page_id: 70, block_key: 'free:b', type: 'text', title: 'free B', body: 'Free B', items: '[]', status: 'published', sort_order: 30 },
@@ -148,6 +179,7 @@ const state = {
   snapshots: [],
   imported: null,
   publishCalls: 0,
+  upsertCalls: 0,
   media: [],
   nextMediaId: 1,
   settings: normalizeSiteSettings({}),
@@ -172,7 +204,7 @@ const repo = {
   async createPage(payload) { const route = normalizeRoute(payload.route); if (route === '/') throw validationError('Adj meg érvényes URL-t.'); if (state.pages.find((p) => p.route === route)) throw validationError('Ez az URL már létezik.'); const page = { id: Math.max(...state.pages.map((p) => p.id)) + 1, route, slug: route.replace(/^\//, '').replace(/\/$/, ''), type: payload.type || 'content_page', title: payload.title, status: payload.status || 'draft', sort_order: state.pages.length + 1, seo_title: payload.title, seo_description: '', hero_eyebrow: '', hero_title: payload.title, hero_description: '', hero_asset: '' }; state.pages.push(page); return { id: page.id, route: page.route, slug: page.slug }; },
   async page(id) { const page = state.pages.find((p) => String(p.id) === String(id)); return page ? { page, blocks: state.blocks.filter((b) => String(b.page_id) === String(id)) } : null; },
   async updatePage(id, payload) { validateHeroPayload(payload); const page = state.pages.find((p) => String(p.id) === String(id)); const route = payload.route ? normalizeRoute(payload.route) : page.route; const isExistingHome = page.route === '/' || page.type === 'home'; if (route === '/' && !isExistingHome) throw validationError('Adj meg érvényes URL-t.'); if (state.pages.find((p) => p.route === route && String(p.id) !== String(id))) throw validationError('Ez az URL már létezik.'); Object.assign(page, payload, { route, slug: route === '/' ? 'home' : (payload.slug || page.slug) }); },
-  async upsertBlock(payload) { JSON.parse(payload.items || 'null'); if (payload.id) { Object.assign(state.blocks.find((b) => String(b.id) === String(payload.id)), payload); return { id: payload.id }; } const block = { ...payload, id: state.blocks.length + 1, block_key: `manual:test-${state.blocks.length + 1}` }; state.blocks.push(block); return { id: block.id, block_key: block.block_key }; },
+  async upsertBlock(payload) { state.upsertCalls += 1; JSON.parse(payload.items || 'null'); if (payload.block_key === 'home:hero-meta') throw Object.assign(new Error('Canonical főoldali blokk nem menthető.'), { code: 'HOME_CANONICAL_USE_HOME_EDITOR' }); if (payload.id) { Object.assign(state.blocks.find((b) => String(b.id) === String(payload.id)), payload); return { id: payload.id }; } const block = { ...payload, id: state.blocks.length + 1, block_key: `manual:test-${state.blocks.length + 1}` }; state.blocks.push(block); return { id: block.id, block_key: block.block_key }; },
   async deleteBlock(id) { state.blocks.find((b) => String(b.id) === String(id)).status = 'archived'; },
   async listMedia({ includeArchived = false } = {}) { return state.media.filter((m) => includeArchived || m.status !== 'archived').sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at))||b.id-a.id); },
   async getMedia(id) { return state.media.find((m) => String(m.id) === String(id)) || null; },
@@ -213,6 +245,21 @@ try {
   assert.match(cookie, /HttpOnly/);
   assert.equal(response.headers.get('location'), '/admin/pages');
 
+
+
+  const beforeHomeUpserts = state.upsertCalls;
+  const beforeHomePublishes = state.publishCalls;
+  response = await fetch(`${base}/api/admin/blocks`, { method: 'POST', headers: { cookie, 'content-type': 'application/json' }, body: JSON.stringify({ id: 139, page_id: 10, block_key: 'home:intro', type: 'split-text', title: 'Intro API saved', body: 'Body', items: '[]', status: 'published', sort_order: 100 }) });
+  assert.equal(response.status, 200);
+  const homeSaved = await response.json();
+  assert.equal(homeSaved.ok, true);
+  assert.equal(homeSaved.publish.ok, true);
+  assert.equal(state.upsertCalls, beforeHomeUpserts + 1);
+  assert.equal(state.publishCalls, beforeHomePublishes + 1);
+  assert.equal(state.blocks.find((b) => b.id === 139).title, 'Intro API saved');
+  response = await fetch(`${base}/api/admin/blocks`, { method: 'POST', headers: { cookie, 'content-type': 'application/json' }, body: JSON.stringify({ id: 100, page_id: 10, block_key: 'home:hero-meta', type: 'hero-meta', title: 'Hero meta edit', body: '', items: '[]', status: 'published', sort_order: 0 }) });
+  assert.equal(response.status, 409);
+  assert.equal((await response.json()).error.code, 'HOME_CANONICAL_USE_HOME_EDITOR');
 
   const orderBlocks = () => state.blocks.filter((b) => b.page_id === 70).sort((a,b)=>Number(a.sort_order)-Number(b.sort_order)||a.id-b.id);
   const orderTitles = () => orderBlocks().map((b) => b.title);
