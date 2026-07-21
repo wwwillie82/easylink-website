@@ -4,6 +4,7 @@ import { normalizeAiPreviewItems } from './ai-preview.mjs';
 import { normalizeNetworkVisualItems } from './network-visual.mjs';
 
 const clean = (v) => String(v ?? '').trim();
+const firstNonEmpty = (...values) => values.map(clean).find(Boolean) || '';
 const obj = (v) => v && typeof v === 'object' && !Array.isArray(v);
 const field = (errors, path, message) => { if (errors && path && !errors[path]) errors[path] = message; };
 export function isCardsV2(value) { return obj(value) && Number(value.version) === 2 && Array.isArray(value.cards); }
@@ -13,7 +14,9 @@ function normalizeCardInput(item = {}, path = 'items', errors = {}) {
   if (clean(source.kind) === 'section-action') field(errors, `${path}.kind`, 'A section action nem lehet kártya item.');
   let target_type = clean(source.target_type || (source.href || source.url ? 'legacy' : 'legacy'));
   try { target_type = rawCardTargetType(target_type); } catch { field(errors, `${path}.target_type`, 'Hibás cél típus.'); target_type = 'legacy'; }
-  const out = { target_type, title: clean(source.title_override || source.title || source.label), title_override: clean(source.title_override || ''), text: clean(source.text_override ?? source.text ?? source.shortDescription ?? source.body ?? ''), text_override: clean(source.text_override ?? ''), linkLabel: clean(source.linkLabel ?? source.label ?? ''), badge: source.badge ?? source.order ?? '' };
+  const titleOverride = clean(source.title_override);
+  const textOverride = clean(source.text_override);
+  const out = { target_type, title: firstNonEmpty(titleOverride, source.title, source.label), title_override: titleOverride, text: firstNonEmpty(textOverride, source.textOverride, source.text, source.shortDescription, source.body), text_override: textOverride, linkLabel: firstNonEmpty(source.linkLabel, source.label), badge: source.badge ?? source.order ?? '' };
   if (target_type === 'page') { const id = Number(source.target_page_id); if (!Number.isSafeInteger(id) || id <= 0) field(errors, `${path}.target_page_id`, 'Válassz publikus céloldalt.'); else out.target_page_id = id; }
   else if (target_type === 'legacy') { const href = clean(source.href ?? source.url); if (href && !isInternalRouteCandidate(href)) field(errors, `${path}.href`, 'Legacy cél csak biztonságos belső útvonal lehet.'); out.href = href; }
   else if (target_type === 'external') { const href = clean(source.href ?? source.url); if (href && !isValidHttpExternalUrl(href)) field(errors, `${path}.href`, 'Külső cél csak http(s) URL lehet.'); out.href = href; }
@@ -23,8 +26,8 @@ function normalizeActionInput(action, path, errors) {
   if (!obj(action)) return null;
   const hasAny = ['target_type','target_page_id','href','url','label','title','title_override'].some((key) => clean(action[key]));
   if (!hasAny) return null;
-  const normalized = normalizeCardInput({ ...action, title: action.label || action.title || action.title_override, linkLabel: action.label || action.linkLabel }, path, errors);
-  const label = clean(action.label || action.title_override || action.title || action.linkLabel);
+  const label = firstNonEmpty(action.label, action.title_override, action.title, action.linkLabel);
+  const normalized = normalizeCardInput({ ...action, title: label, linkLabel: label }, path, errors);
   if (!label) field(errors, `${path}.label`, 'A szekció gombfelirat kötelező.');
   return { target_type: normalized.target_type, ...(normalized.target_page_id ? { target_page_id: normalized.target_page_id } : {}), ...(normalized.href ? { href: normalized.href } : {}), label };
 }
