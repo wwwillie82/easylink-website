@@ -15,11 +15,12 @@ const cardsBlock = findRoleBlock(page?.blocks, 'integrations-cards', (block) => 
 const cardsVm = cardsBlock ? publicCardsFromItems(cardsBlock.items ?? [], { pages: routeIndex?.pages || [] }) : null;
 const ctaSectionBlock = resolvePageCtaBlock(page?.blocks, { role: 'cta-section' });
 const remainingBlocks = withoutBlocks(page?.blocks, [introBlock, cardsBlock, importantBlock, ctaSectionBlock]);
-const hasNetworkContent = Boolean(introBlock || cardsVm?.cards?.length || importantBlock);
+const hasNetworkContent = Boolean(introBlock || cardsBlock || importantBlock);
 ---
 <PageHero eyebrow={page?.heroEyebrow ?? "integraciok"} title={page?.heroTitle ?? "Integrációk"} description={page?.heroDescription ?? "Az integrációs registry előkészíti a későbbi partner- és adatkapcsolati tartalmakat. Ahol nincs bizonyított éles kapcsolat, ott integrációs irányként kommunikálunk."} asset={page?.heroAsset || "/assets/nati/hero-bg-flow-02.webp"} height={page?.heroHeight} imageFit={page?.heroImageFit} imagePositionX={page?.heroImagePositionX} imagePositionY={page?.heroImagePositionY} imagePositionMobileX={page?.heroImagePositionMobileX} imagePositionMobileY={page?.heroImagePositionMobileY} overlayStrength={page?.heroOverlayStrength} imageScale={page?.heroImageScale} video={page?.heroVideo} />
 {hasNetworkContent && <section class="section light network-section">
   {introBlock && <div class="container intro">{introBlock.title && <span class="eyebrow">{introBlock.title}</span>}{introBlock.body && <h2>{introBlock.body}</h2>}</div>}
+  {cardsBlock && <div class="container cards-heading">{cardsBlock.title && <h2>{cardsBlock.title}</h2>}{cardsBlock.body && <p>{cardsBlock.body}</p>}</div>}
   {cardsVm?.cards?.length > 0 && <div class="container"><ListingCards items={cardsVm.cards} /></div>}
   {importantBlock && <div class="container"><article class="important card">{importantBlock.title && <span class="eyebrow">{importantBlock.title}</span>}{importantBlock.body && <p>{importantBlock.body}</p>}</article></div>}
 </section>}
@@ -30,6 +31,9 @@ const hasNetworkContent = Boolean(introBlock || cardsVm?.cards?.length || import
   .network-section { background: linear-gradient(180deg, #f6f8f5, #fff); }
   .intro { margin-bottom: 28px; }
   .intro h2 { max-width: 920px; color: var(--color-navy); font-size: clamp(1.65rem, 2.5vw, 2.4rem); }
+  .cards-heading { margin-bottom: 24px; }
+  .cards-heading h2 { margin-bottom: 8px; color: var(--color-navy); font-size: clamp(1.35rem, 2vw, 2rem); }
+  .cards-heading p { max-width: 920px; margin: 0; color: var(--color-ink); }
   .important { margin-top: 28px; padding: 28px; border-radius: 24px; background: #fff; box-shadow: 0 20px 60px rgba(15,17,89,.09); }
   .important p { max-width: 920px; color: var(--color-navy); font-weight: 700; }
 </style>
