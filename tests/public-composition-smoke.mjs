@@ -191,10 +191,14 @@ assert.match(contactIndex, /helpItems = featureBlock\?\.items\?\.length \? featu
 assert.match(contactIndex, /safeContactIntro\(ctaBlock\?\.body\)/);
 assert.match(contactIndex, /data-easylink-cta="demo"/);
 const integrationsIndex = await readFile('src/components/page-renderers/IntegrationsRenderer.astro', 'utf8');
-assert.match(integrationsIndex, /publishedIntegrations.map\(\(item\) => \(\{ title: item.title, text: item.shortDescription, order: item.order, status: item.status \}\)\)/);
+assert.match(integrationsIndex, /import \{ publicCardsFromItems \} from '@\/lib\/content\/block-contracts\.mjs'/);
+assert.doesNotMatch(integrationsIndex, /publishedIntegrations/);
+assert.match(integrationsIndex, /const cardsVm = cardsBlock \? publicCardsFromItems\(cardsBlock\.items \?\? \[\], \{ pages: routeIndex\?\.pages \|\| \[\] \}\) : null/);
 assert.match(integrationsIndex, /findRoleBlock\(page\?\.blocks, 'integrations-intro'/);
 assert.match(integrationsIndex, /findRoleBlock\(page\?\.blocks, 'integrations-important'/);
-assert.match(integrationsIndex, /importantBlock\?\.title \?\? 'Fontos keret'/);
+assert.match(integrationsIndex, /\{importantBlock && <div class="container"><article class="important card">/);
+assert.doesNotMatch(integrationsIndex, /importantBlock\?\.title \?\? 'Fontos keret'/);
+assert.doesNotMatch(integrationsIndex, /A public tartalom integrációs irányokat/);
 assert.match(integrationsIndex, /const remainingBlocks = withoutBlocks/);
 assert.match(integrationsIndex, /<ContentBlocks blocks=\{remainingBlocks\}/);
 assert.match(integrationsIndex, /<CTASection block=\{ctaSectionBlock\}/);
@@ -204,6 +208,5 @@ for (const token of ['asset={page?.heroAsset || "/assets/nati/hero-bg-flow-02.we
 assert.doesNotMatch(integrationsIndex, /integration-card/);
 assert.doesNotMatch(integrationsIndex, /linkLabel:\s*'Részletek'/);
 assert.doesNotMatch(integrationsIndex, /\.\.\.item/);
-assert.match(integrationsIndex, /publishedIntegrations.map\(\(item\) => \(\{ title: item.title, text: item.shortDescription, order: item.order, status: item.status \}\)\)/);
 
 console.log('Public composition smoke passed: detailed home, hero, listing, content block, renderer and dynamic routing contracts.');
