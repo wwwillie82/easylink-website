@@ -1,0 +1,38 @@
+---
+import ListingCards from '@/components/ListingCards.astro';
+import { publicCardsFromItems } from '@/lib/content/block-contracts.mjs';
+
+const { block = {}, routeIndex = null, presentation = 'standard' } = Astro.props;
+const cardsVm = publicCardsFromItems(Array.isArray(block?.items) ? block.items : [], { pages: routeIndex?.pages || [] });
+const isHomePresentation = presentation === 'home';
+const eyebrow = String(block?.eyebrow || '').trim();
+---
+
+<article class:list={['type-cards', isHomePresentation && 'type-cards--home']}>
+  {isHomePresentation ? (
+    <>
+      {block.title && <span class="eyebrow">{block.title}</span>}
+      {block.body && <h2>{block.body}</h2>}
+    </>
+  ) : (
+    <>
+      {eyebrow && <span class="eyebrow">{eyebrow}</span>}
+      {block.title && <h2>{block.title}</h2>}
+      {block.body && <p>{block.body}</p>}
+    </>
+  )}
+  {cardsVm.cards.length > 0 && <ListingCards items={cardsVm.cards} />}
+  {cardsVm.action?.href && <p class="more"><a class="button button-secondary" href={cardsVm.action.href}>{cardsVm.action.label}</a></p>}
+</article>
+
+<style>
+  .type-cards { grid-column: 1 / -1; }
+  .type-cards h2 { color: var(--color-navy); font-size: clamp(1.22rem, 1.45vw, 1.62rem); font-weight: 700; line-height: 1.22; letter-spacing: -0.025em; }
+  .type-cards > p { color: var(--color-ink); line-height: 1.68; }
+  .type-cards--home > .eyebrow { display: block; margin: 0; color: var(--color-neon); font-size: var(--text-eyebrow); font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+  .type-cards--home > h2 { max-width: 900px; margin-top: 0; font-size: var(--text-section-title); line-height: 1; letter-spacing: -0.055em; font-weight: 800; }
+  .type-cards--home > p { margin-top: 0; font-size: var(--text-body); line-height: 1.65; }
+  .more { margin-top: 28px; }
+  .type-cards--home > .more { margin-top: 28px; }
+  .type-cards--home > .more .button-secondary { color: var(--color-navy); border-color: var(--color-line); background: var(--color-white); }
+</style>

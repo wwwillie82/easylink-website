@@ -22,7 +22,7 @@ for (const marker of order) {
   cursor = next;
 }
 const genericContentBlocks = await readFile('src/components/ContentBlocks.astro', 'utf8');
-for (const token of ['ListingCards', 'AiAssistantPreviewBlock', 'IntegrationsStripBlock']) {
+for (const token of ['CardsBlock', 'AiAssistantPreviewBlock', 'IntegrationsStripBlock']) {
   assert.match(genericContentBlocks, new RegExp(token));
 }
 
@@ -119,10 +119,10 @@ const listingCards = await readFile('src/components/ListingCards.astro', 'utf8')
 assert.match(listingCards, /class="listing-card"/);
 assert.match(listingCards, /item\.href \? \(/);
 assert.match(listingCards, /listing-card:hover, \.listing-card:focus-visible/);
-assert.match(listingCards, /target=\{publicHrefTarget\(item.href\)\} rel=\{publicHrefRel\(item.href\)\}/);
+assert.match(listingCards, /target=\{publicHrefTarget\(item\.href\)\} rel=\{publicHrefRel\(item\.href\)\}/);
 assert.match(listingCards, /normalizePublicHref/);
 assert.match(listingCards, /linkLabel: href \? /);
-assert.match(listingCards, /\{item.linkLabel && <i>\{item.linkLabel\}<\/i>\}/);
+assert.match(listingCards, /\{item\.linkLabel && <i>\{item\.linkLabel\}<\/i>\}/);
 assert.match(listingCards, /listing-card--static:hover \{ transform: none; border-color: rgba\(15, 17, 89, 0\.1\); box-shadow: var\(--shadow-card\); \}/);
 const linkHelper = await readFile('src/lib/content/links.ts', 'utf8');
 assert.match(linkHelper, /isDomainLikePublicHref/);
@@ -130,15 +130,16 @@ assert.match(linkHelper, /return `https:\/\/\$\{raw\}`/);
 
 const contentBlocks = await readFile('src/components/ContentBlocks.astro', 'utf8');
 assert.match(contentBlocks, /import \{ normalizePublicHref, publicHrefRel, publicHrefTarget \}/);
-assert.match(contentBlocks, /import ListingCards from/);
-assert.match(contentBlocks, /<ListingCards items=\{cardsVm.cards\}/);
-assert.match(contentBlocks, /const link = linkAttrs\(cta.url\)/);
-assert.match(contentBlocks, /href=\{link.href\} target=\{link.target\} rel=\{link.rel\}/);
-assert.match(contentBlocks, /normalizePublicHref\(item.url \|\| item.href\)/);
-assert.match(contentBlocks, /alt=\{media.alt \|\| ""\}/);
-assert.match(contentBlocks, /if \(type === 'text'\) \{[\s\S]*type-text[\s\S]*block.body && <p>\{block.body\}<\/p>[\s\S]*if \(type === 'cta'\)/);
-assert.match(contentBlocks, /if \(type === 'feature-list'\) \{[\s\S]*<ul>\{items.map/);
-assert.match(contentBlocks, /return <article class:list=\{\['content-card', `type-\$\{type\}`\]\}>[\s\S]*block.body && <p>\{block.body\}<\/p>[\s\S]*items.length > 0 && <ul>\{items.map/);
+assert.match(contentBlocks, /import CardsBlock from/);
+assert.match(contentBlocks, /<CardsBlock block=\{block\} routeIndex=\{routeIndex\}/);
+assert.doesNotMatch(contentBlocks, /import ListingCards from|publicCardsFromItems|<ListingCards items=/);
+assert.match(contentBlocks, /const link = linkAttrs\(cta\.url\)/);
+assert.match(contentBlocks, /href=\{link\.href\} target=\{link\.target\} rel=\{link\.rel\}/);
+assert.match(contentBlocks, /normalizePublicHref\(item\.url \|\| item\.href\)/);
+assert.match(contentBlocks, /alt=\{media\.alt \|\| ""\}/);
+assert.match(contentBlocks, /if \(type === 'text'\) \{[\s\S]*type-text[\s\S]*block\.body && <p>\{block\.body\}<\/p>[\s\S]*if \(type === 'cta'\)/);
+assert.match(contentBlocks, /if \(type === 'feature-list'\) \{[\s\S]*<ul>\{items\.map/);
+assert.match(contentBlocks, /return <article class:list=\{\['content-card', `type-\$\{type\}`\]\}>[\s\S]*block\.body && <p>\{block\.body\}<\/p>[\s\S]*items\.length > 0 && <ul>\{items\.map/);
 assert.doesNotMatch(contentBlocks, /mini-card/);
 
 const registry = await readFile('src/components/page-renderers/registry.ts', 'utf8');
@@ -156,17 +157,17 @@ assert.match(dispatcher, /if \(!isSupportedPublicPageType\(page\.type\)\) throw 
 assert.match(dispatcher, /<Renderer page=\{page\} routeIndex=\{routeIndex\} mode=\{mode\} \/>/);
 async function collectTsFiles(dir) { const out = []; for (const entry of await readdir(dir, { withFileTypes: true })) { const file = `${dir}/${entry.name}`; if (entry.isDirectory()) out.push(...await collectTsFiles(file)); else if (entry.isFile() && file.endsWith('.ts')) out.push(file); } return out; }
 const tsSources = await Promise.all((await collectTsFiles('src')).map(async (file) => [file, await readFile(file, 'utf8')]));
-for (const [file, source] of tsSources) assert.doesNotMatch(source, /from ['\"][^'\"]+\.astro['\"]/, `${file} must not import Astro components from TypeScript`);
+for (const [file, source] of tsSources) assert.doesNotMatch(source, /from ['"][^'"]+\.astro['"]/, `${file} must not import Astro components from TypeScript`);
 
 const solutionsIndex = await readFile('src/components/page-renderers/SolutionsIndexRenderer.astro', 'utf8');
 assert.match(solutionsIndex, /findRoleBlock\(page\?\.blocks, 'golden-cards'/);
-assert.match(solutionsIndex, /const rawSolutionCards = cardsBlock\?\.items\?\.length \? cardsBlock.items : publishedSolutions/);
+assert.match(solutionsIndex, /const rawSolutionCards = cardsBlock\?\.items\?\.length \? cardsBlock\.items : publishedSolutions/);
 assert.match(solutionsIndex, /source: cardsBlock\?\.items\?\.length \? 'db-block' : 'golden'/);
 assert.match(solutionsIndex, /<ListingCards items=\{solutionCards\}/);
 assert.doesNotMatch(solutionsIndex, /basePath="\/megoldasaink\/"/);
 const audiencesIndex = await readFile('src/components/page-renderers/AudiencesIndexRenderer.astro', 'utf8');
 assert.match(audiencesIndex, /findRoleBlock\(page\?\.blocks, 'golden-cards'/);
-assert.match(audiencesIndex, /const rawAudienceCards = cardsBlock\?\.items\?\.length \? cardsBlock.items : publishedAudiences/);
+assert.match(audiencesIndex, /const rawAudienceCards = cardsBlock\?\.items\?\.length \? cardsBlock\.items : publishedAudiences/);
 assert.match(audiencesIndex, /source: cardsBlock\?\.items\?\.length \? 'db-block' : 'golden'/);
 assert.doesNotMatch(audiencesIndex, /basePath="\/kinek-szol\/"/);
 for (const file of ['src/components/page-renderers/SolutionDetailRenderer.astro','src/components/page-renderers/AudienceDetailRenderer.astro']) {
@@ -183,17 +184,17 @@ assert.match(pricingIndex, /findRoleBlock\(page\?\.blocks, 'pricing-features'/);
 assert.match(pricingIndex, /findRoleBlock\(page\?\.blocks, 'pricing-explainer'/);
 assert.match(pricingIndex, /resolvePageCtaBlock\(page\?\.blocks, \{ role: 'pricing-cta' \}\)/);
 assert.match(pricingIndex, /<CTASection block=\{ctaBlock\}/);
-assert.match(pricingIndex, /priceFeatures = featureBlock\?\.items\?\.length \? featureBlock.items :/);
+assert.match(pricingIndex, /priceFeatures = featureBlock\?\.items\?\.length \? featureBlock\.items :/);
 const contactIndex = await readFile('src/components/page-renderers/ContactRenderer.astro', 'utf8');
 assert.match(contactIndex, /findRoleBlock\(page\?\.blocks, 'contact-main'/);
 assert.match(contactIndex, /findRoleBlock\(page\?\.blocks, 'contact-features'/);
-assert.match(contactIndex, /helpItems = featureBlock\?\.items\?\.length \? featureBlock.items :/);
+assert.match(contactIndex, /helpItems = featureBlock\?\.items\?\.length \? featureBlock\.items :/);
 assert.match(contactIndex, /safeContactIntro\(ctaBlock\?\.body\)/);
 assert.match(contactIndex, /data-easylink-cta="demo"/);
 const integrationsIndex = await readFile('src/components/page-renderers/IntegrationsRenderer.astro', 'utf8');
-assert.match(integrationsIndex, /import \{ publicCardsFromItems \} from '@\/lib\/content\/block-contracts\.mjs'/);
-assert.doesNotMatch(integrationsIndex, /publishedIntegrations/);
-assert.match(integrationsIndex, /const cardsVm = cardsBlock \? publicCardsFromItems\(cardsBlock\.items \?\? \[\], \{ pages: routeIndex\?\.pages \|\| \[\] \}\) : null/);
+assert.match(integrationsIndex, /import CardsBlock from '@\/components\/CardsBlock\.astro'/);
+assert.doesNotMatch(integrationsIndex, /publishedIntegrations|publicCardsFromItems|import ListingCards from/);
+assert.match(integrationsIndex, /<CardsBlock block=\{cardsBlock\} routeIndex=\{routeIndex\} presentation="standard" \/>/);
 assert.match(integrationsIndex, /findRoleBlock\(page\?\.blocks, 'integrations-intro'/);
 assert.match(integrationsIndex, /findRoleBlock\(page\?\.blocks, 'integrations-important'/);
 assert.match(integrationsIndex, /\{importantBlock && <div class="container"><article class="important card">/);
