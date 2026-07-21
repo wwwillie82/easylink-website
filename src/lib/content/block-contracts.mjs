@@ -26,8 +26,8 @@ function normalizeActionInput(action, path, errors) {
   if (!obj(action)) return null;
   const hasAny = ['target_type','target_page_id','href','url','label','title','title_override'].some((key) => clean(action[key]));
   if (!hasAny) return null;
-  const label = firstNonEmpty(action.label, action.title_override, action.title, action.linkLabel);
-  const normalized = normalizeCardInput({ ...action, title: label, linkLabel: label }, path, errors);
+  const normalized = normalizeCardInput({ ...action, title: action.label || action.title || action.title_override, linkLabel: action.label || action.linkLabel }, path, errors);
+  const label = clean(action.label || action.title_override || action.title || action.linkLabel);
   if (!label) field(errors, `${path}.label`, 'A szekció gombfelirat kötelező.');
   return { target_type: normalized.target_type, ...(normalized.target_page_id ? { target_page_id: normalized.target_page_id } : {}), ...(normalized.href ? { href: normalized.href } : {}), label };
 }
