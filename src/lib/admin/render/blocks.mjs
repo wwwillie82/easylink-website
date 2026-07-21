@@ -8,8 +8,9 @@ import { supportedBlockTypes, blockTypeOptionsForContext } from '../../content/b
 function blockKind(type) { return supportedBlockTypes.has(type) ? type : String(type || 'text'); }
 function editorMode(type) { if (['feature-list','list'].includes(type)) return 'feature-list'; if (['cards','card-grid'].includes(type)) return 'cards'; if (type === 'ai-preview') return 'ai-preview'; if (type === 'network-visual') return 'network-visual'; if (type === 'split-text') return 'split-text'; if (type === 'ai-assistant-preview') return 'ai-assistant-preview'; if (type === 'integrations-strip') return 'integrations-strip'; if (!supportedBlockTypes.has(type)) return 'raw'; return type; }
 const asObj = (it) => typeof it === 'object' && it ? it : { title: it || '' };
-const titleOf = (it) => typeof it === 'string' ? it : (it.title || it.text || it.question || it.heading || it.label || '');
-const textOf = (it) => typeof it === 'object' && it ? (it.text || it.shortDescription || it.answer || it.body || '') : '';
+const nonEmpty = (value) => { const text = String(value ?? '').trim(); return text ? value : ''; };
+const titleOf = (it) => typeof it === 'string' ? it : (nonEmpty(it?.title_override) || it?.title || it?.text || it?.question || it?.heading || it?.label || '');
+const textOf = (it) => typeof it === 'object' && it ? (nonEmpty(it.text_override) || it.text || it.shortDescription || it.answer || it.body || '') : '';
 const urlOf = (it) => typeof it === 'object' && it ? (it.url || it.href || it.slug || it.id || it.kind || it.role || '') : '';
 const labelOf = (it) => typeof it === 'object' && it ? (it.linkLabel || it.label || '') : '';
 const targetTypeOf = (it) => ['page','legacy','external'].includes(String(it?.target_type || '')) ? String(it.target_type) : (it?.target_page_id ? 'page' : (String(it?.href || it?.url || '').startsWith('http') ? 'external' : 'legacy'));
@@ -159,6 +160,7 @@ export function parseItemRowRaw(rawItem = '{}') { return JSON.parse(rawItem || '
 export function serializeEditorItems({ type, rows = [], first = {}, rawItemsText = '[]' } = {}) {
   const setClean = (obj, key, value) => { if (value === '' || value === undefined || value === null) delete obj[key]; else obj[key] = value; };
   const objectRaw = (raw) => raw && typeof raw === 'object' && !Array.isArray(raw) ? { ...raw } : {};
+  const nonEmptyValue = (value) => { const text = String(value ?? '').trim(); return text ? value : ''; };
   const coerceOrder = (key, value, fallback) => {
     if (value === '' || value === undefined || value === null) return fallback;
     if (key === 'badge') return value;
@@ -183,12 +185,12 @@ export function serializeEditorItems({ type, rows = [], first = {}, rawItemsText
     const card = { target_type: target };
     if (target === 'page') setClean(card, 'target_page_id', i.target_page_id || raw.target_page_id || '');
     else setClean(card, 'href', i.url || raw.href || raw.url || '');
-    setClean(card, 'title', i.title);
-    setClean(card, 'text', i.text);
+    setClean(card, nonEmptyValue(raw.title_override) ? 'title_override' : 'title', i.title);
+    setClean(card, nonEmptyValue(raw.text_override) ? 'text_override' : 'text', i.text);
     setClean(card, 'linkLabel', i.linkLabel);
     setClean(card, 'badge', coerceOrder('badge', i.order, raw.badge || raw.order));
     return card;
-  }).filter((i) => i.title || i.text || i.href || i.target_page_id); const actionRows = rows.action || {}; let action = null; if (actionRows.enabled) { action = { target_type: actionRows.target_type || 'legacy', label: actionRows.label || '' }; if (action.target_type === 'page') action.target_page_id = actionRows.target_page_id || ''; else action.href = actionRows.href || ''; } return [{ version: 2, variant: 'default', cards, action }]; }
+  }).filter((i) => i.title || i.text || i.title_override || i.text_override || i.href || i.target_page_id); const actionRows = rows.action || {}; let action = null; if (actionRows.enabled) { action = { target_type: actionRows.target_type || 'legacy', label: actionRows.label || '' }; if (action.target_type === 'page') action.target_page_id = actionRows.target_page_id || ''; else action.href = actionRows.href || ''; } return [{ version: 2, variant: 'default', cards, action }]; }
   if (type === 'cta') {
     const raw = objectRaw(first);
     setClean(raw, 'label', rows.label || '');
