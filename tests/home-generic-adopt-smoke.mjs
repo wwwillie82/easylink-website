@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import { canonicalHomeBlockFixture, legacyHomeBlockToGenericBlock, HOME_HERO_META_KEY } from '../src/lib/content/home-blocks.mjs';
+const script = await readFile('scripts/adopt-home-generic-blocks.mjs', 'utf8');
+for (const flag of ['--dry-run','--apply','--status','--help']) assert.match(script, new RegExp(flag.replace('--','--')));
+assert.match(script, /beginTransaction/);
+assert.match(script, /without publishing or deploying/);
+const legacy = canonicalHomeBlockFixture();
+const converted = legacy.filter((block) => block.block_key !== HOME_HERO_META_KEY).map(legacyHomeBlockToGenericBlock);
+assert.deepEqual(converted.map((block) => block.type), ['split-text','cards','ai-assistant-preview','integrations-strip','cards']);
+assert.equal(converted.find((block) => block.block_key === 'home:solutions').items[0].version, 2);
+assert.ok(Array.isArray(converted.find((block) => block.block_key === 'home:solutions').items[0].cards));
+console.log('Home generic adopt smoke passed: checked-in CLI and deterministic legacy mapping.');

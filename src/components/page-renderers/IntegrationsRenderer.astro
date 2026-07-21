@@ -8,7 +8,7 @@ import { publishedIntegrations } from '@/content/integrations';
 import { findRoleBlock, withoutBlocks } from '@/lib/content/blockRoles';
 import { resolvePageCtaBlock } from '@/lib/content/pageCta';
 type Props = PublicPageRendererProps;
-const { page } = Astro.props;
+const { page, routeIndex } = Astro.props;
 const introBlock = findRoleBlock(page?.blocks, 'integrations-intro', (block) => block.type === 'text');
 const importantBlock = findRoleBlock(page?.blocks, 'integrations-important', (block) => block.type === 'text' && block !== introBlock);
 const cardsBlock = findRoleBlock(page?.blocks, 'integrations-cards', (block) => ['cards', 'card-grid'].includes(block.type));
@@ -22,7 +22,7 @@ const remainingBlocks = withoutBlocks(page?.blocks, [introBlock, cardsBlock, imp
   <div class="container"><ListingCards items={integrationCards} /></div>
   <div class="container"><article class="important card"><span class="eyebrow">{importantBlock?.title ?? 'Fontos keret'}</span><p>{importantBlock?.body ?? 'A public tartalom integrációs irányokat és előkészített kapcsolódásokat mutat be; kész éles kapcsolatot csak bizonyított implementáció után kommunikálunk.'}</p></article></div>
 </section>
-{remainingBlocks.length > 0 && <ContentBlocks blocks={remainingBlocks} />}
+{remainingBlocks.length > 0 && <ContentBlocks blocks={remainingBlocks} routeIndex={routeIndex} />}
 <CTASection block={ctaSectionBlock} />
 <style>
   .light { background: var(--color-soft); }

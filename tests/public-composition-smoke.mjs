@@ -3,29 +3,27 @@ import { readdir, readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 
 const home = await readFile('src/pages/index.astro', 'utf8');
-for (const token of ['Hero', 'HomeRenderer', 'CTASection']) {
+for (const token of ['Hero', 'ContentBlocks', 'CTASection']) {
   assert.match(home, new RegExp(`import ${token} from`));
   assert.ok(home.includes(`<${token}`));
 }
 assert.doesNotMatch(home, /import PageHero from/);
-assert.doesNotMatch(home, /import ContentBlocks from/);
+assert.doesNotMatch(home, /import HomeRenderer from/);
 assert.doesNotMatch(home, /publishedSolutions|publishedAudiences|resolveListingCards/);
 assert.doesNotMatch(home, /basePath="\/megoldasaink\/"|basePath="\/kinek-szol\/"|href="\/megoldasaink\/"/);
 assert.match(home, /getPublicRouteIndex/);
 assert.match(home, /normalizeHomePage/);
-const order = ['<Header', '<Hero', '<HomeRenderer', '<CTASection', '<Footer'];
+const order = ['<Header', '<Hero', '<ContentBlocks', '<CTASection', '<Footer'];
 let cursor = -1;
 for (const marker of order) {
   const next = home.indexOf(marker, cursor + 1);
   assert.ok(next > cursor, `missing or out of order home marker: ${marker}`);
   cursor = next;
 }
-const homeRenderer = await readFile('src/components/home/HomeRenderer.astro', 'utf8');
-for (const token of ['ListingCards', 'AiAssistantPreview', 'IntegrationsStrip']) {
-  assert.match(homeRenderer, new RegExp(`import ${token} from`));
-  assert.ok(homeRenderer.includes(`<${token}`));
+const genericContentBlocks = await readFile('src/components/ContentBlocks.astro', 'utf8');
+for (const token of ['ListingCards', 'AiAssistantPreviewBlock', 'IntegrationsStripBlock']) {
+  assert.match(genericContentBlocks, new RegExp(token));
 }
-assert.doesNotMatch(homeRenderer, /Összes megoldás/);
 
 const hero = await readFile('src/components/Hero.astro', 'utf8');
 for (const phrase of ['heroCta.secondaryLabel', 'VideoMedia']) assert.match(hero, new RegExp(phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
@@ -132,7 +130,7 @@ assert.match(linkHelper, /return `https:\/\/\$\{raw\}`/);
 const contentBlocks = await readFile('src/components/ContentBlocks.astro', 'utf8');
 assert.match(contentBlocks, /import \{ normalizePublicHref, publicHrefRel, publicHrefTarget \}/);
 assert.match(contentBlocks, /import ListingCards from/);
-assert.match(contentBlocks, /<ListingCards items=\{items\}/);
+assert.match(contentBlocks, /<ListingCards items=\{cardsVm.cards\}/);
 assert.match(contentBlocks, /const link = linkAttrs\(cta.url\)/);
 assert.match(contentBlocks, /href=\{link.href\} target=\{link.target\} rel=\{link.rel\}/);
 assert.match(contentBlocks, /normalizePublicHref\(item.url \|\| item.href\)/);

@@ -1,0 +1,36 @@
+---
+const { block = {} } = Astro.props;
+const items = Array.isArray(block.items) ? block.items : [];
+const heading = items.find((item) => item?.kind === 'heading')?.text || items.find((item) => item?.kind === 'heading')?.heading || '';
+const sources = items.filter((item) => item?.kind === 'source').map((item) => ({ title: item.title || item.label || '' })).filter((item) => item.title);
+const messages = items.filter((item) => item?.kind === 'message').map((item) => ({ role: item.role, title: item.title || '', text: item.text || '' }));
+const userMessages = messages.filter((message) => message.role === 'user');
+const assistantMessages = messages.filter((message) => message.role === 'assistant');
+---
+<div class="ai ai-assistant-preview" data-ai-assistant-preview-block>
+  <div class="ai-grid">
+    <div class="ai-copy">
+      <span class="eyebrow">{block.title || 'AI asszisztens'}</span>
+      <h2>{heading}</h2>
+      {block.body && <p>{block.body}</p>}
+    </div>
+    <div class="chat">
+      <div class="source-row">{sources.map((source) => <span>{source.title}</span>)}</div>
+      {userMessages.map((message) => <div class="msg user">{message.text}</div>)}
+      {assistantMessages.map((message) => <div class="msg bot">{message.title && <b>{message.title}</b>}<p>{message.text}</p></div>)}
+    </div>
+  </div>
+</div>
+<style>
+  .ai { color: white; }
+  .ai-grid { display: grid; grid-template-columns: 0.9fr 1.1fr; gap: 38px; align-items: center; }
+  .ai-copy p { color: rgba(255, 255, 255, 0.76); }
+  .chat { padding: clamp(20px, 3vw, 28px); border-radius: 28px; border: 1px solid rgba(174, 255, 0, 0.24); background: rgba(255, 255, 255, 0.07); backdrop-filter: blur(12px); display: grid; gap: 14px; box-shadow: 0 28px 85px rgba(0, 0, 0, 0.22); }
+  .source-row { display: flex; gap: 9px; flex-wrap: wrap; }
+  .source-row span { background: rgba(174, 255, 0, 0.13); border: 1px solid rgba(174, 255, 0, 0.28); color: var(--color-neon); font-weight: 800; border-radius: 999px; padding: 7px 11px; font-size: 0.86rem; }
+  .msg { padding: 16px 18px; border-radius: 20px; line-height: 1.55; }
+  .user { background: rgba(15, 17, 89, 0.82); color: white; margin-left: 8%; border: 1px solid rgba(255, 255, 255, 0.12); }
+  .bot { background: white; color: var(--color-navy); margin-right: 8%; }
+  .bot p { color: var(--color-ink); margin: 8px 0 0; }
+  @media (max-width: 800px) { .ai-grid { grid-template-columns: 1fr; } .user, .bot { margin-left: 0; margin-right: 0; } }
+</style>

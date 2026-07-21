@@ -9,13 +9,14 @@ import { buildYouTubeEmbedUrl, normalizeVideoConfig, parseYouTubeUrl } from '../
 const featureObject = serializeEditorItems({ type: 'feature-list', rows: [{ raw: { title: 'Elem', url: '/pelda/', customMeta: 'maradjon' }, title: 'Elem 2' }] });
 assert.deepEqual(featureObject, [{ title: 'Elem 2', url: '/pelda/', customMeta: 'maradjon' }]);
 assert.deepEqual(serializeEditorItems({ type: 'feature-list', rows: [{ raw: {}, title: 'Első szerk' }] }), ['Első szerk']);
-const card = serializeEditorItems({ type: 'cards', rows: [{ raw: { title: 'Kártya', href: '/cel/', badge: 'A', customMeta: 42 }, title: 'Kártya 2', text: '', url: '/cel-2/', linkLabel: '', order: 'B' }] })[0];
+const cardContract = serializeEditorItems({ type: 'cards', rows: [{ raw: { title: 'Kártya', href: '/cel/', badge: 'A', customMeta: 42 }, title: 'Kártya 2', text: '', url: '/cel-2/', linkLabel: '', order: 'B' }] })[0];
+assert.equal(cardContract.version, 2);
+const card = cardContract.cards[0];
 assert.equal(card.href, '/cel-2/');
 assert.equal(card.badge, 'B');
-assert.equal(card.customMeta, 42);
 assert.ok(!('url' in card));
-const numericOrder = serializeEditorItems({ type: 'cards', rows: [{ raw: { title: 'K', url: '/c/', order: 7 }, title: 'K', text: '', url: '/c/', linkLabel: '', order: '' }] })[0];
-assert.equal(numericOrder.order, 7);
+const numericOrder = serializeEditorItems({ type: 'cards', rows: [{ raw: { title: 'K', url: '/c/', order: 7 }, title: 'K', text: '', url: '/c/', linkLabel: '', order: '' }] })[0].cards[0];
+assert.equal(numericOrder.badge, 7);
 const faq = serializeEditorItems({ type: 'faq', rows: [{ raw: { question: 'Kérdés', answer: 'Válasz', schemaId: 'faq-1' }, title: 'Kérdés 2', text: 'Válasz 2' }] })[0];
 assert.deepEqual(faq, { question: 'Kérdés 2', answer: 'Válasz 2', schemaId: 'faq-1' });
 assert.deepEqual(serializeEditorItems({ type: 'raw', rawItemsText: '[{"x":1}]' }), [{ x: 1 }]);

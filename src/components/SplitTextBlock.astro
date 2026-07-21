@@ -1,0 +1,20 @@
+---
+const { block = {} } = Astro.props;
+const first = Array.isArray(block.items) && block.items[0] ? block.items[0] : {};
+const heading = first.heading || first.text || block.heading || '';
+---
+<div class="split-text-section" data-split-text-block>
+  <div class="split-text-grid">
+    <div>
+      <span class="eyebrow">{block.title}</span>
+      <h2>{heading}</h2>
+    </div>
+    <div>{block.body && <p>{block.body}</p>}</div>
+  </div>
+</div>
+<style>
+  .split-text-section { display: block; }
+  .split-text-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 42px; align-items: start; }
+  .split-text-grid h2 { max-width: 900px; }
+  @media (max-width: 800px) { .split-text-grid { grid-template-columns: 1fr; } }
+</style>
