@@ -20,22 +20,48 @@ function parseCli(argv = process.argv.slice(2)) {
 
 const parseItems = (value) => typeof value === 'string' && value.trim() ? JSON.parse(value) : (Array.isArray(value) ? structuredClone(value) : []);
 const sameJson = (a, b) => JSON.stringify(a) === JSON.stringify(b);
-function hasSectionAction(items = []) { return items.some((item) => item?.kind === 'section-action') || items.some((item) => item?.version === 2 && item?.action); }
-function validCopiedAction(action) {
-  if (!action || action.kind !== 'section-action') return null;
-  const label = String(action.title_override || action.title || action.label || '').trim();
+function normalizeActionContract(action = {}, { legacy = false } = {}) {
+  const label = String(action.label || action.title_override || action.title || '').trim();
   const href = String(action.href || action.url || '').trim();
   const pageId = action.target_page_id == null || action.target_page_id === '' ? undefined : Number(action.target_page_id);
+  const targetType = action.target_type || (legacy ? 'legacy' : '');
   if (!label) return null;
-  if (action.target_type === 'page') { if (!Number.isSafeInteger(pageId) || pageId <= 0) return null; return { kind: 'section-action', target_type: 'page', target_page_id: pageId, title_override: label }; }
-  if ((action.target_type || 'legacy') === 'legacy' && href.startsWith('/')) return { kind: 'section-action', target_type: 'legacy', href, title: label };
-  if (action.target_type === 'external' && /^https?:\/\//.test(href)) return { kind: 'section-action', target_type: 'external', href, title: label };
+  if (targetType === 'page') { if (!Number.isSafeInteger(pageId) || pageId <= 0) return null; return { target_type: 'page', target_page_id: pageId, label }; }
+  if (targetType === 'legacy' && href.startsWith('/') && !href.startsWith('//')) return { target_type: 'legacy', href, label };
+  if (targetType === 'external') { try { const url = new URL(href); if (url.protocol === 'http:' || url.protocol === 'https:') return { target_type: 'external', href, label }; } catch {} }
   return null;
 }
+function toLegacyCopiedAction(action) {
+  if (action.target_type === 'page') return { kind: 'section-action', target_type: 'page', target_page_id: action.target_page_id, title_override: action.label };
+  return { kind: 'section-action', target_type: action.target_type, href: action.href, title: action.label };
+}
+const actionComparable = (action) => JSON.stringify(action, ['target_type', 'target_page_id', 'href', 'label']);
+function extractValidSectionAction(items = []) {
+  const v2Item = items.find((item) => item?.version === 2 && Array.isArray(item?.cards));
+  const flatActions = items.filter((item) => item?.kind === 'section-action');
+  if (flatActions.length > 1) throw new Error('Több legacy flat section-action van a canonical home:solutions blokkban.');
+  const v2Disabled = v2Item?.action?.enabled === false;
+  const v2Action = v2Item && !v2Disabled ? normalizeActionContract(v2Item.action || {}) : null;
+  const flatAction = flatActions.length === 1 ? normalizeActionContract(flatActions[0], { legacy: true }) : null;
+  if (v2Item && flatActions.length === 1 && v2Action && flatAction) {
+    if (actionComparable(v2Action) !== actionComparable(flatAction)) throw new Error('A cards V2 és legacy flat section-action konfliktusos a canonical home:solutions blokkban.');
+    return { format: 'cards-v2', action: v2Action };
+  }
+  if (v2Item && flatActions.length === 1 && (v2Disabled || !v2Action) && flatAction) throw new Error('A cards V2 és legacy flat section-action konfliktusos a canonical home:solutions blokkban.');
+  if (v2Action) return { format: 'cards-v2', action: v2Action };
+  if (flatAction) return { format: 'legacy-flat', action: flatAction };
+  const reasons = [];
+  if (v2Item) reasons.push('cards V2 action hiányzik vagy tiltott');
+  if (flatActions.length === 0) reasons.push('legacy flat action hiányzik');
+  throw new Error(`A canonical home:solutions blokkban nincs valid másolható section-action (${reasons.join('; ')}).`);
+}
+function hasSectionAction(items = []) { return items.some((item) => item?.kind === 'section-action') || items.some((item) => item?.version === 2 && item?.action && item.action.enabled !== false); }
+function validCopiedAction(action) { const normalized = normalizeActionContract(action, { legacy: action?.kind === 'section-action' }); return normalized ? toLegacyCopiedAction(normalized) : null; }
 function copyActionToManualItems(items, action) {
   if (hasSectionAction(items)) return items;
-  if (items[0]?.version === 2 && Array.isArray(items[0]?.cards)) return [{ ...items[0], action: { target_type: action.target_type, target_page_id: action.target_page_id, href: action.href || '', label: action.title_override || action.title } }, ...items.slice(1)];
-  return [...items, action];
+  const copied = toLegacyCopiedAction(action);
+  if (items[0]?.version === 2 && Array.isArray(items[0]?.cards)) return [{ ...items[0], action: { target_type: action.target_type, target_page_id: action.target_page_id, href: action.href || '', label: action.label } }, ...items.slice(1)];
+  return [...items, copied];
 }
 function assertOne(name, rows) { if (rows.length !== 1) throw new Error(`${name} pontosan egy rekordot igényel, talált: ${rows.length}.`); return rows[0]; }
 function assertAffected(result, label) { if (Number(result?.affectedRows) !== 1) throw new Error(`${label}: affectedRows != 1 (${result?.affectedRows ?? 'n/a'}).`); }
@@ -77,13 +103,13 @@ export async function reconcileHomeMiddleCanonicalTransaction(conn, { apply = fa
     const canonicalRows = RECONCILE_HOME_MIDDLE_KEYS.map((key) => assertOne(key, allBlocks.filter((row) => row.block_key === key)));
     const manualSolutions = allBlocks.filter((row) => row.status !== 'archived' && row.block_key !== HERO_META_KEY && !RECONCILE_HOME_MIDDLE_KEYS.includes(row.block_key) && ['cards','card-grid'].includes(row.type) && String(row.title || '').trim() === 'Megoldásaink');
     const manual = assertOne('manual Megoldásaink cards blokk', manualSolutions);
-    const sourceAction = validCopiedAction(parseItems(assertOne(SOLUTIONS_KEY, canonicalRows.filter((row) => row.block_key === SOLUTIONS_KEY)).items).find((item) => item?.kind === 'section-action'));
+    const source = extractValidSectionAction(parseItems(assertOne(SOLUTIONS_KEY, canonicalRows.filter((row) => row.block_key === SOLUTIONS_KEY)).items));
+    const sourceAction = source.action;
     const beforeItems = parseItems(manual.items);
-    if (!hasSectionAction(beforeItems) && !sourceAction) throw new Error('A canonical home:solutions blokkban nincs valid másolható section-action.');
     const afterItems = sourceAction ? copyActionToManualItems(beforeItems, sourceAction) : beforeItems;
     const updateManual = !sameJson(beforeItems, afterItems);
     const archiveTargets = canonicalRows.filter((row) => row.status !== 'archived');
-    const plan = { apply, home: { id: home.id, route: home.route, type: home.type }, totalBlocks: allBlocks.length, manualSolutions: { id: manual.id, block_key: manual.block_key, willUpdateItems: updateManual }, archive: canonicalRows.map((row) => ({ id: row.id, block_key: row.block_key, status: row.status, willArchive: row.status !== 'archived' })), noOp: !updateManual && archiveTargets.length === 0 };
+    const plan = { apply, home: { id: home.id, route: home.route, type: home.type }, totalBlocks: allBlocks.length, manualSolutions: { id: manual.id, block_key: manual.block_key, willUpdateItems: updateManual }, sourceAction: { format: source.format, label: sourceAction.label, target_type: sourceAction.target_type, target_page_id: sourceAction.target_page_id, href: sourceAction.href }, archive: canonicalRows.map((row) => ({ id: row.id, block_key: row.block_key, status: row.status, willArchive: row.status !== 'archived' })), noOp: !updateManual && archiveTargets.length === 0 };
     if (apply) {
       if (updateManual) assertAffected((await conn.execute('UPDATE site_content_blocks SET items=? WHERE id=? AND page_id=?', [JSON.stringify(afterItems), manual.id, home.id]))[0], 'manual Megoldásaink items update');
       for (const row of archiveTargets) assertAffected((await conn.execute('UPDATE site_content_blocks SET status=? WHERE id=? AND page_id=? AND block_key=?', ['archived', row.id, home.id, row.block_key]))[0], `archive ${row.block_key}`);
@@ -104,4 +130,4 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     finally { conn.release(); await pool.end(); }
   } catch (error) { console.error(error.message || error); process.exit(1); }
 }
-export { parseCli, parseItems, hasSectionAction, validCopiedAction, assertPostcondition };
+export { parseCli, parseItems, hasSectionAction, validCopiedAction, extractValidSectionAction, assertPostcondition };
