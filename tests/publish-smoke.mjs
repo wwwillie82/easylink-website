@@ -5,7 +5,6 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createPublishService, contentHash, ensureWebrootPermissions, stableJson } from '../src/lib/admin/publish.mjs';
 import { PUBLIC_SMOKE_METADATA_PATH } from '../src/lib/content/smoke-metadata.mjs';
-import { canonicalHomeBlockFixture } from '../src/lib/content/home-blocks.mjs';
 import { publishPanel } from '../src/lib/admin/render.mjs';
 
 
@@ -19,21 +18,19 @@ assert.match(adminPublishSource, /process\.env\.SITE_ADMIN_ENV_FILE/);
 assert.match(adminPublishSource, /required: true/);
 assert.match(adminPublishSource, /process\.env\[match\[1\]\] !== undefined/);
 
-const homeBlockRows = canonicalHomeBlockFixture().map((block, index) => {
-  const items = structuredClone(block.items);
-  if (block.blockKey === 'home:solutions') {
-    items[0] = { kind: 'card', target_type: 'page', target_page_id: 3, title_override: null, text_override: 'Pénzügy text', linkLabel: 'Részletek →', badge: 1 };
-    items[1] = { kind: 'card', target_type: 'page', target_page_id: 4, title_override: null, text_override: 'HR text', linkLabel: 'Részletek →', badge: 2 };
-    items[2] = { kind: 'card', target_type: 'page', target_page_id: 5, title_override: null, text_override: 'CRM text', linkLabel: 'Részletek →', badge: 3 };
-    items[3] = { kind: 'section-action', target_type: 'page', target_page_id: 2, title_override: 'Összes megoldás' };
-  }
-  if (block.blockKey === 'home:audiences') {
-    items[0] = { kind: 'card', target_type: 'page', target_page_id: 21, title_override: null, text_override: 'Hotel text', linkLabel: 'Részletek →', badge: 1 };
-    items[1] = { kind: 'card', target_type: 'page', target_page_id: 22, title_override: null, text_override: 'Vendéglátó text', linkLabel: 'Részletek →', badge: 2 };
-    items[2] = { kind: 'card', target_type: 'page', target_page_id: 23, title_override: null, text_override: 'Szolgáltató text', linkLabel: 'Részletek →', badge: 3 };
-  }
-  return { id: index + 10, page_id: 1, block_key: block.blockKey, type: block.type, title: block.title, body: block.body, items: JSON.stringify(items), sort_order: block.sortOrder, status: 'published' };
-});
+const homeBlockRows = [
+  { id: 10, page_id: 1, block_key: 'home:hero-meta', type: 'hero-meta', title: 'Hero meta', body: '', items: JSON.stringify([{ title: 'Gyorsabb döntés', text: 'Átlátható adatok.' }]), sort_order: 0, status: 'published' },
+  { id: 11, page_id: 1, block_key: 'manual:solutions', type: 'cards', title: 'Megoldásaink', body: 'Egy rendszer a napi működés kulcspontjaira.', items: JSON.stringify([{ version: 2, cards: [
+    { target_type: 'page', target_page_id: 3, text_override: 'Pénzügy text', linkLabel: 'Részletek →', badge: 1 },
+    { target_type: 'page', target_page_id: 4, text_override: 'HR text', linkLabel: 'Részletek →', badge: 2 },
+    { target_type: 'page', target_page_id: 5, text_override: 'CRM text', linkLabel: 'Részletek →', badge: 3 },
+  ], action: { target_type: 'page', target_page_id: 2, label: 'Összes megoldás' } }]), sort_order: 20, status: 'published' },
+  { id: 12, page_id: 1, block_key: 'manual:audiences', type: 'cards', title: 'Kinek szól?', body: 'Hoteleknek, vendéglátóhelyeknek és szolgáltató vállalkozásoknak.', items: JSON.stringify([{ version: 2, cards: [
+    { target_type: 'page', target_page_id: 21, text_override: 'Hotel text', linkLabel: 'Részletek →', badge: 1 },
+    { target_type: 'page', target_page_id: 22, text_override: 'Vendéglátó text', linkLabel: 'Részletek →', badge: 2 },
+    { target_type: 'page', target_page_id: 23, text_override: 'Szolgáltató text', linkLabel: 'Részletek →', badge: 3 },
+  ] }]), sort_order: 30, status: 'published' },
+];
 const content = { navigation: [{ id: 1, title: 'A' }], pages: [
   { id: 1, route: '/', type: 'home', title: 'Home', status: 'published', hero_eyebrow: 'Home eyebrow', hero_title: 'Home title', hero_description: 'Home desc', hero_asset: '/assets/site-media/2026/07/kep-a1b2c3d4.png' },
   { id: 2, route: '/megoldasaink/', type: 'solutions_index', title: 'Megoldásaink', status: 'published' },

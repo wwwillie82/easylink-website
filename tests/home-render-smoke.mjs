@@ -1,12 +1,13 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { homeMiddleContentBlocks, staticHomeBlocksFixture } from '../src/lib/content/home-blocks.mjs';
+import { homeMiddleContentBlocks } from '../src/lib/content/home-blocks.mjs';
 const index = await readFile('src/pages/index.astro', 'utf8');
 assert.match(index, /import ContentBlocks from/);
 assert.doesNotMatch(index, /import HomeRenderer from/);
 assert.match(index, /<Hero[\s\S]*<ContentBlocks[\s\S]*<CTASection/);
-const blocks = homeMiddleContentBlocks({ page: { route: '/', type: 'home', blocks: staticHomeBlocksFixture }, mode: 'static', routeIndex: { pages: [] } });
-assert.deepEqual(blocks.map((block)=>block.type), ['split-text','cards','ai-assistant-preview','integrations-strip','cards']);
+const manual = [{ block_key: 'manual:intro', type: 'split-text', status: 'published', sort_order: 10, items: [] }, { block_key: 'manual:solutions', type: 'cards', status: 'published', sort_order: 20, items: [] }, { block_key: 'manual:ai', type: 'ai-assistant-preview', status: 'published', sort_order: 30, items: [] }, { block_key: 'manual:integrations', type: 'integrations-strip', status: 'published', sort_order: 40, items: [] }];
+const blocks = homeMiddleContentBlocks({ page: { route: '/', type: 'home', blocks: manual }, mode: 'db-authoritative', routeIndex: { pages: [] } });
+assert.deepEqual(blocks.map((block)=>block.type), ['split-text','cards','ai-assistant-preview','integrations-strip']);
 const contentBlocks = await readFile('src/components/ContentBlocks.astro', 'utf8');
 for (const token of ['SplitTextBlock','AiAssistantPreviewBlock','IntegrationsStripBlock','publicCardsFromItems']) assert.match(contentBlocks, new RegExp(token));
 assert.match(contentBlocks, /data-content-blocks-layout="stacked-sections"/);
@@ -26,4 +27,4 @@ const aiAssistant = await readFile('src/components/AiAssistantPreviewBlock.astro
 assert.doesNotMatch(aiAssistant, /background-image|padding:\s*clamp\(58px, 7vw, 92px\)|background:\s*#07082d/);
 const integrations = await readFile('src/components/IntegrationsStripBlock.astro', 'utf8');
 assert.doesNotMatch(integrations, /background-image|padding:\s*clamp\(58px, 7vw, 92px\)|background:\s*#080a34/);
-console.log('Home render smoke passed: Hero -> ContentBlocks -> CTA with legacy-to-generic adapter.');
+console.log('Home render smoke passed: Hero -> manual ContentBlocks -> CTA.');

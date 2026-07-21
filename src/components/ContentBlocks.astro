@@ -9,7 +9,8 @@ import AiAssistantPreviewBlock from '@/components/AiAssistantPreviewBlock.astro'
 import IntegrationsStripBlock from '@/components/IntegrationsStripBlock.astro';
 import { publicCardsFromItems } from '@/lib/content/block-contracts.mjs';
 import { isRecognizedPageCta } from '@/lib/content/pageCta';
-const { blocks = [], routeIndex = null, layout = 'grid' } = Astro.props;
+const { blocks = [], routeIndex = null, layout = 'grid', context = '' } = Astro.props;
+const isHomeContext = context === 'home';
 const isStackedSections = layout === 'stacked-sections';
 const visibleBlocks = blocks.filter((block) => !isRecognizedPageCta(block));
 const asArray = (items) => Array.isArray(items) ? items : [];
@@ -23,7 +24,7 @@ const cardsVmFor = (items) => publicCardsFromItems(items, { pages: routeIndex?.p
 const sectionClassFor = (type) => ['content-block-section', `content-block-section--${type}`, (type === 'ai-assistant-preview' || type === 'integrations-strip') && 'content-block-section--full content-block-section--dark'];
 ---
 {isStackedSections ? (
-  <div data-content-blocks-layout="stacked-sections">
+  <div class:list={[isHomeContext && 'home-content-blocks']} data-content-blocks-layout="stacked-sections">
     {visibleBlocks.map((block) => {
       const type = blockType(block);
       const items = asArray(block.items);
@@ -92,6 +93,9 @@ const sectionClassFor = (type) => ['content-block-section', `content-block-secti
   .content-card { position: relative; overflow: hidden; border: 1px solid rgba(15, 17, 89, 0.1); border-radius: var(--radius-md); background: white; box-shadow: var(--shadow-card); padding: var(--card-padding); }
   .content-card::before { content: ""; position: absolute; inset: 0 0 auto; height: 4px; background: linear-gradient(90deg, var(--color-neon), var(--color-cyan)); }
   .content-card h2, .type-cards h2 { color: var(--color-navy); font-size: clamp(1.22rem, 1.45vw, 1.62rem); font-weight: 700; line-height: 1.22; letter-spacing: -0.025em; }
+  .home-content-blocks .type-cards > .eyebrow { display: block; margin: 0; color: var(--color-neon); font-size: var(--text-eyebrow); font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+  .home-content-blocks .type-cards > h2 { max-width: 900px; margin-top: 0; font-size: var(--text-section-title); line-height: 1; letter-spacing: -0.055em; font-weight: 800; }
+  .home-content-blocks .type-cards > p { margin-top: 0; font-size: var(--text-body); line-height: 1.65; }
   .content-card p, .type-cards > p { color: var(--color-ink); line-height: 1.68; }
   .type-cards, .type-video { grid-column: 1 / -1; }
   .more { margin-top: 28px; }

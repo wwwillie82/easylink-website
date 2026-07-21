@@ -18,7 +18,7 @@ assert.equal(computeGenericHomeEditorRevision(revisionPage, revisionBlocks.map((
 function makePool({ failBlock = false } = {}) {
   const state = { commit: 0, rollback: 0, pages: [{ id: 1, route: '/', slug: 'home', type: 'home', title: 'Home', status: 'published', sort_order: 0, hero_eyebrow: 'Ey', hero_title: 'Hero', hero_description: 'Desc', hero_asset: '/a.webp' }, { id: 2, route: '/target/', slug: 'target', type: 'content_page', title: 'Target', status: 'published', sort_order: 2 }], blocks: [
     { id: 1, page_id: 1, block_key: 'home:hero-meta', type: 'hero-meta', title: 'Meta', body: '', items: '[]', sort_order: 0, status: 'published' },
-    { id: 2, page_id: 1, block_key: 'home:intro', type: 'split-text', title: 'Intro', body: 'Body', items: '[{"version":1,"heading":"Heading"}]', sort_order: 10, status: 'published' },
+    { id: 2, page_id: 1, block_key: 'manual:intro', type: 'split-text', title: 'Intro', body: 'Body', items: '[{"version":1,"heading":"Heading"}]', sort_order: 10, status: 'published' },
     { id: 3, page_id: 1, block_key: '/:cta:4', type: 'cta', title: 'CTA', body: '', items: '[{"ctaMode":"global"}]', sort_order: 900, status: 'published' },
     { id: 4, page_id: 1, block_key: 'manual:inline-cta', type: 'cta', title: 'Inline CTA', body: 'Inline body', items: '[{"label":"Start","url":"/start/"}]', sort_order: 30, status: 'published' },
     { id: 9, page_id: 99, block_key: 'foreign', type: 'text', title: 'Foreign', body: '', items: '[]', sort_order: 1, status: 'published' },

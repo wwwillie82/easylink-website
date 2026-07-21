@@ -8,8 +8,7 @@ import { canonicalCtaBlockFromDefault } from '../content/cta-contract.mjs';
 import { mediaConfig } from './media-storage.mjs';
 import { isInternalRouteCandidate, isValidHttpExternalUrl, normalizeNavigationTargetFields, normalizeNavigationTargetType, positiveNavigationPageId, resolveNavigationItem } from '../content/internal-links.mjs';
 import { activePageUsageBlockers, pageInUseError } from '../content/reference-validation.mjs';
-import { allCanonicalHomeBlockKeys, canonicalHomeBlocks } from '../content/home-blocks.mjs';
-import { assertEditorRevision, canonicalHomeEditorBlocks, computeHomeEditorRevision, computeGenericHomeEditorRevision, homeEditableBlocks, homeValidationError, isHomeCanonicalKey, normalizeHomeAdminPayload } from './home-validation.mjs';
+import { assertEditorRevision, computeGenericHomeEditorRevision, homeEditableBlocks, homeValidationError, isHomeCanonicalKey } from './home-validation.mjs';
 
 function normalizeRoute(value) { const raw = String(value || '').trim().toLowerCase().replace(/[^a-z0-9áéíóöőúüű\/-]+/g, '-'); const withStart = raw.startsWith('/') ? raw : `/${raw}`; return withStart.endsWith('/') ? withStart : `${withStart}/`; }
 function validationError(message) { const error = new Error(message); error.code = 'VALIDATION_ERROR'; error.status = 400; return error; }
@@ -316,26 +315,8 @@ if (Array.isArray(payload.blocks)) {
           const editor_revision = computeGenericHomeEditorRevision(freshPages[0], freshBlocks);
           await conn.commit();
           return { page: freshPages[0], blocks: homeEditableBlocks(freshBlocks), block_mappings: blockMappings, editor_revision, warnings: [] };
-        }                const [blocks] = await conn.query('SELECT * FROM site_content_blocks WHERE page_id=? AND block_key IN (?,?,?,?,?,?) ORDER BY block_key FOR UPDATE', [id, ...allCanonicalHomeBlockKeys]);
-        const byKey = new Map();
-        for (const block of blocks) { if (byKey.has(block.block_key)) throw homeValidationError('Duplikált canonical home blokk.', { [`blocks.${block.block_key}`]: 'Duplikált canonical blokk.' }, 'HOME_CANONICAL_DUPLICATE'); byKey.set(block.block_key, block); }
-        for (const key of allCanonicalHomeBlockKeys) { const block = byKey.get(key); if (!block) throw homeValidationError('Hiányzó canonical home blokk.', { [`blocks.${key}`]: 'Hiányzó canonical blokk.' }, 'HOME_CANONICAL_MISSING'); if (block.type !== canonicalHomeBlocks[key].type) throw homeValidationError('Canonical home blokk type eltérés.', { [`blocks.${key}`]: 'Hibás blokktípus.' }, 'HOME_CANONICAL_TYPE_MISMATCH'); }
-        const currentRevision = computeHomeEditorRevision(page, blocks);
-        assertEditorRevision(payload, currentRevision);
-        let targetRows = [];
-        const rawIds = [...new Set(Object.values(payload.blocks || {}).flatMap((block) => Array.isArray(block?.items) ? block.items : []).map((item) => Number(item?.target_page_id)).filter((id) => Number.isSafeInteger(id) && id > 0))].sort((a,b)=>a-b);
-        if (rawIds.length) { const placeholders = rawIds.map(()=>'?').join(','); const [rows] = await conn.query(`SELECT id,route,slug,type,title,status,seo_description,hero_description,sort_order FROM site_pages WHERE id IN (${placeholders}) ORDER BY id FOR UPDATE`, rawIds); targetRows = rows; }
-        const normalized = normalizeHomeAdminPayload(payload, { currentPage: page, currentBlocks: blocks, targetPages: targetRows });
-        const hero = normalizeHeroDisplay(normalized.page);
-        const heroVideo = await validateVideoConfigForSave(conn, normalized.page.hero_video, 'hero');
-        const [pageUpdate] = await conn.execute('UPDATE site_pages SET route=?, slug=?, type=?, title=?, seo_title=?, seo_description=?, hero_eyebrow=?, hero_title=?, hero_description=?, hero_asset=?, hero_video=?, hero_height=?, hero_image_fit=?, hero_image_position_x=?, hero_image_position_y=?, hero_image_position_mobile_x=?, hero_image_position_mobile_y=?, hero_overlay_strength=?, hero_image_scale=? WHERE id=?', ['/', page.slug || 'home', 'home', normalized.page.title, normalized.page.seo_title, normalized.page.seo_description, normalized.page.hero_eyebrow, normalized.page.hero_title, normalized.page.hero_description, normalized.page.hero_asset, heroVideo ? JSON.stringify(heroVideo) : null, hero.hero_height, hero.hero_image_fit, hero.hero_image_position_x, hero.hero_image_position_y, hero.hero_image_position_mobile_x, hero.hero_image_position_mobile_y, hero.hero_overlay_strength, hero.hero_image_scale, id]);
-        if (pageUpdate.affectedRows !== 1) throw homeValidationError('A főoldal mentése sikertelen.', { page: 'A főoldal nem frissült.' }, 'INVALID_HOME');
-        for (const block of normalized.blocks) { const [blockUpdate] = await conn.execute('UPDATE site_content_blocks SET title=?, body=?, items=?, sort_order=?, status=? WHERE page_id=? AND block_key=? AND type=?', [block.title, block.body, JSON.stringify(block.items), block.sort_order, block.status, id, block.block_key, block.type]); if (blockUpdate.affectedRows !== 1) throw homeValidationError('Canonical blokk mentése sikertelen.', { [`blocks.${block.block_key}`]: 'A canonical blokk nem frissült.' }, 'HOME_CANONICAL_MISSING'); }
-        const [freshPages] = await conn.query('SELECT * FROM site_pages WHERE id=? LIMIT 1', [id]);
-        const [freshBlocks] = await conn.query('SELECT * FROM site_content_blocks WHERE page_id=? AND block_key IN (?,?,?,?,?,?) ORDER BY block_key', [id, ...allCanonicalHomeBlockKeys]);
-        const editor_revision = computeHomeEditorRevision(freshPages[0], freshBlocks);
-        await conn.commit();
-        return { page: freshPages[0], blocks: freshBlocks, editor_revision, warnings: normalized.warnings || [] };
+        }
+        throw homeValidationError('A főoldal szerkesztése csak generic aggregate block payloadot fogad.', { blocks: 'Hiányzó blokkok.' }, 'INVALID_HOME');
       } catch (error) { await conn.rollback(); throw error; } finally { conn.release(); }
     },
     async nav() { const [r] = await pool.query('SELECT n.*, p.route AS target_route, p.title AS target_title FROM site_navigation_items n LEFT JOIN site_pages p ON p.id=n.target_page_id ORDER BY n.sort_order,n.id'); return r.map((row) => { const normalized = normalizeNavigationSnapshotRow(row); const resolved = resolveNavigationItem(normalized, normalized.target_type === 'page' && row.target_route ? { id: normalized.target_page_id, route: row.target_route, title: row.target_title } : null); return { ...normalized, title: resolved.title, href: resolved.href }; }); },

@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import { parseCli } from '../scripts/reconcile-home-middle-canonical.mjs';
+assert.deepEqual(parseCli(['--status']), { action: 'status', apply: false });
+assert.deepEqual(parseCli(['--dry-run']), { action: 'dry-run', apply: false });
+assert.deepEqual(parseCli(['--apply', '--yes']), { action: 'apply', apply: true });
+assert.throws(() => parseCli([]), /Pontosan egy action/);
+assert.throws(() => parseCli(['--status', '--dry-run']), /Pontosan egy action/);
+assert.throws(() => parseCli(['--apply']), /--apply csak explicit --yes/);
+assert.throws(() => parseCli(['--yes']), /--yes kizárólag/);
+assert.throws(() => parseCli(['--status', '--wat']), /Ismeretlen option/);
+console.log('reconcile CLI smoke ok');
