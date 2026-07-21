@@ -16,7 +16,7 @@ function normalizeCardInput(item = {}, path = 'items', errors = {}) {
   try { target_type = rawCardTargetType(target_type); } catch { field(errors, `${path}.target_type`, 'Hibás cél típus.'); target_type = 'legacy'; }
   const titleOverride = clean(source.title_override);
   const textOverride = clean(source.text_override);
-  const out = { target_type, title: firstNonEmpty(titleOverride, source.title, source.label), title_override: titleOverride, text: firstNonEmpty(textOverride, source.textOverride, source.text, source.shortDescription, source.body), text_override: textOverride, linkLabel: firstNonEmpty(source.linkLabel, source.label), badge: source.badge ?? source.order ?? '' };
+  const out = { target_type, title: firstNonEmpty(titleOverride, source.title, source.label), title_override: titleOverride, text: firstNonEmpty(textOverride, source.text, source.shortDescription, source.body), text_override: textOverride, linkLabel: clean(source.linkLabel ?? source.label ?? ''), badge: source.badge ?? source.order ?? '' };
   if (target_type === 'page') { const id = Number(source.target_page_id); if (!Number.isSafeInteger(id) || id <= 0) field(errors, `${path}.target_page_id`, 'Válassz publikus céloldalt.'); else out.target_page_id = id; }
   else if (target_type === 'legacy') { const href = clean(source.href ?? source.url); if (href && !isInternalRouteCandidate(href)) field(errors, `${path}.href`, 'Legacy cél csak biztonságos belső útvonal lehet.'); out.href = href; }
   else if (target_type === 'external') { const href = clean(source.href ?? source.url); if (href && !isValidHttpExternalUrl(href)) field(errors, `${path}.href`, 'Külső cél csak http(s) URL lehet.'); out.href = href; }
