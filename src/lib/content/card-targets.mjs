@@ -16,6 +16,7 @@ export function rawCardTargetType(value) {
 }
 
 function hasValue(value) { return value !== undefined && value !== null && String(value).trim() !== ''; }
+function firstNonEmpty(...values) { for (const value of values) { const text = String(value ?? '').trim(); if (text) return text; } return ''; }
 function cardLabel(item = {}) { return String(item.title_override || item.title || item.label || item.href || item.url || `#${item.badge || '?'}`); }
 function targetError(code, message, details = {}) { const error = new Error(message); error.code = code; error.status = 409; error.details = details; return error; }
 
@@ -29,7 +30,7 @@ function cleanTitle(value) {
 }
 
 function textForPage(item, page) {
-  return String(item.text_override ?? item.textOverride ?? item.text ?? item.description ?? page?.seoDescription ?? page?.heroDescription ?? '').trim();
+  return firstNonEmpty(item.text_override, item.textOverride, item.text, item.description, page?.seoDescription, page?.heroDescription);
 }
 
 export function resolveCardTarget(item = {}, { pagesById, allowedPageTypes, requirePublished = true, blockKey = '', itemIndex = 0 } = {}) {
@@ -50,12 +51,12 @@ export function resolveCardTarget(item = {}, { pagesById, allowedPageTypes, requ
     if (hasValue(item.target_page_id) || hasValue(item.title_override)) throw targetError('CARD_LEGACY_TARGET_INVALID', `Legacy kártyához nem tartozhat oldalazonosító vagy title_override: ${cardLabel(item)}`, baseDetails);
     const href = String(item.href ?? item.url ?? '').trim();
     if (!isInternalRouteCandidate(href)) throw targetError('CARD_LEGACY_URL_INVALID', `Legacy kártya csak biztonságos belső URL lehet: ${cardLabel(item)}`, { ...baseDetails, href });
-    return { ...item, target_type: 'legacy', title: cleanTitle(item.title) || cardLabel(item), text: String(item.text_override ?? item.text ?? '').trim(), href, url: href, linkLabel: item.linkLabel || item.label || 'Részletek →', badge: item.badge ?? item.order ?? itemIndex + 1 };
+    return { ...item, target_type: 'legacy', title: cleanTitle(item.title) || cardLabel(item), text: firstNonEmpty(item.text_override, item.text), href, url: href, linkLabel: item.linkLabel || item.label || 'Részletek →', badge: item.badge ?? item.order ?? itemIndex + 1 };
   }
   if (hasValue(item.target_page_id) || hasValue(item.title_override)) throw targetError('CARD_EXTERNAL_TARGET_INVALID', `Külső kártyához nem tartozhat oldalazonosító vagy title_override: ${cardLabel(item)}`, baseDetails);
   const href = String(item.href ?? item.url ?? '').trim();
   if (!isValidHttpExternalUrl(href)) throw targetError('CARD_EXTERNAL_URL_INVALID', `Külső kártya csak érvényes http(s) URL lehet: ${cardLabel(item)}`, { ...baseDetails, href });
-  return { ...item, target_type: 'external', title: cleanTitle(item.title) || cardLabel(item), text: String(item.text_override ?? item.text ?? '').trim(), href, url: href, linkLabel: item.linkLabel || item.label || 'Megnyitás →', badge: item.badge ?? item.order ?? itemIndex + 1 };
+  return { ...item, target_type: 'external', title: cleanTitle(item.title) || cardLabel(item), text: firstNonEmpty(item.text_override, item.text), href, url: href, linkLabel: item.linkLabel || item.label || 'Megnyitás →', badge: item.badge ?? item.order ?? itemIndex + 1 };
 }
 
 export { isInternalRouteCandidate, isValidHttpExternalUrl, navigationTitleOverride, normalizeNavigationTargetFields, normalizeNavigationTargetType, positiveNavigationPageId, resolveNavigationItem };
