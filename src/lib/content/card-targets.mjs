@@ -51,12 +51,12 @@ export function resolveCardTarget(item = {}, { pagesById, allowedPageTypes, requ
     if (hasValue(item.target_page_id) || hasValue(item.title_override)) throw targetError('CARD_LEGACY_TARGET_INVALID', `Legacy kártyához nem tartozhat oldalazonosító vagy title_override: ${cardLabel(item)}`, baseDetails);
     const href = String(item.href ?? item.url ?? '').trim();
     if (!isInternalRouteCandidate(href)) throw targetError('CARD_LEGACY_URL_INVALID', `Legacy kártya csak biztonságos belső URL lehet: ${cardLabel(item)}`, { ...baseDetails, href });
-    return { ...item, target_type: 'legacy', title: cleanTitle(item.title) || cardLabel(item), text: firstNonEmpty(item.text_override, item.textOverride, item.text), href, url: href, linkLabel: item.linkLabel || item.label || 'Részletek →', badge: item.badge ?? item.order ?? itemIndex + 1 };
+    return { ...item, target_type: 'legacy', title: cleanTitle(item.title) || cardLabel(item), text: firstNonEmpty(item.text_override, item.text), href, url: href, linkLabel: item.linkLabel || item.label || 'Részletek →', badge: item.badge ?? item.order ?? itemIndex + 1 };
   }
   if (hasValue(item.target_page_id) || hasValue(item.title_override)) throw targetError('CARD_EXTERNAL_TARGET_INVALID', `Külső kártyához nem tartozhat oldalazonosító vagy title_override: ${cardLabel(item)}`, baseDetails);
   const href = String(item.href ?? item.url ?? '').trim();
   if (!isValidHttpExternalUrl(href)) throw targetError('CARD_EXTERNAL_URL_INVALID', `Külső kártya csak érvényes http(s) URL lehet: ${cardLabel(item)}`, { ...baseDetails, href });
-  return { ...item, target_type: 'external', title: cleanTitle(item.title) || cardLabel(item), text: firstNonEmpty(item.text_override, item.textOverride, item.text), href, url: href, linkLabel: item.linkLabel || item.label || 'Megnyitás →', badge: item.badge ?? item.order ?? itemIndex + 1 };
+  return { ...item, target_type: 'external', title: cleanTitle(item.title) || cardLabel(item), text: firstNonEmpty(item.text_override, item.text), href, url: href, linkLabel: item.linkLabel || item.label || 'Megnyitás →', badge: item.badge ?? item.order ?? itemIndex + 1 };
 }
 
 export { isInternalRouteCandidate, isValidHttpExternalUrl, navigationTitleOverride, normalizeNavigationTargetFields, normalizeNavigationTargetType, positiveNavigationPageId, resolveNavigationItem };
