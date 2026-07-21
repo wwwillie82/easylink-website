@@ -56,9 +56,9 @@ export function publicCardsFromItems(items = [], { pages = [] } = {}) {
   const resolve = (entry, index, isAction = false) => {
     if (!entry) return null;
     try {
-      const resolved = resolveCardTarget({ ...entry, kind: isAction ? 'section-action' : 'card', title: entry.title || entry.title_override || entry.label, label: entry.label || entry.linkLabel }, { pagesById, itemIndex: index });
+      const resolved = resolveCardTarget({ ...entry, kind: isAction ? 'section-action' : 'card', title: entry.title || entry.title_override || entry.label, label: entry.label || entry.linkLabel }, { pagesById, itemIndex: index, requirePublished: false });
       return isAction ? { ...resolved, label: entry.label || resolved.title || resolved.linkLabel } : resolved;
-    } catch { return isAction ? { href: entry.href || '', label: entry.label || entry.title || '' } : { ...entry, href: entry.href || entry.url || '', url: entry.href || entry.url || '' }; }
+    } catch (error) { if (entry.target_type === 'page') throw error; return isAction ? { href: entry.href || '', label: entry.label || entry.title || '' } : { ...entry, href: entry.href || entry.url || '', url: entry.href || entry.url || '' }; }
   };
   return { cards: normalized.cards.map((card, index) => resolve(card, index)).filter(Boolean), action: resolve(normalized.action, normalized.cards.length, true), variant: normalized.variant };
 }
