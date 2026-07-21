@@ -9,7 +9,8 @@ const manual = [{ block_key: 'manual:intro', type: 'split-text', status: 'publis
 const blocks = homeMiddleContentBlocks({ page: { route: '/', type: 'home', blocks: manual }, mode: 'db-authoritative', routeIndex: { pages: [] } });
 assert.deepEqual(blocks.map((block)=>block.type), ['split-text','cards','ai-assistant-preview','integrations-strip']);
 const contentBlocks = await readFile('src/components/ContentBlocks.astro', 'utf8');
-for (const token of ['SplitTextBlock','AiAssistantPreviewBlock','IntegrationsStripBlock','publicCardsFromItems']) assert.match(contentBlocks, new RegExp(token));
+for (const token of ['SplitTextBlock','CardsBlock','AiAssistantPreviewBlock','IntegrationsStripBlock']) assert.match(contentBlocks, new RegExp(token));
+assert.doesNotMatch(contentBlocks, /publicCardsFromItems|import ListingCards from/);
 assert.match(contentBlocks, /data-content-blocks-layout="stacked-sections"/);
 assert.match(contentBlocks, /data-content-block-section=\{type\}/);
 assert.match(contentBlocks, /<section class:list=\{sectionClassFor\(type\)\}/);
