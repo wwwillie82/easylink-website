@@ -3,13 +3,15 @@ import { listNavigation } from '@/lib/content/provider';
 import { getPublicSiteSettings } from '@/lib/content/settings';
 import { resolvePageHeaderCta } from '@/lib/content/pageCta';
 
-const { pageCtaBlock = null } = Astro.props;
+type CtaButton = { label: string; url: string; showInHeader?: boolean; analyticsIntent?: string; analyticsId?: string; analyticsSlot?: string };
+type Props = { pageCtaBlock?: unknown };
+const { pageCtaBlock = null } = Astro.props as Props;
 const siteNavigation = await listNavigation();
 const publicSettings = await getPublicSiteSettings();
 const brand = publicSettings.brand;
-const headerCta = resolvePageHeaderCta(pageCtaBlock, publicSettings.defaultCta);
-const validIntent = (value) => ['demo','trial','email'].includes(String(value || '')) ? String(value) : '';
-const safeId = (value, fallback) => String(value || fallback).trim().replace(/[^a-zA-Z0-9_.:-]/g, '-').slice(0, 80);
+const headerCta = resolvePageHeaderCta(pageCtaBlock, publicSettings.defaultCta) as { shouldRender: boolean; buttons: CtaButton[] };
+const validIntent = (value: unknown) => ['demo','trial','email'].includes(String(value || '')) ? String(value) : '';
+const safeId = (value: unknown, fallback: string) => String(value || fallback).trim().replace(/[^a-zA-Z0-9_.:-]/g, '-').slice(0, 80);
 ---
 <header class="site-header">
   <div class="container nav-wrap">
@@ -25,7 +27,7 @@ const safeId = (value, fallback) => String(value || fallback).trim().replace(/[^
 
     {headerCta.shouldRender && (
       <div class="nav-ctas" aria-label="Kiemelt műveletek">
-        {headerCta.buttons.map((button, index) => {
+        {headerCta.buttons.map((button: CtaButton, index: number) => {
           const intent = validIntent(button.analyticsIntent ?? (index === 0 ? 'demo' : index === 1 ? 'trial' : ''));
           const id = safeId(button.analyticsId, `site-header-${index + 1}`);
           return (
