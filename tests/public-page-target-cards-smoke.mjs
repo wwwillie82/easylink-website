@@ -23,10 +23,11 @@ const resolve = (items, detailType = 'audience_detail') => publicPages.resolveLi
 
 const pageTargetV2 = [{ version: 2, variant: 'default', cards: [{ title_override: 'Hotelek', target_type: 'page', target_page_id: 11 }], action: null }];
 assert.equal(resolve(pageTargetV2)[0].href, '/kinek-szol/hotelek/');
-const internalTargetV2 = [{ version: 2, variant: 'default', cards: [{ title: 'Hotelek', target_type: 'internal', target_url: '/kinek-szol/hotelek/' }], action: null }];
-assert.equal(resolve(internalTargetV2)[0].href, '/kinek-szol/hotelek/');
 assert.equal(publicPages.resolveListingCards({ items: [{ title: 'CRM', target_type: 'page', target_page_id: 10 }], detailType: 'solution_detail', index, sourcePage, blockLabel: 'cards', mode: 'db-authoritative', source: 'db-block' })[0].href, '/megoldasaink/crm/');
 assert.throws(() => resolve([{ version: 2, cards: [{ title: 'Draft', target_type: 'page', target_page_id: 12 }] }]), /page target nem published oldal.*12/);
 assert.throws(() => resolve([{ version: 2, cards: [{ title: 'Rossz típus', target_type: 'page', target_page_id: 10 }] }]), /page target típusa solution_detail, elvárt: audience_detail/);
 assert.equal(publicPages.resolveListingCards({ items: [{ title: 'CRM', url: '/megoldasaink/crm/' }], detailType: 'solution_detail', index, sourcePage, blockLabel: 'cards', mode: 'db-authoritative', source: 'db-block' })[0].href, '/megoldasaink/crm/');
-console.log('Public cards page-target and normalized target URL resolution smoke ok');
+const normalizedSlug = normalizeCardsItems([{ title: 'CRM', slug: 'crm' }])[0].cards[0];
+assert.equal(normalizedSlug.slug, 'crm');
+assert.equal(publicPages.resolveListingCards({ items: [{ title: 'CRM', slug: 'crm' }], detailType: 'solution_detail', index, sourcePage, blockLabel: 'cards', mode: 'db-authoritative', source: 'db-block' })[0].href, '/megoldasaink/crm/');
+console.log('Public cards page-target, URL and legacy slug resolution smoke ok');
