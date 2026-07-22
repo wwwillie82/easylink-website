@@ -75,14 +75,14 @@ export function detailPageForSlug(index: PublicRouteIndex, type: 'solution_detai
 }
 
 function legacyUrlSlug(item: LinkableItem) {
-  const url = String(item.target_url ?? item.url ?? item.href ?? '').trim();
+  const url = String(item.url ?? item.href ?? '').trim();
   if (!url || !url.startsWith('/')) return '';
   const clean = normalizePublicRoute(url).replace(/^\//, '').replace(/\/$/, '');
   return clean.split('/').filter(Boolean).pop() ?? '';
 }
 
 function cardError({ item, itemIndex, sourcePage, blockLabel, detailType, reason }: { item: LinkableItem; itemIndex: number; sourcePage: SitePage; blockLabel: string; detailType: 'solution_detail' | 'audience_detail'; reason: string }) {
-  const title = String(item.title ?? item.title_override ?? item.label ?? item.slug ?? item.target_url ?? item.url ?? item.href ?? `#${itemIndex + 1}`);
+  const title = String(item.title ?? item.title_override ?? item.label ?? item.slug ?? item.url ?? item.href ?? `#${itemIndex + 1}`);
   return new Error(`Nem feloldható public kártyalink: page=${sourcePage.title} route=${sourcePage.route} type=${sourcePage.type} block=${blockLabel} item=${title} detailType=${detailType}. ${reason}`);
 }
 
@@ -97,7 +97,7 @@ export function resolveListingCards({ items, detailType, index, sourcePage, bloc
       if (target.type !== detailType) throw cardError({ item, itemIndex, sourcePage, blockLabel, detailType, reason: `A page target típusa ${target.type}, elvárt: ${detailType}.` });
       return { ...item, slug: target.slug, href: target.route, url: target.route };
     }
-    const explicitUrl = String(item.target_url ?? item.url ?? item.href ?? '').trim();
+    const explicitUrl = String(item.url ?? item.href ?? '').trim();
     const explicitSlug = String(item.slug ?? '').trim();
     if (explicitUrl.startsWith('/')) {
       const target = index.byRoute.get(normalizePublicRoute(explicitUrl));
