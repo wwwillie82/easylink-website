@@ -151,20 +151,19 @@ try {
 }
 
 const footerSource = readFileSync('src/components/Footer.astro', 'utf8');
-const contactPageSource = readFileSync('src/components/page-renderers/ContactRenderer.astro', 'utf8');
+const contentBlocksSource = readFileSync('src/components/ContentBlocks.astro', 'utf8');
 assert.match(footerSource, /publicSettings\.contact/);
-assert.match(contactPageSource, /safeContactIntro\(ctaBlock\?\.body\)/);
-assert.match(contactPageSource, /href=\{deployUrl\}[^>]*data-easylink-cta="demo"[^>]*>Demót kérek<\/a>/);
-assert.doesNotMatch(contactPageSource, /ctaItem|ctaBlock\?\.items|href=\{cta[^}]*url/);
+assert.match(contentBlocksSource, /analyticsIntent/);
+assert.match(contentBlocksSource, /data-easylink-cta=\{intent \|\| undefined\}/);
+assert.doesNotMatch(contentBlocksSource, /href=\{deployUrl\}[^>]*data-easylink-cta="demo"/);
 assert.doesNotMatch(footerSource, /mailto:hello@easylink\.hu/);
-assert.doesNotMatch(contactPageSource, /Email: hello@easylink\.hu/);
+assert.doesNotMatch(contentBlocksSource, /Email: hello@easylink\.hu/);
 
 const layoutSource = readFileSync('src/layouts/BaseLayout.astro', 'utf8');
 assert.match(layoutSource, /<Ga4Analytics[\s\S]*<CtaTracking \/>/);
-for (const file of ['src/components/Header.astro', 'src/components/Hero.astro', 'src/components/CTASection.astro', 'src/components/Footer.astro', 'src/components/page-renderers/ContactRenderer.astro']) {
+for (const file of ['src/components/Header.astro', 'src/components/Hero.astro', 'src/components/CTASection.astro', 'src/components/Footer.astro', 'src/components/ContentBlocks.astro']) {
   assert.match(readFileSync(file, 'utf8'), /data-easylink-cta/);
 }
-const contentBlocksSource = readFileSync('src/components/ContentBlocks.astro', 'utf8');
 assert.match(contentBlocksSource, /analyticsIntent/);
 assert.doesNotMatch(contentBlocksSource, /label.*Demót|url.*mailto.*hello/);
 

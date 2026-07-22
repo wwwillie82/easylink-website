@@ -52,14 +52,15 @@ assert.equal(resolvePageCtaBlock([home], { role: 'home-legacy-cta' }), home, 'si
 assert.throws(() => resolvePageCtaBlock([{ blockKey: 'golden:cta-section', type: 'cta', items: [{ presentationRole: 'pricing-cta' }] }]), (error) => error?.code === 'CTA_INTEGRITY_ERROR', 'single block with multiple page CTA roles must fail integrity');
 assert.equal(isRecognizedPageCta(inline), false, 'arbitrary manual type=cta must remain a generic inline CTA candidate');
 for (const block of [canonical, pricing, home]) assert.equal(isRecognizedPageCta(block), true, `${block.blockKey} must be blocked from generic ContentBlocks CTA rendering`);
+assert.equal(resolvePageCtaBlock([canonical]), canonical, 'canonical cta-section must resolve generically');
+assert.equal(resolvePageCtaBlock([pricing]), pricing, 'pricing-cta must resolve generically');
+assert.equal(resolvePageCtaBlock([]), undefined, 'missing page CTA keeps CTASection default behavior available');
+assert.throws(() => resolvePageCtaBlock([canonical, pricing]), (error) => error?.code === 'CTA_INTEGRITY_ERROR', 'canonical + pricing CTA conflict must remain fail-closed');
 
-const pricingSource = await readFile('src/components/page-renderers/PricingRenderer.astro', 'utf8');
-assert.match(pricingSource, /resolvePageCtaBlock\(page\?\.blocks, \{ role: 'pricing-cta' \}\)/, 'PricingRenderer must use the common page CTA resolver');
-assert.match(pricingSource, /<CTASection block=\{ctaBlock\}/, 'PricingRenderer must render pricing CTA through CTASection');
-assert.match(pricingSource, /withoutBlocks\(page\?\.blocks, \[featureBlock, textBlock, rawCtaBlock\]\)/, 'PricingRenderer must consume the raw pricing CTA from remainingBlocks');
-
-const contactSource = await readFile('src/components/page-renderers/ContactRenderer.astro', 'utf8');
-assert.match(contactSource, /resolvePageCtaBlock\(page\?\.blocks, \{ role: 'cta-section' \}\)/, 'ContactRenderer must render canonical CTA through the common resolver');
+const genericSource = await readFile('src/components/page-renderers/GenericPublicPageRenderer.astro', 'utf8');
+assert.match(genericSource, /resolvePageCtaBlock\(page\?\.blocks\)/, 'Generic renderer must use the common page CTA resolver without page-type role branching');
+assert.match(genericSource, /<CTASection block=\{ctaSectionBlock\}/, 'Generic renderer must render page CTA through CTASection');
+assert.match(genericSource, /composePublicSections\(page\?\.blocks \|\| \[\]\)/, 'Generic renderer must keep CTA out of composed content sections');
 
 const homeSource = await readFile('src/pages/index.astro', 'utf8');
 assert.match(homeSource, /resolvePageCtaBlock\(homePage\?\.blocks, \{ role: 'home-legacy-cta' \}\)/, 'home page must use the /:cta:4 legacy page CTA resolver');
@@ -79,6 +80,6 @@ assert.equal(resolvePageCta({ ...localBlock, items: [{ ...localBlock.items[0], c
 assert.throws(() => resolvePageCta({ ...localBlock, items: [{ ...localBlock.items[0], ctaMode: 'bogus' }] }, modeDefaults), (error) => error?.code === 'CTA_INTEGRITY_ERROR', 'explicit invalid mode fails integrity');
 assert.equal(resolvePageCta({ ...localBlock, items: [{ ...localBlock.items[0], ctaMode: undefined }] }, modeDefaults).mode, 'global', 'legacy missing mode is global');
 assert.doesNotMatch(homeSource, /normalizePageCtaBlock/, 'home must pass raw CTA block without pre-normalizing');
-assert.doesNotMatch(pricingSource, /normalizePageCtaBlock/, 'pricing must pass raw CTA block without pre-normalizing');
+assert.doesNotMatch(genericSource, /normalizePageCtaBlock/, 'generic renderer must pass raw CTA block without pre-normalizing');
 
 console.log('CTA render regression smoke passed');

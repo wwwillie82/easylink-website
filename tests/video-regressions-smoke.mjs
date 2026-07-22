@@ -126,7 +126,7 @@ assert.equal(pageSources.some(([file, src]) => file === 'src/pages/[...slug].ast
 assert.equal(pageSources.some(([, src]) => src.includes('<PageHero')), false, 'route entry points must not render PageHero directly');
 const rendererHeroFiles = [];
 for (const file of await files('src/components/page-renderers')) { const src = await readFile(file, 'utf8'); if (src.includes('<PageHero')) rendererHeroFiles.push(file); }
-assert.deepEqual(rendererHeroFiles.sort(), ['src/components/page-renderers/ContentPageRenderer.astro','src/components/page-renderers/SolutionsIndexRenderer.astro','src/components/page-renderers/SolutionDetailRenderer.astro','src/components/page-renderers/AudiencesIndexRenderer.astro','src/components/page-renderers/AudienceDetailRenderer.astro','src/components/page-renderers/IntegrationsRenderer.astro','src/components/page-renderers/PricingRenderer.astro','src/components/page-renderers/ContactRenderer.astro'].sort());
+assert.deepEqual(rendererHeroFiles.sort(), ['src/components/page-renderers/GenericPublicPageRenderer.astro'].sort());
 for (const file of rendererHeroFiles) { const src = await readFile(file, 'utf8'); assert.match(src, /video=\{page\??\.heroVideo\}/, `${file} must pass heroVideo`); }
 const videoMediaSource = await readFile('src/components/VideoMedia.astro', 'utf8');
 assert.match(await readFile('src/lib/content/video-client.mjs', 'utf8'), /prefers-reduced-motion: reduce/);

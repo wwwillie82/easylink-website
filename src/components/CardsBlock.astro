@@ -6,19 +6,21 @@ const { block = {}, routeIndex = null, presentation = 'standard' } = Astro.props
 const cardsVm = publicCardsFromItems(Array.isArray(block?.items) ? block.items : [], { pages: routeIndex?.pages || [] });
 const isHomePresentation = presentation === 'home';
 const eyebrow = String(block?.eyebrow || '').trim();
+const blockChrome = String(block?.presentation?.blockChrome || block?.presentation?.block_chrome || 'default').trim();
+const showHeader = blockChrome !== 'none';
 ---
 
 <article class:list={['type-cards', isHomePresentation && 'type-cards--home']}>
   {isHomePresentation ? (
     <>
-      {block.title && <span class="eyebrow">{block.title}</span>}
-      {block.body && <h2>{block.body}</h2>}
+      {showHeader && block.title && <span class="eyebrow">{block.title}</span>}
+      {showHeader && block.body && <h2>{block.body}</h2>}
     </>
   ) : (
     <>
-      {eyebrow && <span class="eyebrow">{eyebrow}</span>}
-      {block.title && <h2>{block.title}</h2>}
-      {block.body && <p>{block.body}</p>}
+      {showHeader && eyebrow && <span class="eyebrow">{eyebrow}</span>}
+      {showHeader && block.title && <h2>{block.title}</h2>}
+      {showHeader && block.body && <p>{block.body}</p>}
     </>
   )}
   {cardsVm.cards.length > 0 && <ListingCards items={cardsVm.cards} />}

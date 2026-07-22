@@ -1,0 +1,32 @@
+---
+import ContentBlocks from '@/components/ContentBlocks.astro';
+import RelatedLinks from '@/components/RelatedLinks.astro';
+import { resolveRelatedLinksBlock } from '@/lib/content/section-composition.mjs';
+const { section, routeIndex } = Astro.props;
+const blocks = Array.isArray(section?.blocks) ? section.blocks : [];
+const presentation = section?.presentation ?? {};
+const isRelatedOnly = blocks.length === 1 && blocks[0]?.type === 'related-links';
+const relatedLinks = isRelatedOnly ? resolveRelatedLinksBlock(blocks[0], routeIndex) : [];
+const sectionColumns = presentation.columnRatio || `repeat(${presentation.gridColumns || 1}, 1fr)`;
+const styleVars = `--public-section-columns: ${sectionColumns};`;
+---
+{isRelatedOnly ? (
+  <RelatedLinks title={blocks[0].title || 'Kapcsolódó oldalak'} links={relatedLinks} />
+) : (
+  <section class:list={['section', 'generic-public-section', `generic-public-section--${presentation.sectionTheme || 'default'}`, `generic-public-section--${presentation.layout || 'stack'}`, `generic-public-section--surface-${presentation.surface || 'default'}`]} style={styleVars} data-section-group-key={section.groupKey || undefined} data-section-layout={presentation.layout} data-section-theme={presentation.sectionTheme} data-section-surface={presentation.surface}>
+    <div class:list={['container', 'generic-public-section__blocks', `generic-public-section__blocks--${presentation.layout || 'stack'}`, `generic-public-section__blocks--cols-${presentation.gridColumns || 1}`]}>
+      <ContentBlocks blocks={blocks} routeIndex={routeIndex} layout="fragment" />
+    </div>
+  </section>
+)}
+<style>
+  .generic-public-section--default { background: linear-gradient(180deg, #f6f8f5, #fff); }
+  .generic-public-section--light { background: var(--color-soft); }
+  .generic-public-section--gradient-light { background: linear-gradient(180deg, #f6f8f5, #fff); }
+  .generic-public-section__blocks { display: grid; gap: var(--card-gap); }
+  .generic-public-section__blocks--stack { grid-template-columns: 1fr; }
+  .generic-public-section__blocks--grid { grid-template-columns: var(--public-section-columns, repeat(2, 1fr)); }
+  .generic-public-section--surface-polished :global(.content-card), .generic-public-section--surface-polished :global(.type-cards) { border-radius: 28px; box-shadow: 0 22px 70px rgba(15,17,89,.1); }
+  .generic-public-section--surface-polished :global(.content-card) { padding: 32px; }
+  @media (max-width: 860px) { .generic-public-section__blocks--grid { grid-template-columns: 1fr; } }
+</style>
