@@ -4,6 +4,7 @@ import { normalizeSiteSettings } from '../src/lib/admin/settings.mjs';
 import { normalizeCtaItems } from '../src/lib/content/block-contracts.mjs';
 import { resolvePageCta, resolvePageHeaderCta } from '../src/lib/content/page-cta-contract.mjs';
 import { ctaAdminEnhancementJs } from '../src/lib/admin/render/cta-admin.mjs';
+import { assertHeaderCtaContent, routeHeaderCtaExpectations } from '../scripts/smoke-live-site.mjs';
 
 const buttons = [
   { label: 'Első', url: '/egy/', showInHeader: true },
@@ -48,5 +49,33 @@ assert.match(ctaSectionSource, /secondaryAnalyticsId = 'cta-section-secondary'/)
 assert.match(ctaSectionSource, /return `cta-section-\$\{index \+ 1\}`/);
 assert.doesNotMatch(ctaSectionSource, /button\.analyticsId/);
 assert.doesNotMatch(ctaSectionSource, /button\.analyticsSlot/);
+
+const smokeDefaultCta = normalizeSiteSettings({
+  defaultCta: {
+    eyebrow: 'CTA',
+    title: 'Header smoke',
+    description: 'Teszt',
+    buttons: [
+      { label: 'Első', url: '/egy/', showInHeader: false },
+      { label: 'Második', url: '/ketto/', showInHeader: true },
+      { label: 'Harmadik', url: '/harom/', showInHeader: false },
+      { label: 'Negyedik', url: '/negy/', showInHeader: true },
+    ],
+  },
+}).defaultCta;
+const smokePages = [{ route: '/', type: 'home', ctaRole: 'home-legacy-cta', ctaBlock: { block_key: '/:cta:4', type: 'cta', items: [{ ctaMode: 'global', headerHidden: false }] } }];
+const headerByRoute = routeHeaderCtaExpectations(smokePages, smokeDefaultCta);
+assert.deepEqual(headerByRoute.get('/').buttons.map((button) => button.label), ['Második', 'Negyedik']);
+const headerFailures = [];
+assertHeaderCtaContent('/', '<div class="nav-ctas" aria-label="Kiemelt műveletek"><a href="/ketto/">Második</a><a href="/negy/">Negyedik</a></div>', headerByRoute.get('/'), headerFailures);
+assert.deepEqual(headerFailures, []);
+const hiddenHeaderFailures = [];
+assertHeaderCtaContent('/', '<header class="site-header"></header>', resolvePageHeaderCta({ ...globalBlock, items: [{ ...globalBlock.items[0], headerHidden: true }] }, smokeDefaultCta), hiddenHeaderFailures);
+assert.deepEqual(hiddenHeaderFailures, []);
+
+const liveSmokeSource = await readFile('scripts/smoke-live-site.mjs', 'utf8');
+assert.match(liveSmokeSource, /resolvePageHeaderCta/);
+assert.match(liveSmokeSource, /routeHeaderCtaExpectations/);
+assert.doesNotMatch(liveSmokeSource, /assertAnchor\(rawHtml, route, 'site-header-demo'/);
 
 console.log('CTA four-button/header-toggle smoke passed');
