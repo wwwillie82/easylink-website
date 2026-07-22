@@ -9,6 +9,7 @@ const nodeRequire = createRequire(import.meta.url);
 import { validateRelease } from '../src/lib/admin/publish.mjs';
 import { writePublicSmokeMetadata } from '../src/lib/content/smoke-metadata.mjs';
 import { assertRootHomePage, validateRootHomeSnapshot } from '../src/lib/content/root-invariant.mjs';
+import { normalizeCardsItems } from '../src/lib/content/block-contracts.mjs';
 
 function loadPublicPagesModule() {
   let source = readFileSyncText('src/lib/content/public-pages.ts');
@@ -36,6 +37,7 @@ function loadTsModule(source, injected = {}) {
   const module = { exports };
   const require = (name) => {
     if (name === '@/lib/db/repository') throw new Error('import error');
+    if (name === './block-contracts.mjs') return { normalizeCardsItems };
     throw new Error(`Unexpected require: ${name}`);
   };
   Function('exports', 'module', 'require', ...Object.keys(injected), js)(exports, module, require, ...Object.values(injected));
