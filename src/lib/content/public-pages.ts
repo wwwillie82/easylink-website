@@ -6,6 +6,7 @@ export type PublicContentMode = 'db-authoritative' | 'static';
 export type PublicRouteIndex = {
   pages: SitePage[];
   byRoute: Map<string, SitePage>;
+  byId: Map<string, SitePage>;
   byType: Map<string, SitePage[]>;
   byTypeAndSlug: Map<string, Map<string, SitePage>>;
 };
@@ -36,6 +37,7 @@ function pageIdentity(page: SitePage) {
 
 export function buildPublicRouteIndex(pages: SitePage[]): PublicRouteIndex {
   const byRoute = new Map<string, SitePage>();
+  const byId = new Map<string, SitePage>();
   const byType = new Map<string, SitePage[]>();
   const byTypeAndSlug = new Map<string, Map<string, SitePage>>();
   for (const page of pages.filter((entry) => entry.status === 'published')) {
@@ -43,6 +45,8 @@ export function buildPublicRouteIndex(pages: SitePage[]): PublicRouteIndex {
     const existingRoute = byRoute.get(route);
     if (existingRoute) throw new Error(`Duplikált public route index kulcs: route=${route}; first=${pageIdentity(existingRoute)}; duplicate=${pageIdentity(page)}`);
     byRoute.set(route, page);
+    const id = String(page.id ?? '').trim();
+    if (id) byId.set(id, page);
     const typed = byType.get(page.type) ?? [];
     typed.push(page);
     byType.set(page.type, typed);
@@ -56,7 +60,7 @@ export function buildPublicRouteIndex(pages: SitePage[]): PublicRouteIndex {
     byTypeAndSlug.set(page.type, slugMap);
   }
   for (const entries of byType.values()) entries.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || String(a.route).localeCompare(String(b.route)));
-  return { pages, byRoute, byType, byTypeAndSlug };
+  return { pages, byRoute, byId, byType, byTypeAndSlug };
 }
 
 export function firstPageByType(index: PublicRouteIndex, type: string) {
@@ -77,12 +81,20 @@ function legacyUrlSlug(item: LinkableItem) {
 }
 
 function cardError({ item, itemIndex, sourcePage, blockLabel, detailType, reason }: { item: LinkableItem; itemIndex: number; sourcePage: SitePage; blockLabel: string; detailType: 'solution_detail' | 'audience_detail'; reason: string }) {
-  const title = String(item.title ?? item.label ?? item.slug ?? item.url ?? item.href ?? `#${itemIndex + 1}`);
+  const title = String(item.title ?? item.title_override ?? item.label ?? item.slug ?? item.url ?? item.href ?? `#${itemIndex + 1}`);
   return new Error(`Nem feloldható public kártyalink: page=${sourcePage.title} route=${sourcePage.route} type=${sourcePage.type} block=${blockLabel} item=${title} detailType=${detailType}. ${reason}`);
 }
 
 export function resolveListingCards({ items, detailType, index, sourcePage, blockLabel, mode, source }: { items: LinkableItem[]; detailType: 'solution_detail' | 'audience_detail'; index: PublicRouteIndex; sourcePage: SitePage; blockLabel: string; mode: PublicContentMode; source: ListingCardSource }) {
   return items.map((item, itemIndex) => {
+    const targetType = String(item.target_type ?? '').trim();
+    if (targetType === 'page') {
+      const targetPageId = String(item.target_page_id ?? '').trim();
+      const target = targetPageId ? index.byId.get(targetPageId) : undefined;
+      if (!target) throw cardError({ item, itemIndex, sourcePage, blockLabel, detailType, reason: `A page target nem published oldal: target_page_id=${targetPageId || 'hiányzik'}.` });
+      if (target.type !== detailType) throw cardError({ item, itemIndex, sourcePage, blockLabel, detailType, reason: `A page target típusa ${target.type}, elvárt: ${detailType}.` });
+      return { ...item, slug: target.slug, href: target.route, url: target.route };
+    }
     const explicitUrl = String(item.url ?? item.href ?? '').trim();
     const explicitSlug = String(item.slug ?? '').trim();
     if (explicitUrl.startsWith('/')) {
