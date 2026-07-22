@@ -11,6 +11,7 @@ import { isRecognizedPageCta } from '@/lib/content/pageCta';
 const { blocks = [], routeIndex = null, layout = 'grid', context = '' } = Astro.props;
 const isHomeContext = context === 'home';
 const isStackedSections = layout === 'stacked-sections';
+const isFragment = layout === 'fragment';
 const visibleBlocks = blocks.filter((block) => !isRecognizedPageCta(block));
 const asArray = (items) => Array.isArray(items) ? items : [];
 const textOf = (item) => typeof item === 'string' ? item : (item?.title ?? item?.text ?? item?.label ?? '');
@@ -19,9 +20,44 @@ const editorialEyebrowFor = (block) => String(block?.eyebrow || '').trim();
 const linkAttrs = (value) => { const href = normalizePublicHref(value); return { href, target: publicHrefTarget(href), rel: publicHrefRel(href) }; };
 const validIntent = (value) => ['demo','trial','email'].includes(String(value || '').trim()) ? String(value).trim() : '';
 const safeId = (value) => String(value || '').trim().replace(/[^a-zA-Z0-9_.:-]/g, '-').slice(0, 80);
+const allow = (set, value, fallback = '') => { const raw = String(value || '').trim(); return set.has(raw) ? raw : fallback; };
+const contentLayouts = new Set(['default', 'lead']);
+const headingScales = new Set(['default', 'section', 'display', 'prominent']);
+const surfaceVariants = new Set(['default', 'gradient', 'emphasis']);
+const bodyWhitespaces = new Set(['normal', 'preserve-lines']);
+const blockPresentation = (block) => block?.presentation && typeof block.presentation === 'object' && !Array.isArray(block.presentation) ? block.presentation : {};
+const contentLayoutFor = (block) => allow(contentLayouts, blockPresentation(block).contentLayout || blockPresentation(block).content_layout, 'default');
+const headingScaleFor = (block) => allow(headingScales, blockPresentation(block).headingScale || blockPresentation(block).heading_scale, 'default');
+const surfaceVariantFor = (block) => allow(surfaceVariants, blockPresentation(block).surfaceVariant || blockPresentation(block).surface_variant, 'default');
+const bodyWhitespaceFor = (block) => allow(bodyWhitespaces, blockPresentation(block).bodyWhitespace || blockPresentation(block).body_whitespace, 'normal');
+const contentCardClassFor = (block, type) => ['content-card', `type-${type}`, `content-card--layout-${contentLayoutFor(block)}`, `content-card--heading-${headingScaleFor(block)}`, `content-card--surface-${surfaceVariantFor(block)}`, `content-card--body-${bodyWhitespaceFor(block)}`];
+const leadEyebrowFor = (block, eyebrow) => block.title || eyebrow;
+const leadHeadingFor = (block) => block.body || block.title || '';
 const sectionClassFor = (type) => ['content-block-section', `content-block-section--${type}`, (type === 'ai-assistant-preview' || type === 'integrations-strip') && 'content-block-section--full content-block-section--dark'];
 ---
-{isStackedSections ? (
+{isFragment ? (
+  <>
+    {visibleBlocks.map((block) => {
+      const type = blockType(block);
+      const items = asArray(block.items);
+      const eyebrow = editorialEyebrowFor(block);
+      const video = items[0] ?? null;
+      if (type === 'text') { const isLead = contentLayoutFor(block) === 'lead'; return <article class:list={contentCardClassFor(block, 'text')}>{isLead ? <>{leadEyebrowFor(block, eyebrow) && <span class="eyebrow">{leadEyebrowFor(block, eyebrow)}</span>}{leadHeadingFor(block) && <h2>{leadHeadingFor(block)}</h2>}</> : <>{eyebrow && <span class="eyebrow">{eyebrow}</span>}{block.title && <h2>{block.title}</h2>}{block.body && <p>{block.body}</p>}</>}</article>; }
+      if (type === 'cta') { const cta = items[0] ?? {}; const link = linkAttrs(cta.url); const secondaryLink = cta?.secondaryUrl ? linkAttrs(cta.secondaryUrl) : null; const intent = validIntent(cta.analyticsIntent) || (link.href.startsWith('mailto:') ? 'email' : ''); const analyticsId = safeId(cta.analyticsId || block.blockKey || block.block_key || 'content-block-cta'); const slot = safeId(cta.analyticsSlot || block.blockKey || block.block_key || 'content-block'); const hasActions = Boolean((link.href && cta.label) || (secondaryLink?.href && cta.secondaryLabel)); return <article class:list={contentCardClassFor(block, 'cta')}>{(cta.eyebrow || eyebrow) && <span class="eyebrow">{cta.eyebrow || eyebrow}</span>}{block.title && <h2>{block.title}</h2>}{block.body && <p>{block.body}</p>}{hasActions && <p class="cta-actions">{link.href && cta.label && <a class="button button-primary" href={link.href} target={link.target} rel={link.rel} data-easylink-cta={intent || undefined} data-easylink-cta-id={intent && analyticsId ? analyticsId : undefined} data-easylink-cta-slot={intent && analyticsId ? slot : undefined}>{cta.label}</a>}{secondaryLink?.href && cta.secondaryLabel && <a class="button button-secondary" href={secondaryLink.href} target={secondaryLink.target} rel={secondaryLink.rel}>{cta.secondaryLabel}</a>}</p>}</article>; }
+      if (type === 'cards' || type === 'card-grid') return <CardsBlock block={block} routeIndex={routeIndex} presentation="standard" />;
+      if (type === 'split-text') return <article class="content-card"><SplitTextBlock block={block} /></article>;
+      if (type === 'ai-assistant-preview') return <article class="type-cards"><AiAssistantPreviewBlock block={block} /></article>;
+      if (type === 'integrations-strip') return <article class="type-cards"><IntegrationsStripBlock block={block} /></article>;
+      if (type === 'image-text') { const media = items[0] ?? {}; return <article class:list={['content-card', 'type-image-text', media.position === 'left' ? 'image-left' : 'image-right']}><div>{media.image && <img src={media.image} alt={media.alt || ""} loading="lazy" />}</div><div>{eyebrow && <span class="eyebrow">{eyebrow}</span>}{block.title && <h2>{block.title}</h2>}{block.body && <p>{block.body}</p>}</div></article>; }
+      if (type === 'ai-preview') return <AiPreviewBlock block={block} />;
+      if (type === 'network-visual') return <NetworkVisualBlock block={block} />;
+      if (type === 'video') return <article class="content-card type-video">{eyebrow && <span class="eyebrow">{eyebrow}</span>}{block.title && <h2>{block.title}</h2>}{block.body && <p>{block.body}</p>}<VideoMedia config={video} mode="inline" title={block.title || 'Videó'} /></article>;
+      if (type === 'faq') return <article class="content-card type-faq">{eyebrow && <span class="eyebrow">{eyebrow}</span>}{block.title && <h2>{block.title}</h2>}{block.body && <p>{block.body}</p>}{items.map((item) => <details><summary>{item.question || item.title}</summary>{(item.answer || item.text) && <p>{item.answer || item.text}</p>}</details>)}</article>;
+      if (type === 'feature-list') { return <article class:list={contentCardClassFor(block, 'feature-list')}>{eyebrow && <span class="eyebrow">{eyebrow}</span>}{block.title && <h2>{block.title}</h2>}{block.body && <p>{block.body}</p>}{items.length > 0 && <ul>{items.map((item) => { const href = typeof item === 'object' ? normalizePublicHref(item.url || item.href) : ''; const label = textOf(item); return <li>{href ? <a href={href} target={publicHrefTarget(href)} rel={publicHrefRel(href)}>{label}</a> : label}</li>; })}</ul>}</article>; }
+      return <article class:list={['content-card', `type-${type}`]}>{eyebrow && <span class="eyebrow">{eyebrow}</span>}{block.title && <h2>{block.title}</h2>}{block.body && <p>{block.body}</p>}{items.length > 0 && <ul>{items.map((item) => <li>{textOf(item)}</li>)}</ul>}</article>;
+    })}
+  </>
+) : isStackedSections ? (
   <div class:list={[isHomeContext && 'home-content-blocks']} data-content-blocks-layout="stacked-sections">
     {visibleBlocks.map((block) => {
       const type = blockType(block);
@@ -61,8 +97,8 @@ const sectionClassFor = (type) => ['content-block-section', `content-block-secti
         const items = asArray(block.items);
         const eyebrow = editorialEyebrowFor(block);
         const video = items[0] ?? null;
-        if (type === 'text') { return <article class="content-card type-text">{eyebrow && <span class="eyebrow">{eyebrow}</span>}{block.title && <h2>{block.title}</h2>}{block.body && <p>{block.body}</p>}</article>; }
-        if (type === 'cta') { const cta = items[0] ?? {}; const link = linkAttrs(cta.url); const intent = validIntent(cta.analyticsIntent); const analyticsId = safeId(cta.analyticsId); const slot = safeId(cta.analyticsSlot || block.blockKey || block.block_key || 'content-block'); return <article class="content-card type-cta">{eyebrow && <span class="eyebrow">{eyebrow}</span>}{block.title && <h2>{block.title}</h2>}{block.body && <p>{block.body}</p>}{link.href && <a class="button button-primary" href={link.href} target={link.target} rel={link.rel} data-easylink-cta={intent || undefined} data-easylink-cta-id={intent && analyticsId ? analyticsId : undefined} data-easylink-cta-slot={intent && analyticsId ? slot : undefined}>{cta.label || 'Tovább'}</a>}</article>; }
+        if (type === 'text') { const isLead = contentLayoutFor(block) === 'lead'; return <article class:list={contentCardClassFor(block, 'text')}>{isLead ? <>{leadEyebrowFor(block, eyebrow) && <span class="eyebrow">{leadEyebrowFor(block, eyebrow)}</span>}{leadHeadingFor(block) && <h2>{leadHeadingFor(block)}</h2>}</> : <>{eyebrow && <span class="eyebrow">{eyebrow}</span>}{block.title && <h2>{block.title}</h2>}{block.body && <p>{block.body}</p>}</>}</article>; }
+        if (type === 'cta') { const cta = items[0] ?? {}; const link = linkAttrs(cta.url); const secondaryLink = cta?.secondaryUrl ? linkAttrs(cta.secondaryUrl) : null; const intent = validIntent(cta.analyticsIntent) || (link.href.startsWith('mailto:') ? 'email' : ''); const analyticsId = safeId(cta.analyticsId || block.blockKey || block.block_key || 'content-block-cta'); const slot = safeId(cta.analyticsSlot || block.blockKey || block.block_key || 'content-block'); const hasActions = Boolean((link.href && cta.label) || (secondaryLink?.href && cta.secondaryLabel)); return <article class:list={contentCardClassFor(block, 'cta')}>{(cta.eyebrow || eyebrow) && <span class="eyebrow">{cta.eyebrow || eyebrow}</span>}{block.title && <h2>{block.title}</h2>}{block.body && <p>{block.body}</p>}{hasActions && <p class="cta-actions">{link.href && cta.label && <a class="button button-primary" href={link.href} target={link.target} rel={link.rel} data-easylink-cta={intent || undefined} data-easylink-cta-id={intent && analyticsId ? analyticsId : undefined} data-easylink-cta-slot={intent && analyticsId ? slot : undefined}>{cta.label}</a>}{secondaryLink?.href && cta.secondaryLabel && <a class="button button-secondary" href={secondaryLink.href} target={secondaryLink.target} rel={secondaryLink.rel}>{cta.secondaryLabel}</a>}</p>}</article>; }
         if (type === 'cards' || type === 'card-grid') return <CardsBlock block={block} routeIndex={routeIndex} presentation="standard" />;
         if (type === 'split-text') return <article class="content-card"><SplitTextBlock block={block} /></article>;
         if (type === 'ai-assistant-preview') return <article class="type-cards"><AiAssistantPreviewBlock block={block} /></article>;
@@ -72,7 +108,7 @@ const sectionClassFor = (type) => ['content-block-section', `content-block-secti
         if (type === 'network-visual') return <NetworkVisualBlock block={block} />;
         if (type === 'video') return <article class="content-card type-video">{eyebrow && <span class="eyebrow">{eyebrow}</span>}{block.title && <h2>{block.title}</h2>}{block.body && <p>{block.body}</p>}<VideoMedia config={video} mode="inline" title={block.title || 'Videó'} /></article>;
         if (type === 'faq') return <article class="content-card type-faq">{eyebrow && <span class="eyebrow">{eyebrow}</span>}{block.title && <h2>{block.title}</h2>}{block.body && <p>{block.body}</p>}{items.map((item) => <details><summary>{item.question || item.title}</summary>{(item.answer || item.text) && <p>{item.answer || item.text}</p>}</details>)}</article>;
-        if (type === 'feature-list') { return <article class="content-card type-feature-list">{eyebrow && <span class="eyebrow">{eyebrow}</span>}{block.title && <h2>{block.title}</h2>}{block.body && <p>{block.body}</p>}{items.length > 0 && <ul>{items.map((item) => { const href = typeof item === 'object' ? normalizePublicHref(item.url || item.href) : ''; const label = textOf(item); return <li>{href ? <a href={href} target={publicHrefTarget(href)} rel={publicHrefRel(href)}>{label}</a> : label}</li>; })}</ul>}</article>; }
+        if (type === 'feature-list') { return <article class:list={contentCardClassFor(block, 'feature-list')}>{eyebrow && <span class="eyebrow">{eyebrow}</span>}{block.title && <h2>{block.title}</h2>}{block.body && <p>{block.body}</p>}{items.length > 0 && <ul>{items.map((item) => { const href = typeof item === 'object' ? normalizePublicHref(item.url || item.href) : ''; const label = textOf(item); return <li>{href ? <a href={href} target={publicHrefTarget(href)} rel={publicHrefRel(href)}>{label}</a> : label}</li>; })}</ul>}</article>; }
         return <article class:list={['content-card', `type-${type}`]}>{eyebrow && <span class="eyebrow">{eyebrow}</span>}{block.title && <h2>{block.title}</h2>}{block.body && <p>{block.body}</p>}{items.length > 0 && <ul>{items.map((item) => <li>{textOf(item)}</li>)}</ul>}</article>;
       })}
     </div>
@@ -90,6 +126,15 @@ const sectionClassFor = (type) => ['content-block-section', `content-block-secti
   .content-card { position: relative; overflow: hidden; border: 1px solid rgba(15, 17, 89, 0.1); border-radius: var(--radius-md); background: white; box-shadow: var(--shadow-card); padding: var(--card-padding); }
   .content-card::before { content: ""; position: absolute; inset: 0 0 auto; height: 4px; background: linear-gradient(90deg, var(--color-neon), var(--color-cyan)); }
   .content-card h2 { color: var(--color-navy); font-size: clamp(1.22rem, 1.45vw, 1.62rem); font-weight: 700; line-height: 1.22; letter-spacing: -0.025em; }
+  .content-card--layout-lead { border: 0; box-shadow: none; background: transparent; padding: 0; }
+  .content-card--layout-lead::before { display: none; }
+  .content-card--layout-lead h2, .content-card--heading-display h2 { max-width: 920px; font-size: clamp(1.65rem, 2.5vw, 2.4rem); }
+  .content-card--heading-section h2 { font-size: clamp(1.45rem, 2.2vw, 2.2rem); }
+  .content-card--heading-prominent h2 { font-size: clamp(1.8rem, 4vw, 3rem); }
+  .content-card--surface-emphasis { margin-top: 28px; padding: 28px; border-radius: 24px; background: #fff; box-shadow: 0 20px 60px rgba(15,17,89,.09); }
+  .content-card--surface-emphasis p { max-width: 920px; color: var(--color-navy); font-weight: 700; }
+  .content-card--surface-gradient { background: linear-gradient(180deg, #fff, #f0f5eb); }
+  .content-card--body-preserve-lines p { white-space: pre-line; }
   .content-card p { color: var(--color-ink); line-height: 1.68; }
   .type-video { grid-column: 1 / -1; }
   .cta-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 24px; }
@@ -100,6 +145,9 @@ const sectionClassFor = (type) => ['content-block-section', `content-block-secti
   .type-network-visual, .type-cta { background: linear-gradient(135deg, var(--color-navy), #080a34); color: white; }
   .type-network-visual h2, .type-cta h2 { color: white; }
   .type-network-visual p, .type-cta p { color: rgba(255, 255, 255, 0.75); }
+  :global(.generic-public-section--surface-polished) .type-cta { background: white; color: var(--color-navy); }
+  :global(.generic-public-section--surface-polished) .type-cta h2 { color: var(--color-navy); }
+  :global(.generic-public-section--surface-polished) .type-cta p { color: var(--color-ink); }
   li { margin: 10px 0; color: var(--color-navy); font-weight: 600; line-height: 1.58; }
   .type-network-visual li { color: rgba(255, 255, 255, 0.92); }
   details { border-top: 1px solid rgba(15,17,89,.12); padding: 12px 0; }

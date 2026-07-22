@@ -135,10 +135,10 @@ assert.doesNotMatch(registry, /\.astro/);
 const dispatcher = await readFile('src/components/page-renderers/PublicPageRenderer.astro', 'utf8');
 assert.match(catchAll, /PublicPageRenderer/);
 assert.doesNotMatch(catchAll, /getPublicPageRenderer/);
-for (const type of ['solutions_index','solution_detail','audiences_index','audience_detail','integrations','pricing','contact','content_page']) assert.match(dispatcher, new RegExp(`${type}:`));
+assert.doesNotMatch(dispatcher, /solutions_index:|solution_detail:|audiences_index:|audience_detail:|integrations:|pricing:|contact:|content_page:/);
 assert.doesNotMatch(dispatcher, /home:/);
 assert.match(dispatcher, /unsupportedPublicPageTypeError\(page\.type\)/);
-assert.match(dispatcher, /<Renderer page=\{page\} routeIndex=\{routeIndex\} mode=\{mode\} \/>/);
+assert.match(dispatcher, /<GenericPublicPageRenderer page=\{page\} routeIndex=\{routeIndex\} mode=\{mode\} \/>/);
 
 const release = await mkdtemp(join(tmpdir(), 'easylink-dynamic-release-'));
 async function addRoute(route) { const clean = route.replace(/^\/+|\/+$/g, ''); const dir = clean ? join(release, clean) : release; await mkdir(dir, { recursive: true }); await writeFile(join(dir, 'index.html'), `<!doctype html><title>${route}</title>`); }

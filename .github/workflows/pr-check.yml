@@ -1,0 +1,33 @@
+name: PR checks
+
+on:
+  pull_request:
+
+jobs:
+  test:
+    name: Smoke, check and build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.12.0
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generic public renderer smoke
+        run: npm run smoke:generic-public-renderer
+
+      - name: Composition smoke
+        run: npm run smoke:composition
+
+      - name: Check
+        run: npm run check
+
+      - name: Build
+        run: npm run build

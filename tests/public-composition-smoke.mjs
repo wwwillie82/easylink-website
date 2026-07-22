@@ -150,64 +150,27 @@ assert.match(registry, /unsupportedPublicPageTypeError/);
 assert.match(registry, /Unsupported published public page\.type/);
 assert.doesNotMatch(registry, /\.astro/);
 const dispatcher = await readFile('src/components/page-renderers/PublicPageRenderer.astro', 'utf8');
-for (const renderer of ['ContentPageRenderer','SolutionsIndexRenderer','SolutionDetailRenderer','AudiencesIndexRenderer','AudienceDetailRenderer','IntegrationsRenderer','PricingRenderer','ContactRenderer']) assert.match(dispatcher, new RegExp(`import ${renderer} from './${renderer}\\.astro'`));
-for (const type of ['solutions_index','solution_detail','audiences_index','audience_detail','integrations','pricing','contact','content_page']) assert.match(dispatcher, new RegExp(`${type}:`));
+assert.match(dispatcher, /GenericPublicPageRenderer/);
+assert.doesNotMatch(dispatcher, /ContentPageRenderer|SolutionsIndexRenderer|SolutionDetailRenderer|AudiencesIndexRenderer|AudienceDetailRenderer|IntegrationsRenderer|PricingRenderer|ContactRenderer/);
+assert.doesNotMatch(dispatcher, /solutions_index:|solution_detail:|audiences_index:|audience_detail:|integrations:|pricing:|contact:|content_page:/);
 assert.doesNotMatch(dispatcher, /home:/);
 assert.match(dispatcher, /if \(!isSupportedPublicPageType\(page\.type\)\) throw unsupportedPublicPageTypeError\(page\.type\)/);
-assert.match(dispatcher, /<Renderer page=\{page\} routeIndex=\{routeIndex\} mode=\{mode\} \/>/);
+assert.match(dispatcher, /<GenericPublicPageRenderer page=\{page\} routeIndex=\{routeIndex\} mode=\{mode\} \/>/);
 async function collectTsFiles(dir) { const out = []; for (const entry of await readdir(dir, { withFileTypes: true })) { const file = `${dir}/${entry.name}`; if (entry.isDirectory()) out.push(...await collectTsFiles(file)); else if (entry.isFile() && file.endsWith('.ts')) out.push(file); } return out; }
 const tsSources = await Promise.all((await collectTsFiles('src')).map(async (file) => [file, await readFile(file, 'utf8')]));
 for (const [file, source] of tsSources) assert.doesNotMatch(source, /from ['"][^'"]+\.astro['"]/, `${file} must not import Astro components from TypeScript`);
 
-const solutionsIndex = await readFile('src/components/page-renderers/SolutionsIndexRenderer.astro', 'utf8');
-assert.match(solutionsIndex, /findRoleBlock\(page\?\.blocks, 'golden-cards'/);
-assert.match(solutionsIndex, /const rawSolutionCards = cardsBlock\?\.items\?\.length \? cardsBlock\.items : publishedSolutions/);
-assert.match(solutionsIndex, /source: cardsBlock\?\.items\?\.length \? 'db-block' : 'golden'/);
-assert.match(solutionsIndex, /<ListingCards items=\{solutionCards\}/);
-assert.doesNotMatch(solutionsIndex, /basePath="\/megoldasaink\/"/);
-const audiencesIndex = await readFile('src/components/page-renderers/AudiencesIndexRenderer.astro', 'utf8');
-assert.match(audiencesIndex, /findRoleBlock\(page\?\.blocks, 'golden-cards'/);
-assert.match(audiencesIndex, /const rawAudienceCards = cardsBlock\?\.items\?\.length \? cardsBlock\.items : publishedAudiences/);
-assert.match(audiencesIndex, /source: cardsBlock\?\.items\?\.length \? 'db-block' : 'golden'/);
-assert.doesNotMatch(audiencesIndex, /basePath="\/kinek-szol\/"/);
-for (const file of ['src/components/page-renderers/SolutionDetailRenderer.astro','src/components/page-renderers/AudienceDetailRenderer.astro']) {
-  const source = await readFile(file, 'utf8');
-  assert.match(source, /<PageHero\b[\s\S]*variant="detail"/);
-  const cb = source.indexOf('<ContentBlocks');
-  const related = source.indexOf('<RelatedLinks');
-  const cta = source.indexOf('<CTASection');
-  assert.ok(cb > -1 && related > cb && cta > related, `${file} detail order must be ContentBlocks -> RelatedLinks -> CTASection`);
-  assert.match(source, /relatedPages\(routeIndex, page,/);
-}
-const pricingIndex = await readFile('src/components/page-renderers/PricingRenderer.astro', 'utf8');
-assert.match(pricingIndex, /findRoleBlock\(page\?\.blocks, 'pricing-features'/);
-assert.match(pricingIndex, /findRoleBlock\(page\?\.blocks, 'pricing-explainer'/);
-assert.match(pricingIndex, /resolvePageCtaBlock\(page\?\.blocks, \{ role: 'pricing-cta' \}\)/);
-assert.match(pricingIndex, /<CTASection block=\{ctaBlock\}/);
-assert.match(pricingIndex, /priceFeatures = featureBlock\?\.items\?\.length \? featureBlock\.items :/);
-const contactIndex = await readFile('src/components/page-renderers/ContactRenderer.astro', 'utf8');
-assert.match(contactIndex, /findRoleBlock\(page\?\.blocks, 'contact-main'/);
-assert.match(contactIndex, /findRoleBlock\(page\?\.blocks, 'contact-features'/);
-assert.match(contactIndex, /helpItems = featureBlock\?\.items\?\.length \? featureBlock\.items :/);
-assert.match(contactIndex, /safeContactIntro\(ctaBlock\?\.body\)/);
-assert.match(contactIndex, /data-easylink-cta="demo"/);
-const integrationsIndex = await readFile('src/components/page-renderers/IntegrationsRenderer.astro', 'utf8');
-assert.match(integrationsIndex, /import CardsBlock from '@\/components\/CardsBlock\.astro'/);
-assert.doesNotMatch(integrationsIndex, /publishedIntegrations|publicCardsFromItems|import ListingCards from/);
-assert.match(integrationsIndex, /<CardsBlock block=\{cardsBlock\} routeIndex=\{routeIndex\} presentation="standard" \/>/);
-assert.match(integrationsIndex, /findRoleBlock\(page\?\.blocks, 'integrations-intro'/);
-assert.match(integrationsIndex, /findRoleBlock\(page\?\.blocks, 'integrations-important'/);
-assert.match(integrationsIndex, /\{importantBlock && <div class="container"><article class="important card">/);
-assert.doesNotMatch(integrationsIndex, /importantBlock\?\.title \?\? 'Fontos keret'/);
-assert.doesNotMatch(integrationsIndex, /A public tartalom integrációs irányokat/);
-assert.match(integrationsIndex, /const remainingBlocks = withoutBlocks/);
-assert.match(integrationsIndex, /<ContentBlocks blocks=\{remainingBlocks\}/);
-assert.match(integrationsIndex, /<CTASection block=\{ctaSectionBlock\}/);
-for (const token of ['asset={page?.heroAsset || "/assets/nati/hero-bg-flow-02.webp"}', 'height={page?.heroHeight}', 'imageFit={page?.heroImageFit}', 'overlayStrength={page?.heroOverlayStrength}', 'imageScale={page?.heroImageScale}']) {
-  assert.match(integrationsIndex, new RegExp(token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
-}
-assert.doesNotMatch(integrationsIndex, /integration-card/);
-assert.doesNotMatch(integrationsIndex, /linkLabel:\s*'Részletek'/);
-assert.doesNotMatch(integrationsIndex, /\.\.\.item/);
+const genericRenderer = await readFile('src/components/page-renderers/GenericPublicPageRenderer.astro', 'utf8');
+const publicSection = await readFile('src/components/PublicSection.astro', 'utf8');
+const composer = await readFile('src/lib/content/section-composition.mjs', 'utf8');
+assert.match(genericRenderer, /<PageHero[\s\S]*variant=\{heroVariant\}/);
+assert.match(genericRenderer, /composePublicSections\(page\?\.blocks \|\| \[\]\)/);
+assert.match(genericRenderer, /<CTASection block=\{ctaSectionBlock\}/);
+assert.match(publicSection, /<RelatedLinks/);
+assert.match(publicSection, /<ContentBlocks blocks=\{blocks\} routeIndex=\{routeIndex\} layout="fragment" \/>/);
+assert.match(composer, /sectionGroupKey/);
+assert.match(composer, /safeColumnRatio/);
+assert.doesNotMatch(genericRenderer + publicSection + composer, /relatedPages\(|resolveListingCards\(|pricing-features|contact-main|integrations-intro/);
+
 
 console.log('Public composition smoke passed: detailed home, hero, listing, content block, renderer and dynamic routing contracts.');
