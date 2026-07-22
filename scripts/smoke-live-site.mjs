@@ -1,5 +1,5 @@
 import { staticPagesData } from '../src/lib/content/static-seed-data.mjs';
-import { resolvePageCta, resolvePageCtaBlock } from '../src/lib/content/page-cta-contract.mjs';
+import { resolvePageCta, resolvePageCtaBlock, resolvePageHeaderCta } from '../src/lib/content/page-cta-contract.mjs';
 import { PUBLIC_SMOKE_METADATA_PATH, publicRendererPageCtaRole } from '../src/lib/content/smoke-metadata.mjs';
 
 const requiredContentRoutes = new Set(['/', '/megoldasaink/', '/kinek-szol/', '/integraciok/', '/arak/', '/kapcsolat/']);
@@ -103,6 +103,27 @@ export function assertAnchor(html, route, ctaId, expectedLabel, expectedUrl, fai
   if (actualUrl !== expectedUrl) failures.push(`${route}: ${ctaId} URL mismatch: expected "${expectedUrl}", got "${actualUrl}"`);
 }
 
+function headerCtaAnchors(html) {
+  const container = html.match(/<div\b[^>]*class=["'][^"']*\bnav-ctas\b[^"']*["'][^>]*>[\s\S]*?<\/div>/i)?.[0] || '';
+  return container.match(/<a\b[^>]*>[\s\S]*?<\/a>/gi) || [];
+}
+
+export function assertHeaderCtaContent(route, html, resolvedHeader, failures) {
+  const anchors = headerCtaAnchors(html);
+  const expectedButtons = resolvedHeader?.shouldRender ? (resolvedHeader.buttons || []) : [];
+  if (anchors.length !== expectedButtons.length) {
+    failures.push(`${route}: expected ${expectedButtons.length} header CTA anchor(s), got ${anchors.length}`);
+  }
+  expectedButtons.forEach((button, index) => {
+    const anchor = anchors[index] || '';
+    if (!anchor) return;
+    const actualLabel = anchorText(anchor);
+    const actualUrl = getAttribute(anchor, 'href');
+    if (actualLabel !== normalizeWhitespace(button.label)) failures.push(`${route}: header CTA ${index + 1} label mismatch: expected "${button.label}", got "${actualLabel}"`);
+    if (actualUrl !== button.url) failures.push(`${route}: header CTA ${index + 1} URL mismatch: expected "${button.url}", got "${actualUrl}"`);
+  });
+}
+
 export function assertPageCtaContent(route, html, resolvedCta, failures) {
   const ctaSections = countMatches(html, /<section\b[^>]*class=["'][^"']*\bcta\b[^"']*["'][^>]*>/gi);
   if (!resolvedCta?.shouldRender) {
@@ -142,10 +163,19 @@ export function routeCtaExpectations(pages, defaultCta) {
   return byRoute;
 }
 
+export function routeHeaderCtaExpectations(pages, defaultCta) {
+  const byRoute = new Map();
+  for (const page of pages || []) {
+    const role = page.ctaRole || publicRendererPageCtaRole(page);
+    const block = page.ctaBlock ?? resolvePageCtaBlock(page.blocks || [], { role });
+    byRoute.set(page.route, resolvePageHeaderCta(block, defaultCta));
+  }
+  return byRoute;
+}
+
 function countMatches(value, pattern) {
   return (value.match(pattern) || []).length;
 }
-
 
 function assertContains(normalizedHtml, route, check, failures) {
   if (!normalizedHtml.includes(check.value)) {
@@ -159,6 +189,7 @@ async function run(baseUrl) {
   let publicData = { defaultCta: {}, pages: [] };
   try { publicData = await fetchPublicSmokeData(baseUrl); } catch (error) { failures.push(error.message); }
   const ctaByRoute = routeCtaExpectations(publicData.pages, publicData.defaultCta);
+  const headerCtaByRoute = routeHeaderCtaExpectations(publicData.pages, publicData.defaultCta);
   const homeCta = publicData.defaultCta;
 
   for (const route of routes) {
@@ -189,8 +220,8 @@ async function run(baseUrl) {
       if (!/<meta\s+[^>]*name=["']robots["'][^>]*content=["']noindex,nofollow["']/i.test(rawHtml)) {
         failures.push(`${route}: missing expected content from layout.meta.robots: noindex,nofollow`);
       }
+      if (headerCtaByRoute.has(route)) assertHeaderCtaContent(route, rawHtml, headerCtaByRoute.get(route), failures);
       if (route === '/') {
-        assertAnchor(rawHtml, route, 'site-header-demo', homeCta.primaryLabel, homeCta.primaryUrl, failures);
         assertAnchor(rawHtml, route, 'home-hero-demo', homeCta.primaryLabel, homeCta.primaryUrl, failures);
         if (homeCta.secondaryLabel && homeCta.secondaryUrl) assertAnchor(rawHtml, route, 'home-hero-trial', homeCta.secondaryLabel, homeCta.secondaryUrl, failures);
       }
