@@ -4,7 +4,7 @@ import { getPublicSiteSettings } from '@/lib/content/settings';
 import { resolvePageHeaderCta } from '@/lib/content/pageCta';
 
 type CtaButton = { label: string; url: string; showInHeader?: boolean; analyticsIntent?: string; analyticsId?: string; analyticsSlot?: string };
-type Props = { pageCtaBlock?: unknown };
+type Props = { pageCtaBlock?: any };
 const { pageCtaBlock = null } = Astro.props as Props;
 const siteNavigation = await listNavigation();
 const publicSettings = await getPublicSiteSettings();
