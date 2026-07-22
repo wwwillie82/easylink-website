@@ -1,9 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
 import ts from 'typescript';
-
-const nodeRequire = createRequire(import.meta.url);
 
 function loadPublicPagesModule() {
   let source = readFileSync('src/lib/content/public-pages.ts', 'utf8');
