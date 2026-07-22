@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - chatgpt/cta-four-buttons-header-toggle
+  pull_request:
+    branches:
+      - main
 
 jobs:
   typecheck:
