@@ -1,6 +1,17 @@
 ---
 import { getPublicSiteSettings } from '@/lib/content/settings';
 import { resolvePageCta, resolvedCtaToBlock } from '@/lib/content/pageCta';
+import { itemCtaButtons } from '@/lib/content/cta-buttons.mjs';
+
+type CtaButton = { label: string; url: string; showInHeader?: boolean; analyticsIntent?: string; analyticsId?: string; analyticsSlot?: string };
+type Props = {
+  primaryAnalyticsIntent?: string;
+  secondaryAnalyticsIntent?: string;
+  primaryAnalyticsId?: string;
+  secondaryAnalyticsId?: string;
+  analyticsSlot?: string;
+  block?: any;
+};
 const {
   primaryAnalyticsIntent = 'demo',
   secondaryAnalyticsIntent = 'trial',
@@ -8,41 +19,45 @@ const {
   secondaryAnalyticsId = 'cta-section-secondary',
   analyticsSlot = 'cta-section',
   block: rawBlock,
-} = Astro.props;
-const validIntent = (value) => ['demo','trial','email'].includes(String(value || '')) ? String(value) : '';
-const safeId = (value, fallback) => String(value || fallback).trim().replace(/[^a-zA-Z0-9_.:-]/g, '-').slice(0, 80);
+} = Astro.props as Props;
+const validIntent = (value: unknown) => ['demo','trial','email'].includes(String(value || '')) ? String(value) : '';
+const safeId = (value: unknown, fallback: string) => String(value || fallback).trim().replace(/[^a-zA-Z0-9_.:-]/g, '-').slice(0, 80);
 const publicSettings = await getPublicSiteSettings();
 const block = rawBlock?.resolvedPageCta ? rawBlock : resolvedCtaToBlock(resolvePageCta(rawBlock, publicSettings.defaultCta));
 const cta = block?.items?.[0] ?? null;
 const resolvedEyebrow = cta?.eyebrow || '';
 const resolvedTitle = block?.title || '';
 const resolvedDescription = block?.body || '';
-const resolvedPrimaryLabel = cta?.label || '';
-const resolvedPrimaryHref = cta?.url || '';
-const resolvedSecondaryLabel = cta?.secondaryLabel || '';
-const resolvedSecondaryHref = cta?.secondaryUrl || '';
-const primaryIntent = validIntent(cta?.primaryAnalyticsIntent ?? cta?.analyticsIntent ?? primaryAnalyticsIntent);
-const secondaryIntent = validIntent(cta?.secondaryAnalyticsIntent ?? secondaryAnalyticsIntent);
-const slot = safeId(cta?.analyticsSlot ?? analyticsSlot, 'cta-section');
-const shouldRender = Boolean(block && cta && resolvedTitle && resolvedPrimaryLabel && resolvedPrimaryHref);
+const buttons = (cta ? itemCtaButtons(cta) : []) as CtaButton[];
+const shouldRender = Boolean(block && cta && resolvedTitle && buttons.length);
 ---
 
 {shouldRender && (
-
-
-<section class="section cta">
-  <div class="container box">
-    <span class="eyebrow">{resolvedEyebrow}</span>
-    <h2>{resolvedTitle}</h2>
-    <p>{resolvedDescription}</p>
-    <div class="actions">
-      <a class="button button-primary" href={resolvedPrimaryHref} data-easylink-cta={primaryIntent || undefined} data-easylink-cta-id={primaryIntent ? safeId(cta.primaryAnalyticsId ?? cta.analyticsId ?? primaryAnalyticsId, 'cta-section-primary') : undefined} data-easylink-cta-slot={primaryIntent ? slot : undefined}>{resolvedPrimaryLabel}</a>
-      {resolvedSecondaryLabel && resolvedSecondaryHref && <a class="button button-secondary" href={resolvedSecondaryHref} data-easylink-cta={secondaryIntent || undefined} data-easylink-cta-id={secondaryIntent ? safeId(cta.secondaryAnalyticsId ?? secondaryAnalyticsId, 'cta-section-secondary') : undefined} data-easylink-cta-slot={secondaryIntent ? slot : undefined}>{resolvedSecondaryLabel}</a>}
+  <section class="section cta">
+    <div class="container box">
+      <span class="eyebrow">{resolvedEyebrow}</span>
+      <h2>{resolvedTitle}</h2>
+      <p>{resolvedDescription}</p>
+      <div class="actions">
+        {buttons.map((button: CtaButton, index: number) => {
+          const intent = validIntent(button.analyticsIntent ?? (index === 0 ? (cta?.primaryAnalyticsIntent ?? cta?.analyticsIntent ?? primaryAnalyticsIntent) : index === 1 ? (cta?.secondaryAnalyticsIntent ?? secondaryAnalyticsIntent) : ''));
+          const id = safeId(button.analyticsId ?? (index === 0 ? (cta?.primaryAnalyticsId ?? cta?.analyticsId ?? primaryAnalyticsId) : index === 1 ? (cta?.secondaryAnalyticsId ?? secondaryAnalyticsId) : ''), `cta-section-${index + 1}`);
+          const slot = safeId(button.analyticsSlot ?? cta?.analyticsSlot ?? analyticsSlot, 'cta-section');
+          return (
+            <a
+              class={`button ${index === 0 ? 'button-primary' : 'button-secondary'}`}
+              href={button.url}
+              data-easylink-cta={intent || undefined}
+              data-easylink-cta-id={intent ? id : undefined}
+              data-easylink-cta-slot={intent ? slot : undefined}
+            >
+              {button.label}
+            </a>
+          );
+        })}
+      </div>
     </div>
-  </div>
-</section>
-
-
+  </section>
 )}
 <style>
   .cta { background: #f4f7f3; }

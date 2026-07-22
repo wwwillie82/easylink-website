@@ -24,7 +24,7 @@ if (pageState.hiddenByDb) Astro.response.status = 404;
 ---
 
 <BaseLayout title={homePage?.seoTitle} description={homePage?.seoDescription}>
-  <Header />
+  <Header pageCtaBlock={homeCtaBlock} />
   <main>
     {pageState.hiddenByDb ? <section class="section"><div class="container"><h1>Az oldal nem található.</h1></div></section> : <>
     <Hero page={homePage} hero={{ heroAsset: homePage?.heroAsset, heroVideo: homePage?.heroVideo, heroHeight: homePage?.heroHeight, heroImageFit: homePage?.heroImageFit, heroImagePositionX: homePage?.heroImagePositionX, heroImagePositionY: homePage?.heroImagePositionY, heroImagePositionMobileX: homePage?.heroImagePositionMobileX, heroImagePositionMobileY: homePage?.heroImagePositionMobileY, heroOverlayStrength: homePage?.heroOverlayStrength, heroImageScale: homePage?.heroImageScale }} heroMeta={normalizedHome.heroMeta} />

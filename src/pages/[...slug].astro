@@ -4,6 +4,7 @@ import Header from '@/components/Header.astro';
 import Footer from '@/components/Footer.astro';
 import { listPublishedPublicPages } from '@/lib/content/provider';
 import { buildPublicRouteIndex, normalizePublicRoute, routeToStaticParam } from '@/lib/content/public-pages';
+import { resolvePageCtaBlock } from '@/lib/content/pageCta';
 import PublicPageRenderer from '@/components/page-renderers/PublicPageRenderer.astro';
 
 export async function getStaticPaths() {
@@ -22,10 +23,11 @@ const routeIndex = buildPublicRouteIndex(allPages);
 if (!page) throw new Error(`Published public oldal nem található a catch-all propsban: ${requestedRoute}`);
 if (normalizePublicRoute(page.route) !== requestedRoute) throw new Error(`A catch-all props route és a kért route eltér: props=${page.route} requested=${requestedRoute}`);
 if (page.route === '/' || page.type === 'home') throw new Error(`Home oldal nem renderelhető catch-all route-on: ${page.route}`);
+const pageCtaBlock = resolvePageCtaBlock(page?.blocks);
 ---
 
 <BaseLayout title={page.seoTitle} description={page.seoDescription}>
-  <Header />
+  <Header pageCtaBlock={pageCtaBlock} />
   <main>
     <PublicPageRenderer page={page} routeIndex={routeIndex} mode={mode} />
   </main>
