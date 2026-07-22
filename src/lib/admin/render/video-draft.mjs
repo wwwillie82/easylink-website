@@ -1,3 +1,5 @@
+import { ctaAdminEnhancementJs } from './cta-admin.mjs';
+
 export function readVideoDraft(form) {
   const sourceType = form?.querySelector?.('[data-video-source]')?.value === 'youtube' ? 'youtube' : 'media';
   const draft = {
@@ -73,5 +75,6 @@ export function installVideoDraftGuard(doc = globalThis.document, options = {}) 
 }
 
 export function videoDraftGuardJs() {
-  return `const readVideoDraft=${readVideoDraft.toString()};const setVideoDraftValue=${setValue.toString()};const restoreVideoDraft=${restoreVideoDraft.toString().replaceAll('setValue(', 'setVideoDraftValue(')};const installVideoDraftGuard=${installVideoDraftGuard.toString()};installVideoDraftGuard(document,{EventCtor:Event,queue:queueMicrotask});`;
+  const videoJs = `const readVideoDraft=${readVideoDraft.toString()};const setVideoDraftValue=${setValue.toString()};const restoreVideoDraft=${restoreVideoDraft.toString().replaceAll('setValue(', 'setVideoDraftValue(')};const installVideoDraftGuard=${installVideoDraftGuard.toString()};installVideoDraftGuard(document,{EventCtor:Event,queue:queueMicrotask});`;
+  return `${videoJs}${ctaAdminEnhancementJs()}`;
 }
