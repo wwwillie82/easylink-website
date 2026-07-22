@@ -119,17 +119,6 @@ jobs:
               echo "--- migrate site-dev database"
               npm run db:migrate
 
-              echo "--- generic public presentation adoption dry-run before apply"
-              node scripts/adopt-generic-public-presentation.mjs --dry-run
-
-              echo "--- apply generic public presentation adoption"
-              node scripts/adopt-generic-public-presentation.mjs --apply --yes
-
-              echo "--- generic public presentation adoption dry-run after apply"
-              post_adopt_output="$(node scripts/adopt-generic-public-presentation.mjs --dry-run)"
-              printf '%s\n' "$post_adopt_output"
-              node -e "const fs=require(\"node:fs\"); const data=JSON.parse(fs.readFileSync(0,\"utf8\")); if(data.pending!==0){ console.error(\"Generic public presentation adoption still has pending changes:\", data.pending); process.exit(1); }" <<< "$post_adopt_output"
-
               echo "--- publish current admin DB content to public webroot"
               SITE_ADMIN_ENV_FILE="$SITE_DEV_ENV_FILE" \
               SITE_CONTENT_SOURCE=db \
