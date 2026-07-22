@@ -89,7 +89,7 @@ const cardsItems = [{ version: 2, cards: [{ target_type: 'page', target_page_id:
 const pages = [
   { id: 10, route: '/fixture/megoldasaink/', slug: 'megoldasaink', type: 'solutions_index', title: 'Megoldásaink fixture', seoTitle: '', seoDescription: '', heroEyebrow: 'Megoldásaink', heroTitle: 'Megoldásaink', heroDescription: 'Listing fixture', heroAsset: '', presentation: { heroVariant: 'listing' }, status: 'published', sortOrder: 1, blocks: [
     { type: 'feature-list', title: 'Lista előszó', body: 'Első published blokk', sort_order: 1, status: 'published', presentation: adoptedPresentations['3'], items: ['A'] },
-    { type: 'cards', title: 'Nem megjelenő cards cím', body: 'Nem megjelenő cards lead', sort_order: 2, status: 'published', presentation: adoptedPresentations['114'], items: cardsItems },
+    { type: 'cards', title: 'Megoldásaink cards cím', body: 'Megoldásaink cards lead', sort_order: 2, status: 'published', presentation: adoptedPresentations['114'], items: cardsItems },
     { type: 'video', title: 'Lista videó', body: 'Video body', sort_order: 3, status: 'published', presentation: adoptedPresentations['120'], items: [{}] },
     { type: 'ai-preview', title: 'Lista AI preview', body: 'AI body', sort_order: 4, status: 'published', presentation: adoptedPresentations['121'], items: [] },
     { type: 'network-visual', title: 'Lista network', body: 'Network body', sort_order: 5, status: 'published', presentation: adoptedPresentations['122'], items: [{}] },
@@ -107,7 +107,7 @@ const pages = [
   { id: 14, route: '/fixture/kapcsolat/', slug: 'kapcsolat', type: 'contact', title: 'Kapcsolat fixture', seoTitle: '', seoDescription: '', heroEyebrow: 'Kapcsolat', heroTitle: 'Kapcsolat', heroDescription: 'Contact fixture', heroAsset: '', presentation: { heroVariant: 'listing' }, status: 'published', sortOrder: 5, blocks: [
     { type: 'cta', title: 'Írj nekünk', body: 'Email: contact@easylink.hu', sort_order: 1, status: 'published', presentation: { sectionGroupKey: 'fixture-contact-main', layout: 'grid', gridColumns: 2, columnRatio: '0.85:1.15', columnPosition: 1, surface: 'polished', headingScale: 'prominent', bodyWhitespace: 'preserve-lines' }, blockKey: 'fixture-contact-inline', items: [{ label: 'Email írása', url: 'mailto:contact@easylink.hu', secondaryLabel: 'Árak', secondaryUrl: '/arak/' }] },
     { type: 'feature-list', title: 'Miben segítünk?', sort_order: 2, status: 'published', presentation: { sectionGroupKey: 'fixture-contact-main', layout: 'grid', gridColumns: 2, columnRatio: '0.85:1.15', columnPosition: 2, surface: 'polished', headingScale: 'prominent' }, items: ['Egyeztetés'] }, cta('Contact fixture CTA') ] },
-  { id: 15, route: '/fixture/tartalom/', slug: 'tartalom', type: 'content_page', title: 'Content page fixture', seoTitle: '', seoDescription: '', heroEyebrow: 'Tartalom', heroTitle: 'Content page fixture', heroDescription: 'Content fixture', heroAsset: '', presentation: { heroVariant: 'listing' }, status: 'published', sortOrder: 6, blocks: [{ type: 'text', title: 'Content block marker', body: 'Default content', status: 'published', items: [] }, cta('Content fixture CTA')] },
+  { id: 15, route: '/fixture/tartalom/', slug: 'tartalom', type: 'content_page', title: 'Content page fixture', seoTitle: '', seoDescription: '', heroEyebrow: 'Tartalom', heroTitle: 'Content page fixture', heroDescription: 'Content fixture', heroAsset: '', presentation: { heroVariant: 'listing' }, status: 'published', sortOrder: 6, blocks: [{ type: 'text', title: 'Content block marker', body: 'Default content', status: 'published', items: [] }, { type: 'related-links', title: 'Kapcsolódó cím', body: 'Kapcsolódó leírás', status: 'published', items: [{ target_type: 'page', target_page_id: 21 }] }, cta('Content fixture CTA')] },
   { id: 21, route: '/fixture/megoldasaink/penzugy/', slug: 'penzugy', type: 'solution_detail', title: 'Pénzügy target', status: 'published', sortOrder: 21, blocks: [] },
   { id: 22, route: '/fixture/megoldasaink/hr/', slug: 'hr', type: 'solution_detail', title: 'HR target', status: 'published', sortOrder: 22, blocks: [] },
   { id: 23, route: '/fixture/kinek-szol/a/', slug: 'a', type: 'audience_detail', title: 'Audience target A', status: 'published', sortOrder: 23, blocks: [] },
@@ -146,9 +146,16 @@ assert.match(pricingHtml, /generic-public-section--surface-polished[\s\S]*--publ
 assert.match(contactHtml, /generic-public-section--surface-polished[\s\S]*--public-section-columns: 0.85fr 1.15fr/);
 assert.match(contactHtml, /data-easylink-cta="email"|data-easylink-cta="demo"|mailto:/);
 assert.match(fixtureHtml, /data-fixture-page="content_page"[\s\S]*Content block marker/);
+const relatedTitleIndex = fixtureHtml.indexOf('Kapcsolódó cím');
+const relatedBodyIndex = fixtureHtml.indexOf('Kapcsolódó leírás');
+const relatedLinkIndex = fixtureHtml.indexOf('Pénzügy target', relatedBodyIndex);
+assert.ok(relatedTitleIndex > -1 && relatedTitleIndex < relatedBodyIndex && relatedBodyIndex < relatedLinkIndex, 'related-links body must render after title and before links');
 assert.ok(fixtureHtml.indexOf('listing-card') < fixtureHtml.indexOf('Lista előszó') && fixtureHtml.indexOf('Lista előszó') < fixtureHtml.indexOf('Lista videó') && fixtureHtml.indexOf('Lista videó') < fixtureHtml.indexOf('Lista AI preview') && fixtureHtml.indexOf('Lista AI preview') < fixtureHtml.indexOf('Lista network') && fixtureHtml.indexOf('Lista network') < fixtureHtml.indexOf('Solutions fixture CTA'), 'solutions listing cards/content/CTA order must stay stable');
 assert.match(fixtureHtml, /generic-public-section--light[\s\S]*listing-card[\s\S]*<\/section>[\s\S]*generic-public-section--default[\s\S]*Lista előszó[\s\S]*Lista videó[\s\S]*Lista AI preview[\s\S]*Lista network/);
-assert.doesNotMatch(fixtureHtml, /Nem megjelenő cards cím|Nem megjelenő cards lead|Audience cards title|Audience cards body/);
+assert.match(fixtureHtml, /Megoldásaink cards cím[\s\S]*Megoldásaink cards lead/);
+assert.match(fixtureHtml, /Audience cards title[\s\S]*Audience cards body/);
+assert.match(solutionsHtml, /<h2[^>]*>Megoldásaink<\/h2>[\s\S]*Válaszd ki, melyik működési területet/);
+assert.match(audiencesHtml, /<h2[^>]*>Kinek szól\?<\/h2>[\s\S]*Válaszd ki a vállalkozásodhoz/);
 assert.match(fixtureHtml, /Csomópontok[\s\S]*Nem késznek állított ígéretek/);
 assert.match(fixtureHtml, /<span class="eyebrow"[^>]*>Csomópontok<\/span>[\s\S]*<h2[^>]*>Nem késznek állított ígéretek\.\.\.<\/h2>[\s\S]*<h2[^>]*>Integrációs irányok<\/h2>[\s\S]*<p[^>]*>Előkészített kapcsolódási irányok: nem kész runtime integrációs állítások\.<\/p>[\s\S]*listing-card/);
 assert.match(fixtureHtml, /content-card--layout-lead/);
@@ -178,7 +185,9 @@ const makeConn = (status='draft') => ({ query: async (sql, params) => {
 assert.equal((await inspect(makeConn('draft'))).changes.filter(c=>c.kind==='related-publish').length, 9);
 assert.equal((await inspect(makeConn('published'))).changes.length, 0);
 rows[0] = { ...rows[0], items: '[]' };
-await assert.rejects(() => inspect(makeConn('draft')), /Conflicting existing related-links block/);
+const driftInspection = await inspect(makeConn('draft'));
+assert.equal(driftInspection.changes.some((c) => c.kind === 'related-note'), false);
+assert.ok(driftInspection.notes.some((c) => c.kind === 'related-note'));
 
 const files = ['SolutionsIndexRenderer','SolutionDetailRenderer','AudiencesIndexRenderer','AudienceDetailRenderer','IntegrationsRenderer','PricingRenderer','ContactRenderer','ContentPageRenderer'];
 for (const name of files) assert.doesNotMatch(publicRenderer, new RegExp(name));

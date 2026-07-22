@@ -11,7 +11,7 @@ const sectionColumns = presentation.columnRatio || `repeat(${presentation.gridCo
 const styleVars = `--public-section-columns: ${sectionColumns};`;
 ---
 {isRelatedOnly ? (
-  <RelatedLinks title={blocks[0].title || 'Kapcsolódó oldalak'} links={relatedLinks} />
+  <RelatedLinks title={blocks[0].title || 'Kapcsolódó oldalak'} body={blocks[0].body || ''} links={relatedLinks} />
 ) : (
   <section class:list={['section', 'generic-public-section', `generic-public-section--${presentation.sectionTheme || 'default'}`, `generic-public-section--${presentation.layout || 'stack'}`, `generic-public-section--surface-${presentation.surface || 'default'}`]} style={styleVars} data-section-group-key={section.groupKey || undefined} data-section-layout={presentation.layout} data-section-theme={presentation.sectionTheme} data-section-surface={presentation.surface}>
     <div class:list={['container', 'generic-public-section__blocks', `generic-public-section__blocks--${presentation.layout || 'stack'}`, `generic-public-section__blocks--cols-${presentation.gridColumns || 1}`]}>

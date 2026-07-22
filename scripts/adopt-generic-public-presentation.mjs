@@ -9,12 +9,12 @@ export const expectedPages = new Map([
 ]);
 const detailPages = [3,4,5,6,7,8,10,11,12];
 const listingBlocks = [
-  { id: 114, pageId: 2, key: 'golden:10:cards:Megoldásaink', type: 'cards', sortOrder: 2, want: { sectionGroupKey: 'solutions-listing-cards', sectionTheme: 'light', layout: 'grid', sectionOrder: 1, blockChrome: 'none' } },
+  { id: 114, pageId: 2, key: 'golden:10:cards:Megoldásaink', type: 'cards', sortOrder: 2, want: { sectionGroupKey: 'solutions-listing-cards', sectionTheme: 'light', layout: 'grid', sectionOrder: 1 } },
   { id: 3, pageId: 2, key: '/megoldasaink/:feature-list:0', type: 'feature-list', sortOrder: 1, want: { sectionGroupKey: 'solutions-listing-content', sectionTheme: 'default', layout: 'grid', sectionOrder: 2, columnPosition: 1 } },
   { id: 120, pageId: 2, key: 'manual:598fbc42-261f-4b8e-ba62-33a1553c3b81', type: 'video', sortOrder: 3, want: { sectionGroupKey: 'solutions-listing-content', sectionTheme: 'default', layout: 'grid', sectionOrder: 2, columnPosition: 2 } },
   { id: 121, pageId: 2, key: 'manual:14e66a0a-ebf9-4f85-9ba3-c182bed2a9c7', type: 'ai-preview', sortOrder: 4, want: { sectionGroupKey: 'solutions-listing-content', sectionTheme: 'default', layout: 'grid', sectionOrder: 2, columnPosition: 3 } },
   { id: 122, pageId: 2, key: 'manual:68e691be-8397-4f16-8c36-fe9587cd7566', type: 'network-visual', sortOrder: 5, want: { sectionGroupKey: 'solutions-listing-content', sectionTheme: 'default', layout: 'grid', sectionOrder: 2, columnPosition: 4 } },
-  { id: 115, pageId: 9, key: 'golden:10:cards:Kinek szól?', type: 'cards', sortOrder: 10, want: { sectionGroupKey: 'audiences-listing-cards', sectionTheme: 'light', layout: 'grid', sectionOrder: 1, blockChrome: 'none' } },
+  { id: 115, pageId: 9, key: 'golden:10:cards:Kinek szól?', type: 'cards', sortOrder: 10, want: { sectionGroupKey: 'audiences-listing-cards', sectionTheme: 'light', layout: 'grid', sectionOrder: 1 } },
 ];
 const groups = [
   { pageId: 13, blocks: [[51,'/integraciok/:text:0','text'],[52,'/integraciok/:cards:1','cards']], p: (pos) => ({ sectionGroupKey: 'integrations-main', sectionTheme: 'gradient-light', layout: 'stack', columnPosition: pos, ...(pos === 1 ? { contentLayout: 'lead', headingScale: 'display' } : {}) }) },
@@ -22,7 +22,7 @@ const groups = [
   { pageId: 15, blocks: [[55,'/kapcsolat/:cta:0','cta'],[56,'/kapcsolat/:feature-list:1','feature-list']], p: (pos) => ({ sectionGroupKey: 'contact-main', sectionTheme: 'default', layout: 'grid', gridColumns: 2, columnRatio: '0.85:1.15', columnPosition: pos, surface: 'polished', headingScale: 'prominent', ...(pos === 1 ? { bodyWhitespace: 'preserve-lines' } : {}) }) },
 ];
 const related = new Map([[3,[4,5,6]],[4,[3,5,6]],[5,[3,4,6]],[6,[3,4,5]],[7,[3,4,5]],[8,[3,4,5]],[10,[11,12]],[11,[10,12]],[12,[10,11]]]);
-function help(){ return `Usage: node scripts/adopt-generic-public-presentation.mjs --status|--dry-run|--apply --yes|--help`; }
+function help(){ return `Usage: node scripts/adopt-generic-public-presentation.mjs --status|--dry-run|--apply --yes|--listing-cards-chrome-dry-run|--listing-cards-chrome-apply --yes|--help\n\nManual one-shot historical migration utility only. Do not run from normal deploys: valid later admin edits to non-home presentation or related links must not be re-applied or treated as deploy conflicts.`; }
 function same(a,b){ return JSON.stringify(a) === JSON.stringify(b); }
 function parse(v){ if(!v) return null; return typeof v === 'string' ? JSON.parse(v) : v; }
 function relatedContract(pageId, targets) {
@@ -37,6 +37,10 @@ function relatedContract(pageId, targets) {
     status: 'published',
   };
 }
+const listingCardsChromeCleanup = [
+  { id: 114, pageId: 2, key: 'golden:10:cards:Megoldásaink', type: 'cards' },
+  { id: 115, pageId: 9, key: 'golden:10:cards:Kinek szól?', type: 'cards' },
+];
 function relatedMatches(row, want) {
   return Number(row.page_id) === want.page_id
     && row.block_key === want.block_key
@@ -68,6 +72,7 @@ export async function inspect(conn){
     unchanged.set(row.id, { title: row.title, body: row.body, items: row.items });
   }
   const changes=[];
+  const notes=[];
   for (const id of detailPages) { const want={heroVariant:'detail'}; if (!same(parse(byId.get(id).presentation), want)) changes.push({kind:'page', id, want}); }
   for (const b of expectedBlocks) if(!same(parse(bb.get(b.id).presentation), b.want)) changes.push({kind:'block', id:b.id, want:b.want});
   for (const b of listingExpected) if(!same(parse(b.row.presentation), b.want)) changes.push({kind:'block', id:b.row.id, want:b.want});
@@ -81,18 +86,50 @@ export async function inspect(conn){
     const want = relatedContract(pageId, targets);
     const found = ex.get(want.block_key);
     if (!found) { changes.push({ kind: 'related-create', want }); continue; }
-    if (!relatedMatches(found, want)) throw new Error(`Conflicting existing related-links block: ${want.block_key}`);
-    if (found.status === 'draft') changes.push({kind:'related-publish', id: found.id, key: want.block_key});
-    else if (found.status !== 'published') throw new Error(`Conflicting related-links status: ${want.block_key} status=${found.status}`);
+    if (!relatedMatches(found, want)) notes.push({ kind: 'related-note', key: want.block_key, message: 'Existing related-links differs from the historical one-shot seed; leaving admin-managed content unchanged.' });
+    else if (found.status === 'draft') changes.push({kind:'related-publish', id: found.id, key: want.block_key});
+    else if (found.status !== 'published') notes.push({ kind: 'related-note', key: want.block_key, message: 'Existing related-links status differs from the historical one-shot seed; leaving admin-managed content unchanged.' });
   }
-  return { changes, unchanged };
+  return { changes, notes, unchanged };
 }
+
+function removeBlockChrome(value) {
+  const current = parse(value) || {};
+  if (!current || typeof current !== 'object' || Array.isArray(current)) return { changed: false, next: current };
+  if (!Object.prototype.hasOwnProperty.call(current, 'blockChrome')) return { changed: false, next: current };
+  const next = { ...current };
+  delete next.blockChrome;
+  return { changed: true, next };
+}
+export async function inspectListingCardsChromeCleanup(conn) {
+  const ids = listingCardsChromeCleanup.map((b) => b.id);
+  const [rows] = await conn.query(`SELECT id,page_id,block_key,type,title,body,items,status,sort_order,presentation FROM site_content_blocks WHERE id IN (${ids.map(()=>'?').join(',')}) FOR UPDATE`, ids);
+  const byId = new Map(rows.map((row) => [Number(row.id), row]));
+  const changes = [];
+  for (const expected of listingCardsChromeCleanup) {
+    const row = byId.get(expected.id);
+    if (!row || Number(row.page_id) !== expected.pageId || row.block_key !== expected.key || row.type !== expected.type) throw new Error(`Listing cards chrome cleanup precondition failed: ${expected.id}`);
+    const cleaned = removeBlockChrome(row.presentation);
+    if (cleaned.changed) changes.push({ kind: 'listing-cards-chrome-cleanup', id: expected.id, want: cleaned.next });
+  }
+  return { changes, pending: changes.length };
+}
+export async function applyListingCardsChromeCleanup(conn, changes) {
+  for (const c of changes) {
+    if (c.kind !== 'listing-cards-chrome-cleanup') throw new Error(`Unknown listing cleanup change kind: ${c.kind}`);
+    const [r] = await conn.execute('UPDATE site_content_blocks SET presentation=? WHERE id=?', [JSON.stringify(c.want), c.id]);
+    if (r.affectedRows !== 1) throw new Error(`Unexpected affectedRows for ${JSON.stringify(c)}`);
+  }
+}
+async function runListingCardsChromeCleanup(mode){ const pool=await createPool(); const conn=await pool.getConnection(); try { await conn.beginTransaction(); const before=await inspectListingCardsChromeCleanup(conn); if(mode==='apply') { await applyListingCardsChromeCleanup(conn, before.changes); const after=await inspectListingCardsChromeCleanup(conn); if(after.changes.length) throw new Error(`Listing cards chrome cleanup postcondition failed: ${after.changes.length} pending`); await conn.commit(); console.log(JSON.stringify({mode, changed: before.changes.length, noop: before.changes.length===0}, null, 2)); } else { await conn.rollback(); console.log(JSON.stringify({mode, pending: before.changes.length, changes: before.changes}, null, 2)); } } catch(e){ await conn.rollback(); throw e; } finally { conn.release(); await pool.end(); } }
+
 export async function applyChanges(conn, changes) {
   for(const c of changes){
     let r;
     if(c.kind==='page') [r]=await conn.execute('UPDATE site_pages SET presentation=? WHERE id=?',[JSON.stringify(c.want),c.id]);
     else if(c.kind==='block') [r]=await conn.execute('UPDATE site_content_blocks SET presentation=? WHERE id=?',[JSON.stringify(c.want),c.id]);
     else if(c.kind==='related-publish') [r]=await conn.execute("UPDATE site_content_blocks SET status='published' WHERE id=? AND status='draft'",[c.id]);
+    else if(c.kind==='related-note') continue;
     else if(c.kind==='related-create') [r]=await conn.execute(
       'INSERT INTO site_content_blocks (page_id, block_key, type, title, body, items, sort_order, status) VALUES (?,?,?,?,?,?,?,?)',
       [c.want.page_id, c.want.block_key, c.want.type, c.want.title, c.want.body, JSON.stringify(c.want.items), c.want.sort_order, c.want.status]
@@ -102,4 +139,4 @@ export async function applyChanges(conn, changes) {
   }
 }
 async function run(mode){ const pool=await createPool(); const conn=await pool.getConnection(); try { await conn.beginTransaction(); const before=await inspect(conn); if(mode==='apply') { await applyChanges(conn, before.changes); const after=await inspect(conn); if(after.changes.length) throw new Error(`Postcondition failed: ${after.changes.length} pending`); for (const [id, old] of before.unchanged) { const [rows]=await conn.query('SELECT title,body,items FROM site_content_blocks WHERE id=?', [id]); if (!same(rows[0], old)) throw new Error(`Content mutation detected: ${id}`); } await conn.commit(); console.log(JSON.stringify({mode, changed: before.changes.length, noop: before.changes.length===0}, null, 2)); } else { await conn.rollback(); console.log(JSON.stringify({mode, pending: before.changes.length, changes: before.changes}, null, 2)); } } catch(e){ await conn.rollback(); throw e; } finally { conn.release(); await pool.end(); } }
-if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) { const args=process.argv.slice(2); if(args.includes('--help')) console.log(help()); else if(args.includes('--status')) await run('status'); else if(args.includes('--dry-run')) await run('dry-run'); else if(args.includes('--apply')&&args.includes('--yes')) await run('apply'); else { console.error(help()); process.exit(2); } }
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) { const args=process.argv.slice(2); if(args.includes('--help')) console.log(help()); else if(args.includes('--listing-cards-chrome-dry-run')) await runListingCardsChromeCleanup('dry-run'); else if(args.includes('--listing-cards-chrome-apply')&&args.includes('--yes')) await runListingCardsChromeCleanup('apply'); else if(args.includes('--status')) await run('status'); else if(args.includes('--dry-run')) await run('dry-run'); else if(args.includes('--apply')&&args.includes('--yes')) await run('apply'); else { console.error(help()); process.exit(2); } }

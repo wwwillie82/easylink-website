@@ -1,10 +1,12 @@
 ---
-const { title = 'Kapcsolódó oldalak', links = [] } = Astro.props;
+const { title = 'Kapcsolódó oldalak', body = '', links = [] } = Astro.props;
+const lead = String(body || '').trim();
 ---
 <section class="section related">
   <div class="container">
     <span class="eyebrow">Tovább</span>
     <h2>{title}</h2>
+    {lead && <p class="related__body">{lead}</p>}
     <div class="links">
       {
         links.map((link) => (
@@ -41,6 +43,8 @@ const { title = 'Kapcsolódó oldalak', links = [] } = Astro.props;
   .related h2 {
     font-size: clamp(2rem, 4vw, 3.4rem);
   }
+
+  .related__body { max-width: 720px; color: rgba(255,255,255,.82); font-size: 1.08rem; line-height: 1.7; margin: 0 0 24px; }
 
   .links {
     display: flex;

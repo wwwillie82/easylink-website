@@ -6,7 +6,7 @@ import { pageForm } from '../src/lib/admin/render/pages.mjs';
 import { createAdminRepository } from '../src/lib/admin/repository.mjs';
 import { blockContracts } from '../src/lib/content/block-registry.mjs';
 import { normalizeBlockItemsByType } from '../src/lib/content/block-contracts.mjs';
-import { applyChanges, inspect } from '../scripts/adopt-generic-public-presentation.mjs';
+import { applyChanges, inspect, inspectListingCardsChromeCleanup, applyListingCardsChromeCleanup } from '../scripts/adopt-generic-public-presentation.mjs';
 
 const schema = await readFile(new URL('../src/lib/db/schema.sql', import.meta.url), 'utf8');
 assert.match(schema, /site_pages[\s\S]*presentation LONGTEXT NULL CHECK \(presentation IS NULL OR JSON_VALID\(presentation\)\)/);
@@ -18,24 +18,11 @@ assert.ok(blockContracts.some((c) => c.type === 'related-links' && c.capabilitie
 const deployWorkflow = await readFile(new URL('../.github/workflows/deploy-site-dev.yml', import.meta.url), 'utf8');
 const envLoadIndex = deployWorkflow.indexOf('. "$SITE_DEV_ENV_FILE"');
 const migrateIndex = deployWorkflow.indexOf('npm run db:migrate');
-const dryRunBeforeIndex = deployWorkflow.indexOf('node scripts/adopt-generic-public-presentation.mjs --dry-run');
-const applyIndex = deployWorkflow.indexOf('node scripts/adopt-generic-public-presentation.mjs --apply --yes');
-const dryRunAfterIndex = deployWorkflow.indexOf('post_adopt_output="$(node scripts/adopt-generic-public-presentation.mjs --dry-run)"');
-const pendingGuardIndex = deployWorkflow.indexOf('data.pending!==0');
+const adoptIndex = deployWorkflow.indexOf('adopt-generic-public-presentation.mjs');
 const publishIndex = deployWorkflow.indexOf('npm run admin:publish');
 assert.ok(envLoadIndex > -1 && envLoadIndex < migrateIndex, 'site-admin.env must load before DB migration');
-assert.ok(migrateIndex < dryRunBeforeIndex && dryRunBeforeIndex < applyIndex && applyIndex < dryRunAfterIndex && dryRunAfterIndex < pendingGuardIndex && pendingGuardIndex < publishIndex, 'site-dev rollout must migrate, dry-run, apply, verify pending=0, then publish');
-const guardLine = deployWorkflow.split('\n').map((line) => line.trim()).find((line) => line.startsWith('node -e ') && line.includes('data.pending!==0'));
-assert.ok(guardLine, 'post-adopt pending guard command must exist');
-assert.doesNotMatch(guardLine, /'/, 'post-adopt guard must not contain raw single quotes inside the outer bash -lc single-quoted script');
-function runPostAdoptGuard(input) {
-  const remoteScript = `post_adopt_output=${JSON.stringify(input)}
-${guardLine}`;
-  return spawnSync('bash', ['-lc', `bash -lc '${remoteScript}'`], { encoding: 'utf8' });
-}
-assert.equal(runPostAdoptGuard('{"pending":0}').status, 0);
-assert.equal(runPostAdoptGuard('{"pending":1}').status, 1);
-assert.equal(runPostAdoptGuard('not json').status, 1);
+assert.equal(adoptIndex, -1, 'site-dev deploy must not run the one-shot adopt utility');
+assert.ok(migrateIndex > -1 && publishIndex > -1 && migrateIndex < publishIndex, 'site-dev rollout must migrate before publish');
 
 
 const pageHtml = pageForm({ page: { id: 2, route: '/x/', slug: 'x', type: 'content_page', title: 'X', status: 'draft', sort_order: 1, presentation: { heroVariant: 'detail' } }, blocks: [], defaultCta: {}, pageTargetPages: [], navigationUsages: [] });
@@ -50,16 +37,31 @@ assert.match(blockHtml, /data-related-links-editor/);
 assert.match(blockHtml, /data-related-target-page/);
 assert.doesNotMatch(blockHtml, /data-card-target-type|data-card-target-href|data-cards-action-editor/);
 assert.doesNotMatch(blockHtml, /value="4"/);
-assert.match(blockHtml, /name="presentation_grid_columns" type="number" min="1" max="4"/);
+assert.doesNotMatch(blockHtml, /data-block-presentation/);
+const cardsHtml = blockForm({ id: 2, page_id: 2, type: 'cards', title: 'Cards', body: 'Body', presentation: { sectionGroupKey: 'keep', sectionOrder: 2, columnPosition: 3 }, items: [], status: 'draft', sort_order: 1 }, { pageTargetPages: [] });
+assert.match(cardsHtml, /<details class="advanced" data-block-presentation>/);
+assert.match(cardsHtml, /<summary>Haladó megjelenési beállítások<\/summary>/);
+for (const hu of ['Nincs külön beállítás','Szekció háttere','Világos színátmenet','Elrendezés','Oszlopok száma','Oszlopok szélességének aránya','Kártya megjelenése','Kiemelt kártya','Címsor és bevezető','Elrejtve']) assert.match(cardsHtml, new RegExp(hu));
+for (const tech of ['presentation_section_group_key','presentation_section_order','presentation_column_position','Section theme','Block chrome']) assert.doesNotMatch(cardsHtml, new RegExp(tech));
 const adminItems = serializeEditorItems({ type: 'related-links', rows: [{ target_page_id: '3', title_override: 'Override' }] });
 assert.deepEqual(adminItems, [{ target_type: 'page', target_page_id: '3', title_override: 'Override' }]);
 
-const runtimeJs = blockForm({ id: 2, page_id: 2, type: 'related-links', title: 'Kapcsolódó oldalak', body: '', items: [{ target_type: 'page', target_page_id: 3, title_override: 'A' }], status: 'draft', sort_order: 800 }, { pageTargetPages: [{ id: 3, title: 'P3', route: '/p3/', status: 'published' }] }) + '';
+const pageCtaHtml = blockForm({ id: 3, page_id: 2, type: 'cta', title: 'CTA', body: '', items: [{ presentationRole: 'cta-section', ctaMode: 'global' }], status: 'published', sort_order: 900 }, { pageCtaEditor: true, pageTargetPages: [] });
+assert.doesNotMatch(pageCtaHtml, /data-block-presentation/);
 assert.match(blockHtml, /data-panel="related-links"/);
 const clientJs = await readFile(new URL('../src/lib/admin/render/blocks.mjs', import.meta.url), 'utf8');
 assert.match(clientJs, /key==='related-links'&&type==='related-links'/);
 assert.doesNotMatch(clientJs, /if\(type==='cards'\|\|type==='related-links'\)\{rowData\.action=/);
 assert.match(clientJs, /data-add-related-link/);
+assert.match(clientJs, /function syncPresentationPanel/);
+assert.match(clientJs, /syncPresentationPanel\(f\)/);
+assert.match(clientJs, /'card-grid':\['sectionTheme','layout','gridColumns','columnRatio','surface','blockChrome'\]/);
+assert.match(clientJs, /text:\['sectionTheme','layout','contentLayout','headingScale','surface','surfaceVariant','bodyWhitespace'\]/);
+assert.match(cardsHtml, /<details class="advanced" data-block-presentation>/);
+assert.match(cardsHtml, /data-presentation-field="gridColumns"/);
+const textHtml = blockForm({ id: 4, page_id: 2, type: 'text', title: 'Text', body: 'Body', presentation: {}, items: [], status: 'draft', sort_order: 1 }, { pageTargetPages: [] });
+assert.match(textHtml, /data-presentation-field="contentLayout"/);
+assert.match(textHtml, /data-presentation-field="gridColumns" hidden inert/);
 assert.match(clientJs, /data-remove-related-link/);
 assert.match(clientJs, /data-move-related-link/);
 
@@ -70,7 +72,8 @@ for (const bad of [[{ target_type: 'legacy', target_page_id: 3 }], [{ target_typ
 
 
 const smokeSource = await readFile(new URL('../scripts/adopt-generic-public-presentation.mjs', import.meta.url), 'utf8');
-for (const expected of ["[4, ['/megoldasaink/hr-munkaugy/", "[5, ['/megoldasaink/crm-ugyfelkezeles/", "[6, ['/megoldasaink/dokumentumkezeles-adminisztracio/", "[7, ['/megoldasaink/kontrolling/", "[11, ['/kinek-szol/vendeglatohelyek/", "[117,'golden:20:text:Demó alapján pontosítunk','text']", "{ id: 114, pageId: 2, key: 'golden:10:cards:Megoldásaink'", "{ id: 120, pageId: 2, key: 'manual:598fbc42-261f-4b8e-ba62-33a1553c3b81'", "{ id: 115, pageId: 9, key: 'golden:10:cards:Kinek szól?'"]) assert.ok(smokeSource.includes(expected), `Missing adopt DB contract literal: ${expected}`);
+assert.match(smokeSource, /Manual one-shot historical migration utility only/);
+for (const expected of ["[117,'golden:20:text:Demó alapján pontosítunk','text']", "{ id: 114, pageId: 2, key: 'golden:10:cards:Megoldásaink'", "{ id: 115, pageId: 9, key: 'golden:10:cards:Kinek szól?'"]) assert.ok(smokeSource.includes(expected), `Missing manual migration literal: ${expected}`);
 for (const forbidden of ['hr-'+'munkaido', 'crm-'+'ertekesites', 'kontrolling-'+'riportok', '/megoldasaink/'+'dokumentumkezeles/', '/kinek-szol/'+'vendeglatas/', '/arak/:'+ 'text:1']) assert.equal(smokeSource.includes(forbidden), false, `Forbidden stale DB contract literal remained: ${forbidden}`);
 
 const basePageRows = [[2, '/megoldasaink/', 'solutions_index'], [3, '/megoldasaink/penzugy-szamlazas/', 'solution_detail'], [4, '/megoldasaink/hr-munkaugy/', 'solution_detail'], [5, '/megoldasaink/crm-ugyfelkezeles/', 'solution_detail'], [6, '/megoldasaink/dokumentumkezeles-adminisztracio/', 'solution_detail'], [7, '/megoldasaink/kontrolling/', 'solution_detail'], [8, '/megoldasaink/ai-asszisztens/', 'solution_detail'], [10, '/kinek-szol/hotelek-szallashelyek/', 'audience_detail'], [11, '/kinek-szol/vendeglatohelyek/', 'audience_detail'], [12, '/kinek-szol/szolgaltato-vallalkozasok/', 'audience_detail'], [9, '/kinek-szol/', 'audiences_index'], [13, '/integraciok/', 'integrations'], [14, '/arak/', 'pricing'], [15, '/kapcsolat/', 'contact']].map(([id, route, type]) => ({ id, route, type, status: 'published', presentation: null }));
@@ -116,7 +119,27 @@ assert.equal(draftStatus.changes.filter((c)=>c.kind==='related-publish').length,
 const publishedConn = fakeConn({ relatedState: 'published' });
 await applyChanges(publishedConn, (await inspect(publishedConn)).changes);
 assert.equal((await inspect(publishedConn)).changes.length, 0);
-await assert.rejects(() => inspect(fakeConn({ conflict: true })), /Conflicting existing related-links/);
+const conflictInspection = await inspect(fakeConn({ conflict: true }));
+assert.equal(conflictInspection.changes.some((c) => c.kind === 'related-note'), false);
+assert.ok(conflictInspection.notes.some((c) => c.kind === 'related-note'));
+
+
+
+const listingChromeRows = [
+  { id: 114, page_id: 2, block_key: 'golden:10:cards:Megoldásaink', type: 'cards', title: 'Keep title', body: 'Keep body', items: '["keep"]', status: 'published', sort_order: 2, presentation: JSON.stringify({ sectionTheme: 'light', layout: 'grid', sectionOrder: 1, blockChrome: 'none' }) },
+  { id: 115, page_id: 9, block_key: 'golden:10:cards:Kinek szól?', type: 'cards', title: 'Keep title 2', body: 'Keep body 2', items: '["keep2"]', status: 'published', sort_order: 10, presentation: JSON.stringify({ sectionTheme: 'light', layout: 'grid', sectionOrder: 1, blockChrome: 'none' }) },
+];
+const listingChromeConn = {
+  async query(sql, params = []) { if (sql.includes('FROM site_content_blocks WHERE id IN')) return [listingChromeRows.filter((row) => params.includes(row.id)), null]; return [[], null]; },
+  async execute(sql, params = []) { const row = listingChromeRows.find((item) => item.id === params[1]); row.presentation = params[0]; return [{ affectedRows: 1 }, null]; },
+};
+const listingChromePlan = await inspectListingCardsChromeCleanup(listingChromeConn);
+assert.equal(listingChromePlan.changes.length, 2);
+await applyListingCardsChromeCleanup(listingChromeConn, listingChromePlan.changes);
+assert.equal((await inspectListingCardsChromeCleanup(listingChromeConn)).changes.length, 0);
+assert.deepEqual(JSON.parse(listingChromeRows[0].presentation), { sectionTheme: 'light', layout: 'grid', sectionOrder: 1 });
+assert.equal(listingChromeRows[0].title, 'Keep title');
+await assert.rejects(() => inspectListingCardsChromeCleanup({ async query(){ return [[{ ...listingChromeRows[0], page_id: 99 }], null]; } }), /precondition failed/);
 
 function fakePoolForPageUpdate() {
   const executed = [];
@@ -148,5 +171,19 @@ const compatPool = fakePoolForPageUpdate();
 await createAdminRepository(compatPool).updatePage(3, { presentation_hero_variant: 'detail' });
 assert.equal(JSON.parse(compatPool.conn.executed.find(([sql]) => sql.startsWith('UPDATE site_pages SET'))[1][19]).heroVariant, 'detail');
 await assert.rejects(() => createAdminRepository(fakePoolForPageUpdate()).updatePage(3, { presentation: { heroVariant: 'bad' } }), (error) => error?.status === 400 && /hero variant/.test(error.message));
+
+
+function fakePoolForBlockUpdate() {
+  const executed = [];
+  const existing = { id: 70, page_id: 2, block_key: 'manual:block', type: 'text', title: 'Old', body: 'Old', items: '[]', presentation: JSON.stringify({ sectionGroupKey: 'internal', sectionOrder: 4, columnPosition: 2, sectionTheme: 'light' }), sort_order: 1, status: 'published' };
+  return { executed, async query(sql) { if (sql.includes('site_content_blocks WHERE id=?')) return [[existing], null]; return [[], null]; }, async execute(sql, params) { executed.push([sql, params]); return [{ affectedRows: 1 }, null]; } };
+}
+const blockPool = fakePoolForBlockUpdate();
+await createAdminRepository(blockPool).upsertBlock({ id: 70, page_id: 2, type: 'text', title: 'New', body: 'Body', items: '[]', presentation: JSON.stringify({ sectionGroupKey: 'internal', sectionOrder: 4, columnPosition: 2 }), presentation_visible_keys: JSON.stringify(['sectionTheme']), sort_order: 1, status: 'published' });
+const savedPresentation = JSON.parse(blockPool.executed.find(([sql]) => sql.startsWith('UPDATE site_content_blocks SET'))[1][4]);
+assert.equal(savedPresentation.sectionTheme, undefined);
+assert.equal(savedPresentation.sectionGroupKey, 'internal');
+assert.equal(savedPresentation.sectionOrder, 4);
+await assert.rejects(() => createAdminRepository(fakePoolForBlockUpdate()).upsertBlock({ id: 70, page_id: 2, type: 'text', title: 'New', body: 'Body', items: '[]', presentation: JSON.stringify({ sectionTheme: 'evil' }), presentation_visible_keys: JSON.stringify(['sectionTheme']), sort_order: 1, status: 'published' }), /section theme/);
 
 console.log('generic presentation contract smoke ok');
