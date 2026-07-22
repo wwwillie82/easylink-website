@@ -1,46 +1,47 @@
 ---
 import { listNavigation } from '@/lib/content/provider';
 import { getPublicSiteSettings } from '@/lib/content/settings';
+import { resolvePageHeaderCta } from '@/lib/content/pageCta';
 
+const { pageCtaBlock = null } = Astro.props;
 const siteNavigation = await listNavigation();
 const publicSettings = await getPublicSiteSettings();
 const brand = publicSettings.brand;
-const headerCta = publicSettings.defaultCta;
+const headerCta = resolvePageHeaderCta(pageCtaBlock, publicSettings.defaultCta);
+const validIntent = (value) => ['demo','trial','email'].includes(String(value || '')) ? String(value) : '';
+const safeId = (value, fallback) => String(value || fallback).trim().replace(/[^a-zA-Z0-9_.:-]/g, '-').slice(0, 80);
 ---
 <header class="site-header">
   <div class="container nav-wrap">
-    <a
-      class="brand"
-      href="/"
-      aria-label="Easylink főoldal"
-    >
+    <a class="brand" href="/" aria-label="Easylink főoldal">
       <span class="brand-logo-frame">
-        <img
-          src={brand.headerLogoPath}
-          alt={brand.headerLogoAlt}
-        />
+        <img src={brand.headerLogoPath} alt={brand.headerLogoAlt} />
       </span>
     </a>
 
     <nav aria-label="Fő navigáció">
-      {
-        siteNavigation.map((item) => (
-          <a href={item.href}>
-            {item.title}
-          </a>
-        ))
-      }
+      {siteNavigation.map((item) => <a href={item.href}>{item.title}</a>)}
     </nav>
 
-    <a
-      class="button button-primary nav-cta"
-      href={headerCta.primaryUrl}
-      data-easylink-cta="demo"
-      data-easylink-cta-id="site-header-demo"
-      data-easylink-cta-slot="header"
-    >
-      {headerCta.primaryLabel}
-    </a>
+    {headerCta.shouldRender && (
+      <div class="nav-ctas" aria-label="Kiemelt műveletek">
+        {headerCta.buttons.map((button, index) => {
+          const intent = validIntent(button.analyticsIntent ?? (index === 0 ? 'demo' : index === 1 ? 'trial' : ''));
+          const id = safeId(button.analyticsId, `site-header-${index + 1}`);
+          return (
+            <a
+              class={`button ${index === 0 ? 'button-primary' : 'button-secondary'} nav-cta`}
+              href={button.url}
+              data-easylink-cta={intent || undefined}
+              data-easylink-cta-id={intent ? id : undefined}
+              data-easylink-cta-slot={intent ? (button.analyticsSlot || 'header') : undefined}
+            >
+              {button.label}
+            </a>
+          );
+        })}
+      </div>
+    )}
   </div>
 </header>
 <style>
@@ -112,9 +113,23 @@ const headerCta = publicSettings.defaultCta;
     outline: none;
   }
 
+  .nav-ctas {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    flex-wrap: wrap;
+    max-width: min(44vw, 620px);
+  }
+
   .nav-cta {
-    padding: 11px 17px;
+    padding: 10px 14px;
     white-space: nowrap;
+  }
+
+  @media (max-width: 1180px) {
+    .nav-wrap { grid-template-columns: minmax(150px, auto) minmax(0, 1fr); }
+    .nav-ctas { grid-column: 1 / -1; max-width: none; justify-content: flex-end; padding-bottom: 10px; }
   }
 
   @media (max-width: 980px) {
@@ -143,10 +158,12 @@ const headerCta = publicSettings.defaultCta;
     }
 
     nav::-webkit-scrollbar { display: none; }
+    .nav-ctas { justify-content: flex-start; }
   }
 
   @media (max-width: 560px) {
     .nav-wrap { grid-template-columns: 1fr; }
+    .nav-ctas { display: grid; grid-template-columns: 1fr; width: 100%; }
     .nav-cta { width: 100%; }
     nav { font-size: 0.82rem; }
   }
