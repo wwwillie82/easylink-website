@@ -30,6 +30,11 @@ const resolvedTitle = block?.title || '';
 const resolvedDescription = block?.body || '';
 const buttons = (cta ? itemCtaButtons(cta) : []) as CtaButton[];
 const shouldRender = Boolean(block && cta && resolvedTitle && buttons.length);
+const sectionAnalyticsId = (index: number) => {
+  if (index === 0) return safeId(cta?.primaryAnalyticsId ?? cta?.analyticsId ?? primaryAnalyticsId, 'cta-section-primary');
+  if (index === 1) return safeId(cta?.secondaryAnalyticsId ?? secondaryAnalyticsId, 'cta-section-secondary');
+  return `cta-section-${index + 1}`;
+};
 ---
 
 {shouldRender && (
@@ -41,8 +46,8 @@ const shouldRender = Boolean(block && cta && resolvedTitle && buttons.length);
       <div class="actions">
         {buttons.map((button: CtaButton, index: number) => {
           const intent = validIntent(button.analyticsIntent ?? (index === 0 ? (cta?.primaryAnalyticsIntent ?? cta?.analyticsIntent ?? primaryAnalyticsIntent) : index === 1 ? (cta?.secondaryAnalyticsIntent ?? secondaryAnalyticsIntent) : ''));
-          const id = safeId(button.analyticsId ?? (index === 0 ? (cta?.primaryAnalyticsId ?? cta?.analyticsId ?? primaryAnalyticsId) : index === 1 ? (cta?.secondaryAnalyticsId ?? secondaryAnalyticsId) : ''), `cta-section-${index + 1}`);
-          const slot = safeId(button.analyticsSlot ?? cta?.analyticsSlot ?? analyticsSlot, 'cta-section');
+          const id = sectionAnalyticsId(index);
+          const slot = safeId(cta?.analyticsSlot ?? analyticsSlot, 'cta-section');
           return (
             <a
               class={`button ${index === 0 ? 'button-primary' : 'button-secondary'}`}
