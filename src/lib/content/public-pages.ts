@@ -1,5 +1,6 @@
 import { publishedAudiences } from '@/content/audiences';
 import { publishedSolutions } from '@/content/solutions';
+import { normalizeCardsItems } from './block-contracts.mjs';
 import { staticPages, type SitePage } from './static';
 
 export type PublicContentMode = 'db-authoritative' | 'static';
@@ -86,7 +87,8 @@ function cardError({ item, itemIndex, sourcePage, blockLabel, detailType, reason
 }
 
 export function resolveListingCards({ items, detailType, index, sourcePage, blockLabel, mode, source }: { items: LinkableItem[]; detailType: 'solution_detail' | 'audience_detail'; index: PublicRouteIndex; sourcePage: SitePage; blockLabel: string; mode: PublicContentMode; source: ListingCardSource }) {
-  return items.map((item, itemIndex) => {
+  const normalizedCards = normalizeCardsItems(items)[0]?.cards ?? [];
+  return normalizedCards.map((item, itemIndex) => {
     const targetType = String(item.target_type ?? '').trim();
     if (targetType === 'page') {
       const targetPageId = String(item.target_page_id ?? '').trim();
