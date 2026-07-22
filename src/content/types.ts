@@ -14,6 +14,7 @@ export type ContentBlock = {
   sortOrder?: number;
   title: string;
   body?: string;
+  presentation?: Record<string, unknown>;
   items?: Array<string | { title?: string; text?: string; url?: string; label?: string; secondaryLabel?: string; secondaryUrl?: string; eyebrow?: string; presentationRole?: string; role?: string; question?: string; answer?: string; image?: string; position?: 'left' | 'right'; [key: string]: unknown }>;
 };
 

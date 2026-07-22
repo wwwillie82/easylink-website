@@ -5,6 +5,12 @@ import { resolveNavigationItem } from '@/lib/content/internal-links.mjs';
 
 type Pool = { query(sql: string, params?: unknown[]): Promise<[any[], unknown]>; execute(sql: string, params?: unknown[]): Promise<[any, unknown]>; end?: () => Promise<void> };
 
+const parseJsonObject = (value: unknown) => {
+  if (value && typeof value === 'object') return value as any;
+  if (typeof value === 'string' && value.length > 0) return JSON.parse(value);
+  return undefined;
+};
+
 const parseItems = (value: unknown) => {
   if (Array.isArray(value)) return value;
   if (typeof value === 'string' && value.length > 0) return JSON.parse(value);
@@ -33,9 +39,10 @@ export function mapPageRow(row: any, blocks: any[] = []): SitePage {
     heroImagePositionMobileY: row.hero_image_position_mobile_y ?? undefined,
     heroOverlayStrength: row.hero_overlay_strength ?? undefined,
     heroImageScale: row.hero_image_scale ?? undefined,
+    presentation: parseJsonObject(row.presentation) ?? { heroVariant: 'listing' },
     status: row.status,
     sortOrder: row.sort_order ?? 0,
-    blocks: blocks.map((block) => ({ id: block.id, page_id: block.page_id, pageId: block.page_id, block_key: block.block_key, blockKey: block.block_key, type: block.type, title: block.title, body: block.body ?? undefined, items: parseItems(block.items), status: block.status, sort_order: block.sort_order ?? 0, sortOrder: block.sort_order ?? 0 } as ContentBlock)),
+    blocks: blocks.map((block) => ({ id: block.id, page_id: block.page_id, pageId: block.page_id, block_key: block.block_key, blockKey: block.block_key, type: block.type, title: block.title, body: block.body ?? undefined, items: parseItems(block.items), presentation: parseJsonObject(block.presentation), status: block.status, sort_order: block.sort_order ?? 0, sortOrder: block.sort_order ?? 0 } as ContentBlock)),
     allBlockMeta: (row.allBlockMeta ?? []).map((block: any) => ({ id: block.id, page_id: block.page_id, pageId: block.page_id, block_key: block.block_key, blockKey: block.block_key, type: block.type, status: block.status, sort_order: block.sort_order ?? 0, sortOrder: block.sort_order ?? 0 })),
   };
 }

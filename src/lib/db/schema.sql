@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS site_pages (
   hero_image_position_mobile_y TINYINT UNSIGNED NULL,
   hero_overlay_strength VARCHAR(32) NULL,
   hero_image_scale TINYINT UNSIGNED NULL,
+  presentation LONGTEXT NULL CHECK (presentation IS NULL OR JSON_VALID(presentation)),
   status VARCHAR(32) NOT NULL DEFAULT 'draft',
   sort_order INT NOT NULL DEFAULT 0,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -35,6 +36,7 @@ CREATE TABLE IF NOT EXISTS site_content_blocks (
   title VARCHAR(255) NOT NULL,
   body MEDIUMTEXT NULL,
   items JSON NULL,
+  presentation LONGTEXT NULL CHECK (presentation IS NULL OR JSON_VALID(presentation)),
   sort_order INT NOT NULL DEFAULT 0,
   status VARCHAR(32) NOT NULL DEFAULT 'published',
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -121,3 +123,6 @@ ALTER TABLE site_pages ADD COLUMN IF NOT EXISTS hero_overlay_strength VARCHAR(32
 ALTER TABLE site_pages ADD COLUMN IF NOT EXISTS hero_image_scale TINYINT UNSIGNED NULL;
 
 ALTER TABLE site_pages ADD COLUMN IF NOT EXISTS hero_video JSON NULL;
+
+ALTER TABLE site_pages ADD COLUMN IF NOT EXISTS presentation LONGTEXT NULL CHECK (presentation IS NULL OR JSON_VALID(presentation));
+ALTER TABLE site_content_blocks ADD COLUMN IF NOT EXISTS presentation LONGTEXT NULL CHECK (presentation IS NULL OR JSON_VALID(presentation));

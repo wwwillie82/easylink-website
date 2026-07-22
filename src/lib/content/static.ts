@@ -28,6 +28,7 @@ export type SitePage = {
   heroImagePositionMobileY?: number;
   heroOverlayStrength?: string;
   heroImageScale?: number;
+  presentation?: { heroVariant?: 'listing' | 'detail'; [key: string]: unknown };
   status: ContentStatus;
   sortOrder: number;
   blocks: ContentBlock[];
