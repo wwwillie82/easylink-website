@@ -34,6 +34,34 @@ function safeCandidate(path: string, base = publicBase()) {
   return value;
 }
 
+function publicDefaultCta(value: unknown): PublicDefaultCtaSettings {
+  const source = value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
+  const rawButtons = Array.isArray(source.buttons) ? source.buttons : [];
+  const buttons = rawButtons.map((button): PublicCtaButton => {
+    const item = button && typeof button === 'object' && !Array.isArray(button) ? button as Record<string, unknown> : {};
+    const normalized: PublicCtaButton = {
+      label: String(item.label ?? '').trim(),
+      url: String(item.url ?? '').trim(),
+      showInHeader: item.showInHeader === true,
+    };
+    for (const key of ['analyticsIntent','analyticsId','analyticsSlot'] as const) {
+      const text = String(item[key] ?? '').trim();
+      if (text) normalized[key] = text;
+    }
+    return normalized;
+  });
+  return {
+    eyebrow: String(source.eyebrow ?? '').trim(),
+    title: String(source.title ?? '').trim(),
+    description: String(source.description ?? '').trim(),
+    primaryLabel: String(source.primaryLabel ?? buttons[0]?.label ?? '').trim(),
+    primaryUrl: String(source.primaryUrl ?? buttons[0]?.url ?? '').trim(),
+    secondaryLabel: String(source.secondaryLabel ?? buttons[1]?.label ?? '').trim(),
+    secondaryUrl: String(source.secondaryUrl ?? buttons[1]?.url ?? '').trim(),
+    buttons,
+  };
+}
+
 // Public activation contract fields: analytics.enabled, analytics.provider, analytics.ga4MeasurementId, analytics.consentMode, analytics.consentConfigurationVersion.
 function publicAnalyticsSettings(settings: typeof DEFAULT_SITE_SETTINGS): PublicAnalyticsSettings {
   const a = settings.analytics;
@@ -53,7 +81,7 @@ function publicAnalyticsSettings(settings: typeof DEFAULT_SITE_SETTINGS): Public
 export function publicFallback(): PublicSiteSettings {
   const legalDocuments = publicLegalDocuments(DEFAULT_SITE_SETTINGS);
   const analytics = publicAnalyticsSettings(DEFAULT_SITE_SETTINGS);
-  return { legalDocuments, analytics, contact: publicContact(DEFAULT_SITE_SETTINGS) as PublicContactSettings, brand: publicBrand(DEFAULT_SITE_SETTINGS), social: publicSocial(DEFAULT_SITE_SETTINGS), defaultCta: { ...DEFAULT_SITE_SETTINGS.defaultCta, buttons: DEFAULT_SITE_SETTINGS.defaultCta.buttons.map((button) => ({ ...button })) }, searchVisibility: 'blocked', consent: { active: false, configurationVersion: 1, privacyPdfPath: '', cookiePdfPath: '' } };
+  return { legalDocuments, analytics, contact: publicContact(DEFAULT_SITE_SETTINGS) as PublicContactSettings, brand: publicBrand(DEFAULT_SITE_SETTINGS), social: publicSocial(DEFAULT_SITE_SETTINGS), defaultCta: publicDefaultCta(DEFAULT_SITE_SETTINGS.defaultCta), searchVisibility: 'blocked', consent: { active: false, configurationVersion: 1, privacyPdfPath: '', cookiePdfPath: '' } };
 }
 
 export async function readPublicSiteSettingsFromPool(pool: DbPool): Promise<PublicSiteSettings> {
@@ -90,7 +118,7 @@ export async function readPublicSiteSettingsFromPool(pool: DbPool): Promise<Publ
     contact,
     brand,
     social: publicSocial(settings as typeof DEFAULT_SITE_SETTINGS),
-    defaultCta: { ...settings.defaultCta, buttons: settings.defaultCta.buttons.map((button) => ({ ...button })) },
+    defaultCta: publicDefaultCta(settings.defaultCta),
     searchVisibility: settings.searchVisibility as 'blocked' | 'indexable',
     consent: {
       active: analytics.active,
