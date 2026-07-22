@@ -95,13 +95,23 @@ export function ctaAdminEnhancementJs() {
       ['primaryLabel','primaryUrl','secondaryLabel','secondaryUrl'].forEach((key)=>form.elements['defaultCta.'+key]?.closest('label')?.classList.add('cta-legacy-field'));
       const fallback=buttonList({primaryLabel:form.elements['defaultCta.primaryLabel']?.value,primaryUrl:form.elements['defaultCta.primaryUrl']?.value,secondaryLabel:form.elements['defaultCta.secondaryLabel']?.value,secondaryUrl:form.elements['defaultCta.secondaryUrl']?.value},'default');
       settingsEditor=makeEditor(fallback,{headerChoices:true,title:'CTA gombok – legfeljebb 4'}); section.querySelector('.admin-grid')?.appendChild(settingsEditor);
-      const sync=()=>{mirrorSettingsLegacy(form);settingsDirty=true;queueMicrotask(()=>{const submit=form.querySelector('button[type="submit"]');if(submit)submit.disabled=false;});};
+      const submit=form.querySelector('button[type="submit"]');
+      const enforceSaveEnabled=()=>{if(settingsDirty&&submit?.disabled)submit.disabled=false;};
+      const submitStateObserver=submit&&globalThis.MutationObserver?new MutationObserver(enforceSaveEnabled):null;
+      submitStateObserver?.observe(submit,{attributes:true,attributeFilter:['disabled']});
+      const sync=()=>{
+        mirrorSettingsLegacy(form);
+        settingsDirty=true;
+        enforceSaveEnabled();
+        queueMicrotask(enforceSaveEnabled);
+        setTimeout(enforceSaveEnabled,0);
+      };
       settingsEditor.addEventListener('input',sync); settingsEditor.addEventListener('change',sync);
       nativeFetch('/api/admin/settings',{headers:{accept:'application/json'}}).then((response)=>response.json()).then((json)=>{if(!settingsDirty&&json?.ok){writeEditor(settingsEditor,buttonList(json.data?.defaultCta||{},'default'));mirrorSettingsLegacy(form);settingsDirty=false;}}).catch(()=>{});
       form.addEventListener('submit',async(event)=>{
         if(!settingsDirty) return;
         event.preventDefault();event.stopImmediatePropagation();
-        const submit=form.querySelector('button[type="submit"]');if(submit)submit.disabled=true;
+        if(submit)submit.disabled=true;
         try{const response=await nativeFetch('/api/admin/settings',{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify(settingsPayload(form))});const json=await response.json();if(!json?.ok){settingsMessage(json?.error?.message||'Mentési hiba.',false);if(submit)submit.disabled=false;return;}settingsDirty=false;settingsMessage(json.publish?.ok?'Beállítások mentve és élesítve.':'Beállítások mentve, de az élesítés nem fejeződött be.',!!json.publish?.ok);setTimeout(()=>globalThis.location?.reload(),350);}
         catch{settingsMessage('Hálózati hiba. Próbáld újra.',false);if(submit)submit.disabled=false;}
       },true);
