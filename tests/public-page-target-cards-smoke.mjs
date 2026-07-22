@@ -21,10 +21,12 @@ const index = publicPages.buildPublicRouteIndex(pages);
 const sourcePage = { id: 2, route: '/kinek-szol/', slug: 'kinek-szol', type: 'audiences_index', title: 'Kinek szól?', status: 'published', sortOrder: 0, blocks: [] };
 const resolve = (items, detailType = 'audience_detail') => publicPages.resolveListingCards({ items, detailType, index, sourcePage, blockLabel: 'golden:10:cards:Kinek szól?', mode: 'db-authoritative', source: 'db-block' });
 
-const v2 = [{ version: 2, variant: 'default', cards: [{ title_override: 'Hotelek', target_type: 'page', target_page_id: 11 }], action: null }];
-assert.equal(resolve(v2)[0].href, '/kinek-szol/hotelek/');
+const pageTargetV2 = [{ version: 2, variant: 'default', cards: [{ title_override: 'Hotelek', target_type: 'page', target_page_id: 11 }], action: null }];
+assert.equal(resolve(pageTargetV2)[0].href, '/kinek-szol/hotelek/');
+const internalTargetV2 = [{ version: 2, variant: 'default', cards: [{ title: 'Hotelek', target_type: 'internal', target_url: '/kinek-szol/hotelek/' }], action: null }];
+assert.equal(resolve(internalTargetV2)[0].href, '/kinek-szol/hotelek/');
 assert.equal(publicPages.resolveListingCards({ items: [{ title: 'CRM', target_type: 'page', target_page_id: 10 }], detailType: 'solution_detail', index, sourcePage, blockLabel: 'cards', mode: 'db-authoritative', source: 'db-block' })[0].href, '/megoldasaink/crm/');
 assert.throws(() => resolve([{ version: 2, cards: [{ title: 'Draft', target_type: 'page', target_page_id: 12 }] }]), /page target nem published oldal.*12/);
 assert.throws(() => resolve([{ version: 2, cards: [{ title: 'Rossz típus', target_type: 'page', target_page_id: 10 }] }]), /page target típusa solution_detail, elvárt: audience_detail/);
 assert.equal(publicPages.resolveListingCards({ items: [{ title: 'CRM', url: '/megoldasaink/crm/' }], detailType: 'solution_detail', index, sourcePage, blockLabel: 'cards', mode: 'db-authoritative', source: 'db-block' })[0].href, '/megoldasaink/crm/');
-console.log('Public cards V2 page-target resolution smoke ok');
+console.log('Public cards page-target and normalized target URL resolution smoke ok');
