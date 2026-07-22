@@ -18,7 +18,7 @@ function normalizeCardInput(item = {}, path = 'items', errors = {}) {
   const textOverride = clean(source.text_override);
   const out = { target_type, title: firstNonEmpty(titleOverride, source.title, source.label), title_override: titleOverride, text: firstNonEmpty(textOverride, source.text, source.shortDescription, source.body), text_override: textOverride, linkLabel: clean(source.linkLabel ?? source.label ?? ''), badge: source.badge ?? source.order ?? '' };
   if (target_type === 'page') { const id = Number(source.target_page_id); if (!Number.isSafeInteger(id) || id <= 0) field(errors, `${path}.target_page_id`, 'Válassz publikus céloldalt.'); else out.target_page_id = id; }
-  else if (target_type === 'legacy') { const href = clean(source.href ?? source.url); if (href && !isInternalRouteCandidate(href)) field(errors, `${path}.href`, 'Legacy cél csak biztonságos belső útvonal lehet.'); out.href = href; }
+  else if (target_type === 'legacy') { const href = clean(source.href ?? source.url); const slug = clean(source.slug); if (href && !isInternalRouteCandidate(href)) field(errors, `${path}.href`, 'Legacy cél csak biztonságos belső útvonal lehet.'); out.href = href; if (slug) out.slug = slug; }
   else if (target_type === 'external') { const href = clean(source.href ?? source.url); if (href && !isValidHttpExternalUrl(href)) field(errors, `${path}.href`, 'Külső cél csak http(s) URL lehet.'); out.href = href; }
   return out;
 }
@@ -35,7 +35,7 @@ export function normalizeCardsItems(items = [], { fieldErrors = {}, path = 'item
   const source = Array.isArray(items) ? items : [];
   const first = source[0];
   const contract = isCardsV2(first) ? first : { version: 2, variant: 'default', cards: source.filter((item) => clean(item?.kind || 'card') !== 'section-action'), action: source.find((item) => clean(item?.kind) === 'section-action') || null };
-  const cards = (Array.isArray(contract.cards) ? contract.cards : []).map((item, index) => normalizeCardInput(item, `${path}.0.cards.${index}`, fieldErrors)).filter((item) => item.title || item.href || item.target_page_id);
+  const cards = (Array.isArray(contract.cards) ? contract.cards : []).map((item, index) => normalizeCardInput(item, `${path}.0.cards.${index}`, fieldErrors)).filter((item) => item.title || item.href || item.slug || item.target_page_id);
   const action = normalizeActionInput(contract.action, `${path}.0.action`, fieldErrors);
   if (!Array.isArray(contract.cards)) field(fieldErrors, `${path}.0.cards`, 'A cards contract cards tömböt vár.');
   if (requirePublishedTargets) {
