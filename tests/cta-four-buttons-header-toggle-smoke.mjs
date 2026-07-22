@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { normalizeSiteSettings } from '../src/lib/admin/settings.mjs';
 import { normalizeCtaItems } from '../src/lib/content/block-contracts.mjs';
 import { resolvePageCta, resolvePageHeaderCta } from '../src/lib/content/page-cta-contract.mjs';
@@ -37,4 +38,12 @@ const adminJs = ctaAdminEnhancementJs();
 assert.match(adminJs, /Header CTA kikapcsolása ezen az oldalon/);
 assert.match(adminJs, /legfeljebb 4/);
 assert.match(adminJs, /cta-mode-selector/);
+
+const ctaSectionSource = await readFile('src/components/CTASection.astro', 'utf8');
+assert.match(ctaSectionSource, /primaryAnalyticsId = 'cta-section-primary'/);
+assert.match(ctaSectionSource, /secondaryAnalyticsId = 'cta-section-secondary'/);
+assert.match(ctaSectionSource, /return `cta-section-\$\{index \+ 1\}`/);
+assert.doesNotMatch(ctaSectionSource, /button\.analyticsId/);
+assert.doesNotMatch(ctaSectionSource, /button\.analyticsSlot/);
+
 console.log('CTA four-button/header-toggle smoke passed');
