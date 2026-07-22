@@ -12,6 +12,7 @@ export const blockContracts = Object.freeze([
   { type: 'network-visual', label: 'Hálózati vizualizáció', canonicalType: 'network-visual', aliases: [], allowedPageContexts: ['*'], capabilities: { listItems: true, cardTarget: false, sectionAction: false, media: false, reorder: true }, validator: 'network-visual', publicContractVersion: 1 },
   { type: 'split-text', label: 'Kétoszlopos szöveg', canonicalType: 'split-text', aliases: [], allowedPageContexts: ['*'], capabilities: { listItems: false, cardTarget: false, sectionAction: false, media: false, reorder: true }, validator: 'split-text', publicContractVersion: 1 },
   { type: 'ai-assistant-preview', label: 'AI asszisztens előnézet', canonicalType: 'ai-assistant-preview', aliases: [], allowedPageContexts: ['*'], capabilities: { listItems: true, cardTarget: false, sectionAction: false, media: false, reorder: true }, validator: 'ai-assistant-preview', publicContractVersion: 1 },
+  { type: 'related-links', label: 'Kapcsolódó oldalak', canonicalType: 'related-links', aliases: [], allowedPageContexts: ['*'], capabilities: { listItems: true, cardTarget: true, sectionAction: false, media: false, reorder: true }, validator: 'related-links', publicContractVersion: 1 },
   { type: 'integrations-strip', label: 'Integrációs sáv', canonicalType: 'integrations-strip', aliases: [], allowedPageContexts: ['*'], capabilities: { listItems: true, cardTarget: false, sectionAction: false, media: false, reorder: true }, validator: 'integrations-strip', publicContractVersion: 1 },
 ]);
 

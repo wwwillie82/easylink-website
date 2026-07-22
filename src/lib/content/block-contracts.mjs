@@ -107,5 +107,27 @@ export function normalizeBlockItemsByType(type, items, options = {}) {
   if (type === 'video') return normalizeVideoItems(items);
   if (type === 'ai-preview') return normalizeAiPreviewItems(items);
   if (type === 'network-visual') return normalizeNetworkVisualItems(items).config ? [normalizeNetworkVisualItems(items).config] : items;
+  if (type === 'related-links') return normalizeRelatedLinksItems(items, options);
   return items;
+}
+
+export function normalizeRelatedLinksItems(items = [], { fieldErrors = {}, path = 'items', pages = [], requirePublishedTargets = false } = {}) {
+  const fail = (message) => { const error = new Error(message); error.code = 'VALIDATION_ERROR'; error.status = 400; throw error; };
+  const pagesById = buildPageIndexById(pages);
+  const source = Array.isArray(items) ? items : (field(fieldErrors, path, 'Az items mezőnek tömbnek kell lennie.'), []);
+  const normalized = source.map((item, index) => {
+    const target_type = clean(item?.target_type || '');
+    const id = Number(item?.target_page_id);
+    if (target_type !== 'page') field(fieldErrors, `${path}.${index}.target_type`, 'A cél típusa csak page lehet.');
+    if (!Number.isSafeInteger(id) || id <= 0) field(fieldErrors, `${path}.${index}.target_page_id`, 'Válassz publikus céloldalt.');
+    else if (requirePublishedTargets) {
+      const page = pagesById.get(id);
+      if (!page) field(fieldErrors, `${path}.${index}.target_page_id`, 'A céloldal nem található.');
+      else if (page.status !== 'published') field(fieldErrors, `${path}.${index}.target_page_id`, 'A céloldal csak publikus oldal lehet.');
+    }
+    return { target_type: 'page', target_page_id: id, title_override: clean(item?.title_override) };
+  });
+  const messages = Object.values(fieldErrors).filter(Boolean);
+  if (messages.length) fail(messages[0]);
+  return normalized;
 }
