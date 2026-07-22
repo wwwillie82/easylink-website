@@ -38,6 +38,9 @@ const adminJs = ctaAdminEnhancementJs();
 assert.match(adminJs, /Header CTA kikapcsolása ezen az oldalon/);
 assert.match(adminJs, /legfeljebb 4/);
 assert.match(adminJs, /cta-mode-selector/);
+assert.match(adminJs, /submitStateObserver/);
+assert.match(adminJs, /attributeFilter:\['disabled'\]/);
+assert.match(adminJs, /setTimeout\(enforceSaveEnabled,0\)/);
 
 const ctaSectionSource = await readFile('src/components/CTASection.astro', 'utf8');
 assert.match(ctaSectionSource, /primaryAnalyticsId = 'cta-section-primary'/);
