@@ -7,10 +7,6 @@ const tests = [
   'tests/contact-renderer-admin-parity-smoke.mjs',
   'tests/cta-render-regression-smoke.mjs',
   'tests/cta-four-buttons-header-toggle-smoke.mjs',
-  'tests/navigation-hierarchy-smoke.mjs',
-  'tests/menu-add-position-controls-smoke.mjs',
-  'tests/navigation-delete-smoke.mjs',
-  'tests/page-delete-smoke.mjs',
 ];
 
 for (const file of tests) {
@@ -28,4 +24,4 @@ for (const file of tests) {
   console.log(`COMPOSITION_PASS: ${file}`);
 }
 
-console.log('Composition smoke suite passed.');
+console.log('Composition diagnostic first half passed.');
