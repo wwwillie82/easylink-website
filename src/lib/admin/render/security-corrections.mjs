@@ -22,7 +22,11 @@ function capabilityOptions(args, scope) {
 
 function withoutArchivedStatusOption(html, allowed) {
   if (allowed) return html;
-  return String(html).replace(/<option value="archived"[^>]*>Archivált<\/option>/g, '');
+  return String(html)
+    .replace(/<option value="archived" selected>Archivált<\/option>/g, '<option value="archived" selected disabled>Archivált</option>')
+    .replace(/<option value="archived"(?![^>]*selected)[^>]*>Archivált<\/option>/g, '')
+    .replace(/<option value=\\"archived\\" selected>Archivált<\/option>/g, '<option value=\\"archived\\" selected disabled>Archivált</option>')
+    .replace(/<option value=\\"archived\\"(?![^>]*selected)[^>]*>Archivált<\/option>/g, '');
 }
 
 function removeLegacyGlobalPermissionGuard(html) {
