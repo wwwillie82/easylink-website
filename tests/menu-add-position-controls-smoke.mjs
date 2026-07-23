@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { navHtml } from '../src/lib/admin/render/menu-position-controls.mjs';
+import { navHtml, menuVisibleDefaultScript } from '../src/lib/admin/render/menu-visible-default.mjs';
 import { menuPositionControlsScript } from '../src/lib/admin/render/menu-position-controls.mjs';
 
 const html = navHtml([
@@ -26,5 +26,8 @@ assert.match(menuPositionControlsScript, /row\.scrollIntoView\(\{ block: 'center
 assert.match(menuPositionControlsScript, /row\.animate\?\./);
 assert.match(menuPositionControlsScript, /event\.target\.matches\('\[data-role="parent-select"\]'\)/);
 assert.match(menuPositionControlsScript, /else showParentMoveFeedback\(row\)/);
+assert.match(menuVisibleDefaultScript, /#add-nav-bottom, \[data-menu-add-position="top"\] button, \[data-add-child\]/);
+assert.match(menuVisibleDefaultScript, /status\.value = 'published'/);
+assert.match(menuVisibleDefaultScript, /status\.dispatchEvent\(new Event\('change', \{ bubbles: true \}\)\)/);
 
-console.log('Menu add position controls smoke passed: deterministic insertion and parent-move feedback contracts are present.');
+console.log('Menu add position controls smoke passed: deterministic insertion, visible default and parent-move feedback contracts are present.');
