@@ -19,6 +19,7 @@ const tests = [
   'tests/admin-users-smoke.mjs',
   'tests/admin-users-message-visibility-smoke.mjs',
   'tests/admin-audit-smoke.mjs',
+  'tests/admin-audit-user-ux-smoke.mjs',
   'tests/admin-home-api-smoke.mjs',
   'tests/menu-a2b-smoke.mjs',
   'tests/live-smoke-metadata-contract-smoke.mjs',
@@ -39,4 +40,4 @@ for (const file of tests) {
   console.log(`COMPOSITION_PASS: ${file}`);
 }
 
-console.log('Composition, U1/U2 admin security and live smoke metadata suite passed.');
+console.log('Composition, U1/U2/U3 admin security and live smoke metadata suite passed.');
