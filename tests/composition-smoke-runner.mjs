@@ -17,6 +17,7 @@ const tests = [
   'tests/admin-permission-ui-smoke.mjs',
   'tests/admin-security-corrections-smoke.mjs',
   'tests/admin-users-smoke.mjs',
+  'tests/admin-users-message-visibility-smoke.mjs',
   'tests/admin-home-api-smoke.mjs',
   'tests/menu-a2b-smoke.mjs',
   'tests/live-smoke-metadata-contract-smoke.mjs',
