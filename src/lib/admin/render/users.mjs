@@ -1,5 +1,6 @@
 import { esc } from './utils.mjs';
 import { adminScopes, scopeActions } from '../permissions.mjs';
+import { RESET_PASSWORD_MIN_LENGTH } from '../password-reset.mjs';
 import { defaultNewUserPermissions } from '../users.mjs';
 
 const scopeLabels = {
@@ -168,5 +169,5 @@ export function forgotPasswordHtml() {
 }
 
 export function resetPasswordHtml(token = '') {
-  return `<div class="card"><h2>Új jelszó beállítása</h2><p id="msg" class="msg"></p><form id="reset"><input name="token" type="hidden" value="${esc(token)}"><label>Új jelszó<input name="password" type="password" minlength="12" required></label><label>Új jelszó megerősítése<input name="password_confirm" type="password" minlength="12" required></label><button>Jelszó módosítása</button></form><p><a href="/admin/login">Vissza a belépéshez</a></p></div><script>reset.addEventListener('submit',async(event)=>{event.preventDefault();const response=await fetch('/api/admin/password-reset/confirm',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({token:reset.token.value,password:reset.password.value,password_confirm:reset.password_confirm.value})});const payload=await response.json();msg.textContent=payload.data?.message||payload.error?.message||'Hiba';msg.className='msg '+(response.ok?'ok':'err');if(response.ok)setTimeout(()=>location.href='/admin/login',1200);});</script>`;
+  return `<div class="card"><h2>Új jelszó beállítása</h2><p id="msg" class="msg"></p><form id="reset"><input name="token" type="hidden" value="${esc(token)}"><label>Új jelszó<input name="password" type="password" minlength="${RESET_PASSWORD_MIN_LENGTH}" required></label><label>Új jelszó megerősítése<input name="password_confirm" type="password" minlength="${RESET_PASSWORD_MIN_LENGTH}" required></label><button>Jelszó módosítása</button></form><p><a href="/admin/login">Vissza a belépéshez</a></p></div><script>reset.addEventListener('submit',async(event)=>{event.preventDefault();const response=await fetch('/api/admin/password-reset/confirm',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({token:reset.token.value,password:reset.password.value,password_confirm:reset.password_confirm.value})});const payload=await response.json();msg.textContent=payload.data?.message||payload.error?.message||'Hiba';msg.className='msg '+(response.ok?'ok':'err');if(response.ok)setTimeout(()=>location.href='/admin/login',1200);});</script>`;
 }
