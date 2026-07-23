@@ -79,6 +79,40 @@ CREATE TABLE IF NOT EXISTS site_admin_users (
   last_login_at TIMESTAMP NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+
+CREATE TABLE IF NOT EXISTS site_admin_migration_markers (
+  marker_code VARCHAR(160) NOT NULL PRIMARY KEY,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS site_admin_user_scopes (
+  admin_user_id BIGINT UNSIGNED NOT NULL,
+  scope_code VARCHAR(32) NOT NULL,
+  can_save TINYINT(1) NOT NULL DEFAULT 0,
+  can_archive TINYINT(1) NOT NULL DEFAULT 0,
+  can_delete TINYINT(1) NOT NULL DEFAULT 0,
+  can_republish TINYINT(1) NOT NULL DEFAULT 0,
+  can_restore TINYINT(1) NOT NULL DEFAULT 0,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (admin_user_id, scope_code),
+  CONSTRAINT fk_site_admin_user_scopes_user FOREIGN KEY (admin_user_id) REFERENCES site_admin_users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS site_admin_sessions (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  admin_user_id BIGINT UNSIGNED NOT NULL,
+  token_hash CHAR(64) NOT NULL UNIQUE,
+  csrf_token_hash CHAR(64) NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  expires_at TIMESTAMP NOT NULL,
+  last_seen_at TIMESTAMP NULL,
+  revoked_at TIMESTAMP NULL,
+  INDEX idx_site_admin_sessions_user_active (admin_user_id, revoked_at, expires_at),
+  INDEX idx_site_admin_sessions_expires (expires_at),
+  CONSTRAINT fk_site_admin_sessions_user FOREIGN KEY (admin_user_id) REFERENCES site_admin_users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS site_media_assets (id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY, path VARCHAR(512) NOT NULL, alt VARCHAR(255) NULL, type VARCHAR(80) NULL, status VARCHAR(32) NOT NULL DEFAULT 'active', processing_status VARCHAR(32) NOT NULL DEFAULT 'ready', staging_path VARCHAR(1024) NULL, original_size_bytes BIGINT UNSIGNED NULL, final_size_bytes BIGINT UNSIGNED NULL, processing_error TEXT NULL, processing_progress_percent TINYINT UNSIGNED NULL, processing_progress_message VARCHAR(255) NULL, processing_progress_updated_at TIMESTAMP NULL, duration_seconds DECIMAL(10,3) NULL, width INT UNSIGNED NULL, height INT UNSIGNED NULL, processing_started_at TIMESTAMP NULL, processing_finished_at TIMESTAMP NULL, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, INDEX idx_site_media_processing (processing_status, id), INDEX idx_site_media_processing_claim (processing_status, status, processing_started_at, id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 

@@ -1,6 +1,7 @@
 import { fileURLToPath } from 'node:url';
 import { readFile } from 'node:fs/promises';
 import { createPool } from '../src/lib/db/client.mjs';
+import { fullAdminPermissionMatrix, permissionRowsForInsert } from '../src/lib/admin/permissions.mjs';
 
 export async function indexExists(pool, table, indexName) {
   const [rows] = await pool.query('SELECT INDEX_NAME FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ? LIMIT 1', [table, indexName]);
@@ -39,6 +40,25 @@ export async function ensureNavigationTargetSchema(pool) {
   if (!(await foreignKeyExists(pool, 'site_navigation_items', 'fk_site_navigation_items_parent'))) await pool.query('ALTER TABLE site_navigation_items ADD CONSTRAINT fk_site_navigation_items_parent FOREIGN KEY (parent_id) REFERENCES site_navigation_items(id) ON DELETE RESTRICT');
 }
 
+
+export const adminAuthBackfillMarker = 'u1_admin_auth_full_backfill_v1';
+export async function ensureAdminAuthFoundation(pool) {
+  const [done] = await pool.query('SELECT marker_code FROM site_admin_migration_markers WHERE marker_code=? LIMIT 1', [adminAuthBackfillMarker]);
+  if (done[0]) return { skipped: true };
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [again] = await conn.query('SELECT marker_code FROM site_admin_migration_markers WHERE marker_code=? LIMIT 1 FOR UPDATE', [adminAuthBackfillMarker]);
+    if (again[0]) { await conn.commit(); return { skipped: true }; }
+    const rows = permissionRowsForInsert(fullAdminPermissionMatrix);
+    const [users] = await conn.query('SELECT id FROM site_admin_users ORDER BY id FOR UPDATE');
+    for (const user of users) for (const row of rows) await conn.execute('INSERT IGNORE INTO site_admin_user_scopes (admin_user_id,scope_code,can_save,can_archive,can_delete,can_republish,can_restore) VALUES (?,?,?,?,?,?,?)', [user.id, row.scope_code, row.can_save, row.can_archive, row.can_delete, row.can_republish, row.can_restore]);
+    await conn.execute('INSERT INTO site_admin_migration_markers (marker_code) VALUES (?)', [adminAuthBackfillMarker]);
+    await conn.commit();
+    return { skipped: false, userCount: users.length };
+  } catch (error) { await conn.rollback(); throw error; } finally { conn.release(); }
+}
+
 export async function ensureMediaIndexes(pool) {
   if (!(await indexExists(pool, 'site_media_assets', 'idx_site_media_processing_claim'))) await pool.query('CREATE INDEX idx_site_media_processing_claim ON site_media_assets (processing_status, status, processing_started_at, id)');
 }
@@ -49,6 +69,7 @@ export async function migrate({ pool, dryRun = false } = {}) {
   for (const stmt of sql.split(/;\s*\n/).map((s) => s.trim()).filter(Boolean)) await pool.query(stmt);
   await ensureNavigationTargetSchema(pool);
   await ensureMediaIndexes(pool);
+  await ensureAdminAuthFoundation(pool);
   return 'MariaDB schema migration completed.';
 }
 

@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import { layout } from '../src/lib/admin/render/layout.mjs';
+const html = layout('<main><form><input name="x"><button type="submit">Mentés</button></form><button data-archive-media="1">Archiválás</button><button data-delete-page="1">Törlés</button></main>', { current:'/admin/media', adminContext:{ permissions:{ media:{ canSave:false, canArchive:true, canDelete:false } } } });
+assert.match(html, /Média/);
+assert.doesNotMatch(html, /Oldalak<\/a>/);
+assert.match(html, /permissionGuardJs|permissionDisabled|data-archive-media/);
+assert.match(html, /canSave":false/);
+assert.match(html, /canArchive":true/);
+assert.match(html, /canDelete":false/);
+const publish = layout('<button data-republish>Újra</button><button data-rollback="1">Vissza</button>', { current:'/admin/publish', adminContext:{ permissions:{ publish:{ canRepublish:true, canRestore:false } } } });
+assert.match(publish, /data-republish/);
+assert.match(publish, /canRepublish":true/);
+assert.match(publish, /canRestore":false/);
+console.log('Admin permission UI smoke passed.');

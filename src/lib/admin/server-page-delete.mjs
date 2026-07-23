@@ -1,6 +1,6 @@
 import { createAdminServer as createBaseAdminServer } from './server-navigation-delete.mjs';
-import { requireAuthFromRequest } from './auth.mjs';
 import { createPublishService, PublishInProgressError } from './publish.mjs';
+import { authorizeAdminRequest } from './policy.mjs';
 
 function json(res, status, body) {
   res.writeHead(status, { 'content-type': 'application/json; charset=utf-8' });
@@ -11,9 +11,6 @@ function apiError(res, status, code, message, details) {
   return json(res, status, { ok: false, error: { code, message, ...(details ? { details } : {}) } });
 }
 
-function authed(req, env) {
-  return requireAuthFromRequest({ headers: { get: (name) => req.headers[name.toLowerCase()] || '' } }, env);
-}
 
 export function createAdminServer({ repo, env = process.env, publishService } = {}) {
   if (!repo) throw new Error('createAdminServer requires repo');
@@ -27,8 +24,9 @@ export function createAdminServer({ repo, env = process.env, publishService } = 
     const match = /^\/api\/admin\/pages\/(\d+)$/.exec(url.pathname);
     if (!match || req.method !== 'DELETE') return baseRequestHandler(req, res);
     try {
-      const user = authed(req, env);
-      if (!user) return apiError(res, 401, 'UNAUTHENTICATED', 'Bejelentkezés szükséges.');
+      const auth = await authorizeAdminRequest({ req, res, repo, env });
+      if (!auth.ok) return;
+      const user = auth.context.user;
       const data = await repo.deletePage(match[1]);
       if (!data) return apiError(res, 404, 'PAGE_NOT_FOUND', 'Az oldal nem található.');
       let publish;

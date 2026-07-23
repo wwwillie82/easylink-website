@@ -1,4 +1,5 @@
 import { pageForm as basePageForm, pagesTable as basePagesTable } from './pages.mjs';
+import { scopePermissions } from './permission-ui.mjs';
 
 function esc(value) {
   return String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
@@ -89,16 +90,18 @@ export const pageDeleteClientScript = String.raw`(() => {
   addListButtons();
 })();`;
 
-export function pageForm(data) {
+export function pageForm(data, options = {}) {
+  const canDelete = scopePermissions(options, 'pages').canDelete === true;
   const page = data?.page || {};
   const protectedHome = String(page.route || '') === '/' || String(page.type || '') === 'home';
   const deleteZone = protectedHome
     ? '<section class="admin-section" data-page-delete-zone><header class="admin-section-header"><h3>Oldal törlése</h3></header><p class="hint">A főoldal nem törölhető.</p></section>'
-    : `<section class="admin-section" data-page-delete-zone><header class="admin-section-header"><h3>Oldal törlése</h3></header><p class="hint">A törlés csak akkor engedélyezett, ha egyetlen menüpont vagy más aktív tartalom sem hivatkozik az oldalra, és legfeljebb egy nem archivált saját tartalmi blokk maradt.</p><button type="button" class="danger" data-page-delete="${esc(page.id)}" data-page-title="${esc(page.title)}">Törlés</button></section>`;
-  return `${basePageForm(data)}${deleteZone}<script>${pageDeleteClientScript}</script>`;
+    : `<section class="admin-section" data-page-delete-zone><header class="admin-section-header"><h3>Oldal törlése</h3></header><p class="hint">A törlés csak akkor engedélyezett, ha egyetlen menüpont vagy más aktív tartalom sem hivatkozik az oldalra, és legfeljebb egy nem archivált saját tartalmi blokk maradt.</p>${canDelete ? `<button type="button" class="danger" data-page-delete="${esc(page.id)}" data-page-title="${esc(page.title)}">Törlés</button>` : '<p class="hint">Nincs fizikai oldaltörlési jog.</p>'}</section>`;
+  return `${basePageForm(data, options)}${deleteZone}${canDelete ? `<script>${pageDeleteClientScript}</script>` : ''}`;
 }
 
-export function pagesTable(pages = []) {
+export function pagesTable(pages = [], options = {}) {
+  const canDelete = scopePermissions(options, 'pages').canDelete === true;
   const catalog = pages.map((page) => ({ id: Number(page.id), title: page.title || '', route: page.route || '', type: page.type || '' }));
-  return `${basePagesTable(pages)}<script type="application/json" id="page-delete-catalog">${jsonForHtml(catalog)}</script><script>${pageDeleteClientScript}</script>`;
+  return `${basePagesTable(pages, options)}${canDelete ? `<script type="application/json" id="page-delete-catalog">${jsonForHtml(catalog)}</script><script>${pageDeleteClientScript}</script>` : ''}`;
 }
