@@ -29,8 +29,9 @@ function smokeText(value) {
 }
 
 function pageSmokeContent(page = {}) {
+  const heroTitle = smokeText(page.hero_title ?? page.heroTitle) || smokeText(page.title);
   return {
-    heroTitle: smokeText(page.hero_title ?? page.heroTitle ?? page.title),
+    heroTitle,
     heroDescription: smokeText(page.hero_description ?? page.heroDescription),
   };
 }
