@@ -254,6 +254,22 @@ function validateCtaBlockForSave(p, items, existingBlock = null) {
 export function createAdminRepository(pool) {
   return {
 
+
+    async insertAuditEvent(row) { await pool.execute('INSERT INTO site_admin_audit_log (actor_user_id,actor_display_name,actor_email,event_code,scope_code,action_code,target_type,target_id,target_label,result,request_id,ip_address,user_agent,metadata_json) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)', [row.actor_user_id,row.actor_display_name,row.actor_email,row.event_code,row.scope_code,row.action_code,row.target_type,row.target_id,row.target_label,row.result,row.request_id,row.ip_address,row.user_agent,row.metadata_json == null ? null : JSON.stringify(row.metadata_json)]); },
+    async listAuditEvents(filters = {}) {
+      const page = Math.max(1, Number(filters.page || 1)); const allowedLimits = new Set([25,50,100,200]); const requestedLimit = Math.min(200, Math.max(1, Number(filters.limit || 50))); const limit = allowedLimits.has(requestedLimit) ? requestedLimit : (requestedLimit > 100 ? 200 : 50); const offset = (page - 1) * limit;
+      const where = []; const params = [];
+      const addEq = (field, value) => { if (value !== undefined && value !== null && String(value).trim() !== '') { where.push(`${field}=?`); params.push(String(value).trim()); } };
+      if (filters.date_from) { where.push('created_at>=?'); params.push(String(filters.date_from).replace('T',' ')); }
+      if (filters.date_to) { where.push('created_at<=?'); params.push(String(filters.date_to).replace('T',' ')); }
+      addEq('result', filters.result); addEq('event_code', filters.event_code); addEq('scope_code', filters.scope_code); addEq('target_type', filters.target_type); addEq('target_id', filters.target_id); addEq('request_id', filters.request_id);
+      if (filters.actor) { where.push('(actor_display_name LIKE ? OR actor_email LIKE ?)'); params.push(`%${String(filters.actor).trim()}%`, `%${String(filters.actor).trim()}%`); }
+      if (filters.q) { where.push('(target_label LIKE ? OR event_code LIKE ?)'); params.push(`%${String(filters.q).trim()}%`, `%${String(filters.q).trim()}%`); }
+      const sqlWhere = where.length ? ` WHERE ${where.join(' AND ')}` : '';
+      const [[countRow]] = await pool.query(`SELECT COUNT(*) AS total FROM site_admin_audit_log${sqlWhere}`, params);
+      const [rows] = await pool.query(`SELECT id,created_at,actor_user_id,actor_display_name,actor_email,event_code,scope_code,action_code,target_type,target_id,target_label,result,request_id,ip_address,user_agent,metadata_json FROM site_admin_audit_log${sqlWhere} ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?`, [...params, limit, offset]);
+      return { data: rows.map((r)=>({ ...r, metadata_json: typeof r.metadata_json === 'string' ? JSON.parse(r.metadata_json) : r.metadata_json })), pagination: { page, limit, total: Number(countRow?.total || 0), total_pages: Math.max(1, Math.ceil(Number(countRow?.total || 0) / limit)) } };
+    },
     async getSiteSettings() { const [rows] = await pool.query('SELECT `key`,`value` FROM site_settings WHERE `key` IN (?,?,?,?,?,?,?) ORDER BY `key`', ['analytics','legalDocuments','contact','brand','social','defaultCta','searchVisibility']); return parseSiteSettingsRows(rows); },
     async updateSiteSettings(input, env = process.env) { const settings = normalizeSiteSettings(input); for (const d of settings.legalDocuments.items) await requireLegalPdf(pool, d.pdfPath, env); await requireLogoImage(pool, settings.brand.headerLogoPath, env); await requireLogoImage(pool, settings.brand.footerLogoPath, env); const conn = await pool.getConnection(); try { await conn.beginTransaction(); for (const key of ['analytics','legalDocuments','contact','brand','social','defaultCta','searchVisibility']) await conn.execute('INSERT INTO site_settings (`key`,`value`) VALUES (?,?) ON DUPLICATE KEY UPDATE `value`=VALUES(`value`)', [key, JSON.stringify(settings[key])]); await conn.commit(); return settings; } catch (error) { await conn.rollback(); throw error; } finally { conn.release(); } },
 

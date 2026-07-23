@@ -80,6 +80,34 @@ CREATE TABLE IF NOT EXISTS site_admin_users (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
+
+CREATE TABLE IF NOT EXISTS site_admin_audit_log (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  actor_user_id BIGINT UNSIGNED NULL,
+  actor_display_name VARCHAR(255) NULL,
+  actor_email VARCHAR(255) NULL,
+  event_code VARCHAR(100) NOT NULL,
+  scope_code VARCHAR(50) NULL,
+  action_code VARCHAR(50) NULL,
+  target_type VARCHAR(80) NULL,
+  target_id VARCHAR(100) NULL,
+  target_label VARCHAR(255) NULL,
+  result VARCHAR(20) NOT NULL,
+  request_id VARCHAR(64) NULL,
+  ip_address VARCHAR(64) NULL,
+  user_agent VARCHAR(512) NULL,
+  metadata_json JSON NULL,
+  CONSTRAINT fk_site_admin_audit_actor FOREIGN KEY (actor_user_id) REFERENCES site_admin_users(id) ON DELETE SET NULL,
+  INDEX idx_site_admin_audit_created (created_at),
+  INDEX idx_site_admin_audit_actor_created (actor_user_id, created_at),
+  INDEX idx_site_admin_audit_event_created (event_code, created_at),
+  INDEX idx_site_admin_audit_scope_created (scope_code, created_at),
+  INDEX idx_site_admin_audit_result_created (result, created_at),
+  INDEX idx_site_admin_audit_target (target_type, target_id),
+  INDEX idx_site_admin_audit_request (request_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS site_admin_migration_markers (
   marker_code VARCHAR(160) NOT NULL PRIMARY KEY,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
