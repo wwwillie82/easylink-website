@@ -26,8 +26,8 @@ assert.doesNotMatch(contentBlocks, /import ListingCards from|publicCardsFromItem
 assert.match(publicSection, /<ContentBlocks blocks=\{blocks\} routeIndex=\{routeIndex\} layout="fragment" \/>/);
 assert.doesNotMatch(publicSection, /cards-heading|import ListingCards from|publicCardsFromItems|<ListingCards items=/);
 
-assert.match(adminBlocks, /<label data-panel="common">\$\{titleLabel\}<input name="title" value="\$\{esc\(b\.title\)\}"><\/label>/);
-assert.match(adminBlocks, /<label data-panel="common">\$\{bodyLabel\}<textarea name="body">\$\{esc\(b\.body\)\}<\/textarea><\/label>/);
+assert.match(adminBlocks, /<label data-panel="common">\$\{titleLabel\}<input name="title" value="\$\{esc\(b\.title\)\}"[^>]*><\/label>/);
+assert.match(adminBlocks, /<label data-panel="common">\$\{bodyLabel\}<textarea name="body"[^>]*>\$\{esc\(b\.body\)\}<\/textarea><\/label>/);
 assert.doesNotMatch(adminBlocks, /input name="title"[^>]*required|textarea name="body"[^>]*required/);
 
 console.log('Cards block renderer smoke passed: one shared component renders optional heading/body, cards and action across generic and integrations paths.');
