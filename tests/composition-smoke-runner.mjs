@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process';
 
-const result = spawnSync(process.execPath, ['tests/public-composition-smoke.mjs'], {
+const result = spawnSync(process.execPath, ['tests/cards-block-renderer-smoke.mjs'], {
   cwd: process.cwd(),
   encoding: 'utf8',
   env: process.env,
