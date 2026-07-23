@@ -1,7 +1,8 @@
 import { isValidHttpExternalUrl, navigationTitleOverride, positiveNavigationPageId } from './internal-links.mjs';
+import { validateNavigationHierarchy } from './navigation-hierarchy.mjs';
 import { validatePublishedHomeBlocksForSnapshot } from './home-blocks.mjs';
 
-const targetTypes = new Set(['legacy', 'page', 'external']);
+const targetTypes = new Set(['legacy', 'page', 'external', 'group']);
 const hasOwn = (obj, key) => Object.prototype.hasOwnProperty.call(obj || {}, key);
 const labelOf = (item = {}) => String(item.title || item.target_title || `#${item.id || '?'}`);
 const statusOf = (v) => String(v || '').trim().toLowerCase();
@@ -29,8 +30,9 @@ export function normalizeSnapshotForReferenceValidation(content = {}) {
   return { ...content, pages, navigation: (content.navigation || []).map((row) => {
     if (!hasOwn(row, 'target_type')) return { ...row, target_type: 'legacy', target_page_id: null, title_override: null };
     const type = rawTargetType(row.target_type);
-    if (type === 'external' || type === 'legacy') return { ...row, target_type: type, target_page_id: null, title_override: null };
-    if (type === 'page') return { ...row, target_type: 'page', target_page_id: positiveNavigationPageId(row.target_page_id), title_override: navigationTitleOverride(row.title_override) };
+    if (type === 'group') return { ...row, target_type: 'group', href: null, target_page_id: null, title_override: null, parent_id: row.parent_id ?? null };
+    if (type === 'external' || type === 'legacy') return { ...row, target_type: type, target_page_id: null, title_override: null, parent_id: row.parent_id ?? null };
+    if (type === 'page') return { ...row, target_type: 'page', target_page_id: positiveNavigationPageId(row.target_page_id), title_override: navigationTitleOverride(row.title_override), parent_id: row.parent_id ?? null };
     return { ...row };
   }) };
 }
@@ -39,6 +41,8 @@ export function validateContentReferences(content = {}) {
   const pages = Array.isArray(content.pages) ? content.pages : [];
   const pagesById = new Map(pages.map((p) => [Number(p.id), p]));
   const errors = [], warnings = [];
+  const hierarchy = validateNavigationHierarchy(content.navigation || [], { pagesById });
+  if (!hierarchy.ok) errors.push(...hierarchy.errors.map((e)=>({ code:e.code, message:`Hibás menühierarchia: ${e.code}`, ...errorBase(e.item) })));
   for (const item of content.navigation || []) {
     const status = statusOf(item.status);
     if (status === 'archived') continue;
@@ -46,6 +50,7 @@ export function validateContentReferences(content = {}) {
     if (!hasOwn(item, 'target_type')) { warnings.push({ code: 'NAVIGATION_LEGACY_TARGET', message: `Örökölt menüpont cél maradt publikálva: ${labelOf(item)}.`, ...errorBase(item) }); continue; }
     const type = rawTargetType(item.target_type);
     if (!targetTypes.has(type)) { errors.push({ code: 'NAVIGATION_TARGET_TYPE_INVALID', message: `A publikált menüpont cél típusa hibás: ${labelOf(item)}.`, ...errorBase(item) }); continue; }
+    if (type === 'group') { if (hasValue(item.href) || hasValue(item.target_page_id) || hasValue(item.title_override)) errors.push({ code: 'NAVIGATION_GROUP_TARGET_INVALID', message: `Csoportosító menüpontnak nem lehet célja: ${labelOf(item)}.`, ...errorBase(item) }); continue; }
     if (type === 'legacy') {
       if (hasValue(item.target_page_id) || hasValue(item.title_override)) errors.push({ code: 'NAVIGATION_TARGET_TYPE_INVALID', message: `Legacy menüponthoz nem tartozhat oldalazonosító vagy felirat override: ${labelOf(item)}.`, ...errorBase(item) });
       else warnings.push({ code: 'NAVIGATION_LEGACY_TARGET', message: `Örökölt menüpont cél maradt publikálva: ${labelOf(item)}.`, ...errorBase(item) });

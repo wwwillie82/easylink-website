@@ -49,17 +49,20 @@ CREATE TABLE IF NOT EXISTS site_content_blocks (
 CREATE TABLE IF NOT EXISTS site_navigation_items (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
   title VARCHAR(255) NOT NULL,
-  href VARCHAR(512) NOT NULL UNIQUE,
+  href VARCHAR(512) NULL UNIQUE,
   target_type VARCHAR(32) NOT NULL DEFAULT 'legacy',
   target_page_id BIGINT UNSIGNED NULL,
   title_override VARCHAR(255) NULL,
+  parent_id BIGINT UNSIGNED NULL,
   sort_order INT NOT NULL DEFAULT 0,
   status VARCHAR(32) NOT NULL DEFAULT 'published',
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   INDEX idx_site_navigation_items_status_order (status, sort_order),
+  INDEX idx_site_navigation_items_parent_status_order (parent_id, status, sort_order, id),
   INDEX idx_site_navigation_items_target_page (target_page_id),
-  CONSTRAINT fk_site_navigation_items_target_page FOREIGN KEY (target_page_id) REFERENCES site_pages(id) ON DELETE RESTRICT
+  CONSTRAINT fk_site_navigation_items_target_page FOREIGN KEY (target_page_id) REFERENCES site_pages(id) ON DELETE RESTRICT,
+  CONSTRAINT fk_site_navigation_items_parent FOREIGN KEY (parent_id) REFERENCES site_navigation_items(id) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS site_settings (`key` VARCHAR(160) NOT NULL PRIMARY KEY, value JSON NULL, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

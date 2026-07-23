@@ -140,7 +140,7 @@ assert.match(html, /function menuMsg[\s\S]*textContent/);
 assert.match(html, /!e\.target\.matches\('\[data-role=\"target-type\"\]'\)/);
 assert.match(html, /previousState=\{\.\.\.rawRowState\(row\),target_type:row\.dataset\.targetMode\}/);
 
-assert.match(html, /applySavedNavigationState\(j\.data\?\.navigationIds\|\|\[\],items\);state\.markSaved\(\)/);
+assert.match(html, /applySavedNavigationState\(j\.data\?\.navigationIds\|\|\[\],items,j\.data\?\.navigationMappings\|\|\[\]\);state\.markSaved\(\)/);
 assert.match(html, /function applySavedNavigationState\(ids=\[\],submittedItems=\[\]\)/);
 {
   const { row, select, idInput, idLabel, help } = fakeRow({ id: '12', initialTarget: 'legacy' });

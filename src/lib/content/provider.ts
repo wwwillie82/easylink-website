@@ -1,7 +1,7 @@
 import { staticNavigationItems, staticPages, getStaticPageByRoute, type SitePage } from './static';
 import { buildPublicRouteIndex, normalizePublicRoute, publishedNonHomePages, type PublishedPublicPagesResult, type PublicContentMode } from './public-pages';
 
-type NavigationItem = { title: string; href: string; sortOrder: number; status: string };
+type NavigationItem = { title: string; href?: string; sortOrder: number; status: string; target_type?: string; children?: NavigationItem[] };
 type DbReader = {
   getPageByRoute(route: string): Promise<SitePage | null>;
   getPageByRouteAny?: (route: string) => Promise<SitePage | null>;

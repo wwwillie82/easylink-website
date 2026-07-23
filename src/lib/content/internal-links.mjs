@@ -1,4 +1,4 @@
-export const navigationTargetTypes = Object.freeze(['legacy', 'page', 'external']);
+export const navigationTargetTypes = Object.freeze(['legacy', 'page', 'external', 'group']);
 const targetTypeSet = new Set(navigationTargetTypes);
 
 export function normalizeNavigationTargetType(value) {
@@ -55,6 +55,7 @@ export function normalizeNavigationTargetFields(row = {}, { validPageIds } = {})
     if (!pageId || (validPageIds && !validPageIds.has(pageId))) return { target_type: 'legacy', target_page_id: null, title_override: null };
     return { target_type: 'page', target_page_id: pageId, title_override: navigationTitleOverride(row.title_override) };
   }
+  if (targetType === 'group') return { target_type: 'group', target_page_id: null, title_override: null };
   if (targetType === 'external') return { target_type: 'external', target_page_id: null, title_override: null };
   return { target_type: 'legacy', target_page_id: null, title_override: null };
 }
@@ -67,6 +68,7 @@ export function resolveNavigationItem(row = {}, page = null) {
     sortOrder: row.sortOrder ?? row.sort_order ?? 0,
     status: row.status ?? 'draft',
   };
+  if (targetType === 'group') return { ...legacy, href: '', target_type: 'group', children: row.children || [] };
   if (targetType !== 'page') return legacy;
   if (!page?.route) return legacy;
   const override = navigationTitleOverride(row.title_override);
