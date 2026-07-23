@@ -40,7 +40,7 @@ export function createAdminServer({ repo, env = process.env, publishService } = 
       }
       return json(res, 200, { ok: true, data: { id: Number(data.id), title: data.title || '' }, publish });
     } catch (error) {
-      if (error.code === 'NAVIGATION_ITEM_HAS_CHILDREN') return apiError(res, 409, error.code, error.message, error.details);
+      if (error.status === 409) return apiError(res, 409, error.code || 'NAVIGATION_DELETE_CONFLICT', error.message, error.details);
       if (error.status === 400 || error.code === 'VALIDATION_ERROR') return apiError(res, 400, error.code || 'INVALID_NAVIGATION_DELETE', error.message);
       return apiError(res, 500, 'NAVIGATION_DELETE_FAILED', error.message || 'A menüpont törlése sikertelen.');
     }
