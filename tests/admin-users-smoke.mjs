@@ -17,10 +17,12 @@ import {
 } from '../src/lib/admin/users.mjs';
 import {
   baseAdminUrl,
+  confirmPasswordReset,
   GENERIC_RESET_MESSAGE,
   issuePasswordReset,
   requestPasswordReset,
   RESET_EXPIRES_MINUTES,
+  RESET_PASSWORD_MIN_LENGTH,
   tokenHash as resetTokenHash,
 } from '../src/lib/admin/password-reset.mjs';
 import { tokenHash as authTokenHash } from '../src/lib/admin/auth.mjs';
@@ -67,9 +69,24 @@ assert.equal(normalizedPublic.permissions.users.canSave, true);
 assert.equal(Array.isArray(normalizedPublic.permissions), false);
 
 assert.equal(RESET_EXPIRES_MINUTES, 60);
+assert.equal(RESET_PASSWORD_MIN_LENGTH, 8);
 assert.match(resetTokenHash('secret'), /^[a-f0-9]{64}$/);
 assert.equal(baseAdminUrl({ SITE_ADMIN_BASE_URL: 'https://site-dev.easylink.hu/' }), 'https://site-dev.easylink.hu');
 assert.throws(() => baseAdminUrl({}), (error) => error.code === 'BASE_URL_NOT_CONFIGURED');
+
+let consumedPasswordHash = '';
+await assert.rejects(
+  confirmPasswordReset(
+    { async consumeAdminPasswordResetToken() { throw new Error('must not be called'); } },
+    { token: 'token', password: '1234567', password_confirm: '1234567' },
+  ),
+  (error) => error.code === 'INVALID_RESET_CONFIRM',
+);
+await confirmPasswordReset(
+  { async consumeAdminPasswordResetToken(_hash, passwordHash) { consumedPasswordHash = passwordHash; } },
+  { token: 'token', password: '12345678', password_confirm: '12345678' },
+);
+assert.match(consumedPasswordHash, /^scrypt:/);
 
 const resetEvents = [];
 const resetRepo = {
@@ -124,8 +141,11 @@ assert.match(userHtml, /A felhasználó létrejött, de/);
 assert.doesNotMatch(userHtml, /password_hash|token_hash/);
 assert.doesNotMatch(usersHtml({ permissions: { users: {} } }), /<button id="newUser">/);
 assert.match(forgotPasswordHtml(), /Vissza a belépéshez/);
-assert.match(resetPasswordHtml('abc'), /minlength="12"/);
+assert.match(resetPasswordHtml('abc'), /minlength="8"/);
 assert.match(loginHtml(), /\/admin\/forgot-password/);
+
+const mailerSource = await readFile(new URL('../src/lib/admin/mailer.mjs', import.meta.url), 'utf8');
+assert.match(mailerSource, /easylink\.hu weblap admin felületéhez/);
 
 const schema = await readFile(new URL('../src/lib/db/schema.sql', import.meta.url), 'utf8');
 assert.match(schema, /CREATE TABLE IF NOT EXISTS site_admin_password_reset_tokens/);
