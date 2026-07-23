@@ -24,6 +24,18 @@ function minimalCtaBlock(block) {
   };
 }
 
+function smokeText(value) {
+  return String(value ?? '').trim();
+}
+
+function pageSmokeContent(page = {}) {
+  const heroTitle = smokeText(page.hero_title ?? page.heroTitle) || smokeText(page.title);
+  return {
+    heroTitle,
+    heroDescription: smokeText(page.hero_description ?? page.heroDescription),
+  };
+}
+
 export function buildPublicSmokeMetadataFromSnapshot(content = {}) {
   const settings = parseSiteSettingsRows(content.settings || []);
   const blocksByPageId = new Map();
@@ -39,9 +51,15 @@ export function buildPublicSmokeMetadataFromSnapshot(content = {}) {
       const role = publicRendererPageCtaRole(page);
       const blocks = blocksByPageId.get(Number(page.id ?? 0)) || page.blocks || [];
       const ctaBlock = resolvePageCtaBlock(blocks, { role });
-      return { route: page.route, type: page.type, ctaRole: role, ctaBlock: minimalCtaBlock(ctaBlock) };
+      return {
+        route: page.route,
+        type: page.type,
+        ctaRole: role,
+        ctaBlock: minimalCtaBlock(ctaBlock),
+        smokeContent: pageSmokeContent(page),
+      };
     });
-  return { version: 1, source: 'admin-publish-snapshot', defaultCta: settings.defaultCta, pages };
+  return { version: 2, source: 'admin-publish-snapshot', defaultCta: settings.defaultCta, pages };
 }
 
 export async function writePublicSmokeMetadata(releasePath, content) {

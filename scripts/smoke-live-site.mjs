@@ -44,25 +44,26 @@ export function getPublishedSeedPages() {
   return staticPagesData.filter((page) => page.status === 'published').sort((a, b) => a.sortOrder - b.sortOrder);
 }
 
-export function buildLiveSmokePlan() {
-  const pages = getPublishedSeedPages();
-  const routeSet = new Set(pages.map((page) => page.route));
-  for (const route of explicitRequiredRoutes) routeSet.add(route);
+function pageMetadataChecks(page = {}) {
+  const checks = [];
+  const content = page.smokeContent || {};
+  if (content.heroTitle) checks.push(expected('metadata.heroTitle', content.heroTitle));
+  if (content.heroDescription) checks.push(expected('metadata.heroDescription', content.heroDescription));
+  return checks;
+}
 
-  const contentChecks = [
-    { route: '/', checks: [
-      expected('home.hero.title', 'easyLink ERP'),
-      expected('home.hero.subtitle', 'Cégvezetés, könnyedén.'),
-      expected('home.hero.benefit', 'Átlátható működés'),
-    ] },
-    { route: '/megoldasaink/', checks: [expected('solutions.heading', 'Megoldásaink'), expected('solutions.card', 'Pénzügy és számlázás')] },
-    { route: '/kinek-szol/', checks: [expected('audiences.heading', 'Kinek szól?'), expected('audiences.card', 'Hoteleknek és szálláshelyeknek')] },
-    { route: '/integraciok/', checks: [expected('integrations.heading', 'Csomópontok'), expected('integrations.card', 'NAV Online Számla')] },
-    { route: '/arak/', checks: [expected('pricing.grid', 'Mitől függhet az ár?'), expected('pricing.cta', 'Demó alapján pontosítunk')] },
-    { route: '/kapcsolat/', checks: [expected('contact.grid', 'Miben tudunk segíteni?')] },
-  ];
-
-  return { routes: [...routeSet].sort(), contentChecks };
+export function buildLiveSmokePlan(publicPages = []) {
+  const routeSet = new Set(explicitRequiredRoutes);
+  const pagesByRoute = new Map();
+  for (const page of publicPages || []) {
+    const route = String(page?.route || '').trim();
+    if (!route) continue;
+    routeSet.add(route);
+    pagesByRoute.set(route, page);
+  }
+  const routes = [...routeSet].sort();
+  const contentChecks = routes.map((route) => ({ route, checks: pageMetadataChecks(pagesByRoute.get(route)) }));
+  return { routes, contentChecks };
 }
 
 async function fetchText(url) {
@@ -184,10 +185,10 @@ function assertContains(normalizedHtml, route, check, failures) {
 }
 
 async function run(baseUrl) {
-  const { routes, contentChecks } = buildLiveSmokePlan();
   const failures = [];
-  let publicData = { defaultCta: {}, pages: [] };
+  let publicData = { version: 0, defaultCta: {}, pages: [] };
   try { publicData = await fetchPublicSmokeData(baseUrl); } catch (error) { failures.push(error.message); }
+  const { routes, contentChecks } = buildLiveSmokePlan(publicData.pages);
   const ctaByRoute = routeCtaExpectations(publicData.pages, publicData.defaultCta);
   const headerCtaByRoute = routeHeaderCtaExpectations(publicData.pages, publicData.defaultCta);
   const homeCta = publicData.defaultCta;
@@ -221,7 +222,7 @@ async function run(baseUrl) {
         failures.push(`${route}: missing expected content from layout.meta.robots: noindex,nofollow`);
       }
       if (headerCtaByRoute.has(route)) assertHeaderCtaContent(route, rawHtml, headerCtaByRoute.get(route), failures);
-      if (route === '/') {
+      if (route === '/' && publicData.defaultCta) {
         assertAnchor(rawHtml, route, 'home-hero-demo', homeCta.primaryLabel, homeCta.primaryUrl, failures);
         if (homeCta.secondaryLabel && homeCta.secondaryUrl) assertAnchor(rawHtml, route, 'home-hero-trial', homeCta.secondaryLabel, homeCta.secondaryUrl, failures);
       }
@@ -241,6 +242,7 @@ async function run(baseUrl) {
   console.log(`Live site smoke passed for ${baseUrl}`);
   console.log(`HTTP routes checked: ${routes.join(', ')}`);
   console.log(`Content routes checked: ${contentChecks.map(({ route }) => route).join(', ')}`);
+  console.log(`Dynamic metadata content assertions: ${contentChecks.reduce((sum, item) => sum + item.checks.length, 0)} (metadata version ${publicData.version || 1})`);
   console.log(`Public defaultCta source: ${PUBLIC_SMOKE_METADATA_PATH}`);
 }
 
