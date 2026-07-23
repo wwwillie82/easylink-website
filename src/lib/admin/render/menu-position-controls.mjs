@@ -30,6 +30,15 @@ export const menuPositionControlsScript = String.raw`(() => {
     return row.querySelector('[data-role="parent-select"]')?.value || '';
   }
 
+  function rowTitle(row) {
+    return row.querySelector('[data-header-title]')?.textContent?.trim() || 'Új menüpont';
+  }
+
+  function findRow(key) {
+    if (!key) return null;
+    return [...rows.querySelectorAll('[data-nav-item]')].find((row) => rowKey(row) === key) || null;
+  }
+
   function siblingRows(parentRef) {
     return [...rows.querySelectorAll('[data-nav-item]')]
       .filter((row) => parentKey(row) === parentRef)
@@ -84,6 +93,34 @@ export const menuPositionControlsScript = String.raw`(() => {
     }
   }
 
+  function showParentMoveFeedback(row) {
+    const parentRef = parentKey(row);
+    const parentRow = findRow(parentRef);
+    const box = document.getElementById('msg');
+    if (!box) return;
+    box.querySelector('[data-message-kind="menu-parent-move"]')?.remove();
+    const message = document.createElement('p');
+    message.className = 'msg';
+    message.dataset.messageKind = 'menu-parent-move';
+    message.setAttribute('role', 'status');
+    message.setAttribute('aria-live', 'polite');
+    message.style.background = '#fff4cc';
+    message.style.color = '#5d4300';
+    message.style.border = '1px solid #d8b85a';
+    message.textContent = parentRow
+      ? 'A(z) „' + rowTitle(row) + '” menüpont átkerült a(z) „' + rowTitle(parentRow) + '” csoport alá.'
+      : 'A(z) „' + rowTitle(row) + '” menüpont átkerült a legfelső szintre.';
+    box.appendChild(message);
+    queueMicrotask(() => {
+      row.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      row.querySelector('[data-role="parent-select"]')?.focus({ preventScroll: true });
+      row.animate?.([
+        { outline: '3px solid #d8b85a', outlineOffset: '3px' },
+        { outline: '0 solid transparent', outlineOffset: '0' },
+      ], { duration: 1600, easing: 'ease-out' });
+    });
+  }
+
   function addRow(parentRef, position) {
     const before = new Set(rows.querySelectorAll('[data-nav-item]'));
     const existingSiblings = siblingRows(parentRef);
@@ -95,6 +132,7 @@ export const menuPositionControlsScript = String.raw`(() => {
     if (parentSelect) parentSelect.value = parentRef;
     const ordered = position === 'start' ? [newRow, ...existingSiblings] : [...existingSiblings, newRow];
     setSiblingOrder(ordered);
+    newRow.dataset.suppressParentMoveFeedback = '1';
     parentSelect?.dispatchEvent(new Event('change', { bubbles: true }));
     syncGroupButtons();
     newRow.scrollIntoView({ block: 'center' });
@@ -116,6 +154,10 @@ export const menuPositionControlsScript = String.raw`(() => {
     const row = event.target.closest('[data-nav-item]');
     if (!row) return;
     if (event.target.matches('[data-role="target-type"]')) normalizeGroupTarget(row);
+    if (event.target.matches('[data-role="parent-select"]')) {
+      if (row.dataset.suppressParentMoveFeedback === '1') delete row.dataset.suppressParentMoveFeedback;
+      else showParentMoveFeedback(row);
+    }
     queueMicrotask(syncGroupButtons);
   });
 
