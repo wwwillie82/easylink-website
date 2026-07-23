@@ -6,6 +6,7 @@ import {
 import {
   layout,
   mediaPanel,
+  navHtml,
   pageForm,
 } from '../src/lib/admin/render.mjs';
 import {
@@ -76,6 +77,17 @@ let html = pageForm(pageData, {
 assertEmbeddedScriptsParse(html, 'page form');
 assert.doesNotMatch(html, /if\(f\.dataset\.canSave/, 'undefined f runtime reference removed');
 assert.doesNotMatch(html, /<option value="archived"[^>]*>Archivált<\/option>/, 'archive option hidden without archive permission');
+
+html = pageForm({ ...pageData, page: { ...basePage, status: 'archived' } }, {
+  permissions: { pages: { canSave: true, canArchive: false, canDelete: false } },
+});
+assert.match(html, /<option value="archived" selected disabled>Archivált<\/option>/, 'current archived state remains visible but cannot be selected as a new transition');
+
+html = navHtml([], [], {
+  permissions: { menu: { canSave: true, canArchive: false, canDelete: false } },
+});
+assertEmbeddedScriptsParse(html, 'menu form');
+assert.doesNotMatch(html, /value=\\"archived\\"(?![^>]*disabled)/, 'dynamic new menu rows do not expose archive without permission');
 
 html = mediaPanel({ permissions: { media: { canSave: true, canArchive: true } } });
 assertEmbeddedScriptsParse(html, 'media panel');
