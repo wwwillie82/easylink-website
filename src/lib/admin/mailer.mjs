@@ -43,7 +43,7 @@ export async function createSmtpMailer(env = process.env) {
           from: config.from,
           to,
           subject: 'Easylink admin jelszóbeállítás',
-          text: `Kedves ${displayName || 'Felhasználó'}!\n\nJelszóbeállító linket kértél az Easylink admin felülethez.\n\nLink: ${resetUrl}\n\nA link ${expiresMinutes} percig érvényes. Ha nem te kérted, hagyd figyelmen kívül ezt az üzenetet.\n\nJelszót nem küldünk e-mailben.`,
+          text: `Kedves ${displayName || 'Felhasználó'}!\n\nJelszóbeállító linket kértél az easylink.hu weblap admin felületéhez.\n\nLink: ${resetUrl}\n\nA link ${expiresMinutes} percig érvényes. Ha nem te kérted, hagyd figyelmen kívül ezt az üzenetet.\n\nJelszót nem küldünk e-mailben.`,
         });
       } catch (cause) {
         throw smtpError('SEND_FAILED', 'A jelszóbeállító e-mail küldése sikertelen.', cause);
