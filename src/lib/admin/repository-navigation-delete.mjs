@@ -31,7 +31,14 @@ export function createAdminRepository(pool) {
         const pagesById = new Map((pages || []).map((page) => [Number(page.id), page]));
         const planned = navigation.filter((row) => Number(row.id) !== id).map((row) => ({ ...row, parent_ref: row.parent_id ? `id:${row.parent_id}` : null }));
         const hierarchy = validateNavigationHierarchy(planned, { pagesById });
-        if (!hierarchy.ok) throw navigationDeleteError('NAVIGATION_DELETE_INVALID_HIERARCHY', 'A menüpont törlése érvénytelen menühierarchiát hozna létre. Előbb archiváld vagy rendezd át az érintett menüágat.', { hierarchyCode: hierarchy.errors[0]?.code || 'INVALID_NAVIGATION_HIERARCHY' });
+        if (!hierarchy.ok) {
+          const publishedEmptyGroup = hierarchy.errors.find((error) => error.code === 'NAVIGATION_PUBLISHED_EMPTY_GROUP');
+          const hierarchyCode = publishedEmptyGroup?.code || hierarchy.errors[0]?.code || 'INVALID_NAVIGATION_HIERARCHY';
+          const message = publishedEmptyGroup
+            ? 'A menüpont nem törölhető, mert a szülőcsoport egyetlen látható gyermeke. Előbb archiváld ezt a menüpontot és a szülőcsoportot, majd mentsd és élesítsd a módosítást. Ezután töröld először a gyermek menüpontot, végül az üres szülőcsoportot.'
+            : 'A menüpont törlése érvénytelen menühierarchiát hozna létre. Előbb archiváld vagy rendezd át az érintett menüágat.';
+          throw navigationDeleteError('NAVIGATION_DELETE_INVALID_HIERARCHY', message, { hierarchyCode });
+        }
         const [result] = await conn.execute('DELETE FROM site_navigation_items WHERE id=?', [id]);
         if (Number(result.affectedRows || 0) !== 1) throw new Error(`Navigation delete failed: ${id}`);
         await conn.commit();
