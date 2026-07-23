@@ -1,6 +1,6 @@
 import { createPool } from '../src/lib/db/client.mjs';
-import { createAdminRepository } from '../src/lib/admin/repository-page-delete.mjs';
-import { createAdminServer } from '../src/lib/admin/server-page-delete.mjs';
+import { createAdminRepository } from '../src/lib/admin/repository-users-hardening.mjs';
+import { createAdminServer } from '../src/lib/admin/server-users-hardening.mjs';
 
 const pool = await createPool();
 const repo = createAdminRepository(pool);
