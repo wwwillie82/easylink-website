@@ -80,7 +80,7 @@ assert.match(menuPositionControlsScript, /directChildren\(row\)\.length/);
 
 const serverSource = await readFile('src/lib/admin/server-navigation-delete.mjs', 'utf8');
 assert.match(serverSource, /api\\\/admin\\\/navigation/);
-assert.match(serverSource, /requireAuthFromRequest/);
+assert.match(serverSource, /authorizeAdminRequest/);
 assert.match(serverSource, /repo\.deleteNavigationItem/);
 assert.match(serverSource, /publisher\.publish/);
 assert.match(serverSource, /error\.status === 409/);

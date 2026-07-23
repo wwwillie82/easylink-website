@@ -2,9 +2,12 @@ import http from 'node:http';
 import path from 'node:path';
 import { createReadStream } from 'node:fs';
 import { open, readFile, stat } from 'node:fs/promises';
-import { authenticate, signSession, sessionCookie, clearSessionCookie, requireAuthFromRequest } from './auth.mjs';
+import { authenticate, createLoginSession, clearAuthCookies, sameOriginOk } from './auth.mjs';
 import { parseJsonItems, validateLoginPayload } from './validation.mjs';
 import { layout, loginHtml, mediaPanel, navHtml, pageForm, pagesTable, publishPanel, settingsPanel } from './render.mjs';
+import { authorizeAdminRequest, apiError as policyApiError } from './policy.mjs';
+import { buildPageEffectiveMutationPlan, buildBlockEffectiveMutationPlan, buildHomeAggregateEffectiveMutationPlan, buildNavigationEffectiveMutationPlan, classifyMediaMutation, hasAction } from './permissions.mjs';
+import { parsedBody } from './request-body.mjs';
 import { buildPreviewRelease, createPublishService, PublishInProgressError } from './publish.mjs';
 import { datedMediaTarget, finalizeStagedMediaFile, isVideoType, maxRequestBytes, mediaConfig, mediaValidationError, removeFileQuietly, storagePathForPublicPath, validateMediaFile } from './media-storage.mjs';
 import { parseMediaMultipart } from './multipart-upload.mjs';
@@ -14,17 +17,15 @@ import { validateNavigationHierarchy } from '../content/navigation-hierarchy.mjs
 
 const apiError = (res, status, code, message, details) => json(res, status, { ok: false, error: { code, message, ...(details ? { details } : {}) } });
 const json = (res, status, body, headers = {}) => { res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', ...headers }); res.end(JSON.stringify(body)); };
-const html = (res, body, status = 200, current = '') => { res.writeHead(status, { 'content-type': 'text/html; charset=utf-8' }); res.end(layout(body, { current })); };
+const html = (res, body, status = 200, current = '', adminContext = null) => { res.writeHead(status, { 'content-type': 'text/html; charset=utf-8' }); res.end(layout(body, { current, adminContext })); };
 const redirect = (res, location, headers = {}) => { res.writeHead(303, { location, ...headers }); res.end(); };
-async function rawBody(req) { const chunks = []; for await (const c of req) chunks.push(c); return Buffer.concat(chunks).toString('utf8'); }
-async function body(req) { const raw = await rawBody(req); if (!raw) return {}; if (req.headers['content-type']?.includes('application/x-www-form-urlencoded')) return Object.fromEntries(new URLSearchParams(raw)); return JSON.parse(raw); }
+async function body(req) { return parsedBody(req); }
 function wantsHtml(req) { return String(req.headers.accept || '').includes('text/html'); }
 function navValidationCode(error) {
   if (error?.code === 'DUPLICATE_NAVIGATION_HREF' || /Duplikált menüpont link/i.test(String(error?.message || ''))) return 'DUPLICATE_NAVIGATION_HREF';
   if (error?.code === 'ER_DUP_ENTRY') return 'DUPLICATE_NAVIGATION_HREF';
   return 'INVALID_NAVIGATION_ITEM';
 }
-function authed(req, env) { return requireAuthFromRequest({ headers: { get: (name) => req.headers[name.toLowerCase()] || '' } }, env); }
 async function multipart(req, env) {
   const maxBytes = maxRequestBytes(env);
   const len = Number(req.headers['content-length'] || 0);
@@ -104,21 +105,27 @@ export function createAdminServer({ repo, env = process.env, publishService } = 
   return http.createServer(async (req, res) => {
     try {
       const url = new URL(req.url, 'http://localhost');
+      if ((url.pathname === '/admin' || url.pathname === '/admin/login') && req.method !== 'GET') return policyApiError(res, 405, 'METHOD_NOT_ALLOWED', 'Nem támogatott HTTP metódus.', undefined, { allow: 'GET' });
+      if (url.pathname === '/api/admin/login' && req.method !== 'POST') return policyApiError(res, 405, 'METHOD_NOT_ALLOWED', 'Nem támogatott HTTP metódus.', undefined, { allow: 'POST' });
       if ((url.pathname === '/admin' || url.pathname === '/admin/login') && req.method === 'GET') { res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); return res.end(loginHtml()); }
       if (url.pathname === '/api/admin/login' && req.method === 'POST') {
         const payload = await body(req);
         const valid = validateLoginPayload(payload);
         if (!valid.ok) return wantsHtml(req) ? (res.writeHead(400, { 'content-type': 'text/html; charset=utf-8' }), res.end(loginHtml(valid.error.message))) : json(res, 400, valid);
+        if (!sameOriginOk(req)) return apiError(res, 403, 'FORBIDDEN', 'Érvénytelen belépési kérés.');
         const user = await authenticate(repo, valid.data.email, valid.data.password);
         if (!user) return wantsHtml(req) ? (res.writeHead(401, { 'content-type': 'text/html; charset=utf-8' }), res.end(loginHtml('Hibás belépési adatok.'))) : apiError(res, 401, 'INVALID_CREDENTIALS', 'Hibás belépési adatok.');
-        const cookie = sessionCookie(signSession(user, env));
-        return wantsHtml(req) ? redirect(res, '/admin/pages', { 'set-cookie': cookie }) : json(res, 200, { ok: true, data: { user } }, { 'set-cookie': cookie });
+        const session = await createLoginSession(repo, user, env);
+        return wantsHtml(req) ? redirect(res, '/admin/pages', { 'set-cookie': session.cookies }) : json(res, 200, { ok: true, data: { user } }, { 'set-cookie': session.cookies });
       }
-      if (url.pathname === '/api/admin/logout') return redirect(res, '/admin/login', { 'set-cookie': clearSessionCookie() });
-      const user = authed(req, env);
-      if (!user) return url.pathname.startsWith('/api/') ? apiError(res, 401, 'UNAUTHENTICATED', 'Bejelentkezés szükséges.') : redirect(res, '/admin/login');
-      if (url.pathname === '/api/admin/session') return json(res, 200, { ok: true, data: { user } });
-      if (url.pathname === '/api/admin/pages') { if (req.method === 'POST') { const payload = await body(req); if (!payload.title || !payload.route) return apiError(res, 400, 'INVALID_PAGE', 'Oldalnév és URL szükséges.'); let data; try { data = await repo.createPage(payload); } catch (error) { if (error.code === 'HOME_USE_HOME_EDITOR') return apiError(res, 409, 'HOME_USE_HOME_EDITOR', error.message); if (error.status === 400 || error.code === 'VALIDATION_ERROR') return apiError(res, 400, 'INVALID_PAGE', error.message); throw error; } return json(res, 200, { ok: true, data, publish: await publishAfterSave(user, `Oldal létrehozás: ${data.id}`) }); } return json(res, 200, { ok: true, data: await repo.pages() }); }
+      if (url.pathname === '/api/admin/logout' && req.method === 'GET') return policyApiError(res, 405, 'METHOD_NOT_ALLOWED', 'Nem támogatott HTTP metódus.', undefined, { allow: 'POST' });
+      const auth = await authorizeAdminRequest({ req, res, repo, env, htmlForbidden: (ctx) => html(res, '<p class="msg err">Nincs jogosultság az oldal megtekintéséhez.</p>', 403, url.pathname, ctx) });
+      if (!auth.ok) return;
+      const adminContext = auth.context;
+      const user = adminContext.user;
+      if (url.pathname === '/api/admin/logout' && req.method === 'POST') { await repo.revokeAdminSession?.(adminContext.session.id); return redirect(res, '/admin/login', { 'set-cookie': clearAuthCookies(env) }); }
+      if (url.pathname === '/api/admin/session' && req.method === 'GET') return json(res, 200, { ok: true, data: { user, permissions: adminContext.permissions, expiresAt: adminContext.session.expiresAt } });
+      if (url.pathname === '/api/admin/pages') { if (!['GET','POST'].includes(req.method)) return apiError(res, 405, 'METHOD_NOT_ALLOWED', 'Nem támogatott HTTP metódus.'); if (req.method === 'POST') { const payload = await body(req); if (!payload.title || !payload.route) return apiError(res, 400, 'INVALID_PAGE', 'Oldalnév és URL szükséges.'); let data; try { data = await repo.createPage(payload); } catch (error) { if (error.code === 'HOME_USE_HOME_EDITOR') return apiError(res, 409, 'HOME_USE_HOME_EDITOR', error.message); if (error.status === 400 || error.code === 'VALIDATION_ERROR') return apiError(res, 400, 'INVALID_PAGE', error.message); throw error; } return json(res, 200, { ok: true, data, publish: await publishAfterSave(user, `Oldal létrehozás: ${data.id}`) }); } return json(res, 200, { ok: true, data: await repo.pages() }); }
 
       if (/\/admin\/pages\/\d+\/home\/preview\/.*(?:%2e|%2f|\.\.)/i.test(req.url || '') || /^\/admin\/pages\/\d+\/home(?!\/preview|$)/.test(url.pathname)) return apiError(res, 400, 'INVALID_PREVIEW_PATH', 'Hibás előnézeti útvonal.');
       const previewMatch = /^\/admin\/pages\/(\d+)\/home\/preview(?:\/(.*))?$/.exec(url.pathname);
@@ -140,8 +147,9 @@ export function createAdminServer({ repo, env = process.env, publishService } = 
         catch { return html(res, '<p class="msg err">Előnézeti fájl nem található.</p>', 404); }
       }
       const homeApiMatch = /^\/api\/admin\/pages\/(\d+)\/home$/.exec(url.pathname);
+      if (homeApiMatch && !['PUT'].includes(req.method)) return apiError(res, 405, 'METHOD_NOT_ALLOWED', 'Nem támogatott HTTP metódus.');
       if (homeApiMatch && req.method === 'PUT') {
-        try { const data = await repo.updateHomePageAtomic(homeApiMatch[1], await body(req)); return json(res, 200, { ok: true, data, warnings: data.warnings || [] }); }
+        try { const payload = await body(req); const current = await repo.page(homeApiMatch[1]); const cls = buildHomeAggregateEffectiveMutationPlan(current, payload); if (cls.noOp) return apiError(res, 400, 'INVALID_EMPTY_MUTATION', 'Nincs menthető változás.'); if ((cls.needsSave && !hasAction(adminContext.permissions, 'pages', 'save')) || (cls.needsArchive && !hasAction(adminContext.permissions, 'pages', 'archive'))) return apiError(res, 403, 'FORBIDDEN', 'Nincs jogosultság a művelethez.'); const data = await repo.updateHomePageAtomic(homeApiMatch[1], cls.nextPayload || payload); return json(res, 200, { ok: true, data, warnings: data.warnings || [] }); }
         catch (error) { const code = error.code || 'INVALID_HOME'; const status = code === 'HOME_EDIT_CONFLICT' ? 409 : (error.status || 400); return apiError(res, status, code, error.message || 'Hibás főoldal tartalom.', error.details); }
       }
       if (url.pathname.startsWith('/api/admin/pages/')) {
@@ -149,22 +157,28 @@ export function createAdminServer({ repo, env = process.env, publishService } = 
         const page = await repo.page(id);
         if (!page) return apiError(res, 404, 'PAGE_NOT_FOUND', 'Az oldal nem található.');
         if (req.method === 'GET') return json(res, 200, { ok: true, data: page });
-        try { await repo.updatePage(id, await body(req)); } catch (error) { if (error.code === 'HOME_USE_HOME_EDITOR') return apiError(res, 409, 'HOME_USE_HOME_EDITOR', error.message); if (error.code === 'HOME_CANONICAL_USE_HOME_EDITOR') return apiError(res, 409, 'HOME_CANONICAL_USE_HOME_EDITOR', error.message); if (error.code === 'PAGE_IN_USE') return apiError(res, 409, 'PAGE_IN_USE', error.message, error.details); if (error.code === 'DUPLICATE_NAVIGATION_HREF') return apiError(res, 409, 'DUPLICATE_NAVIGATION_HREF', error.message, error.details); if (error.status === 400 || error.code === 'VALIDATION_ERROR') return apiError(res, 400, 'INVALID_PAGE', error.message); throw error; }
+        if (!['PUT','PATCH'].includes(req.method)) return apiError(res, 405, 'METHOD_NOT_ALLOWED', 'Nem támogatott HTTP metódus.');
+        try { const payload = await body(req); const cls = buildPageEffectiveMutationPlan(page.page || page, payload); if (cls.noOp) return apiError(res, 400, 'INVALID_EMPTY_MUTATION', 'Nincs menthető változás.'); if ((cls.needsSave && !hasAction(adminContext.permissions, 'pages', 'save')) || (cls.needsArchive && !hasAction(adminContext.permissions, 'pages', 'archive'))) return apiError(res, 403, 'FORBIDDEN', 'Nincs jogosultság a művelethez.'); await repo.updatePage(id, cls.next || payload); } catch (error) { if (error.code === 'HOME_USE_HOME_EDITOR') return apiError(res, 409, 'HOME_USE_HOME_EDITOR', error.message); if (error.code === 'HOME_CANONICAL_USE_HOME_EDITOR') return apiError(res, 409, 'HOME_CANONICAL_USE_HOME_EDITOR', error.message); if (error.code === 'PAGE_IN_USE') return apiError(res, 409, 'PAGE_IN_USE', error.message, error.details); if (error.code === 'DUPLICATE_NAVIGATION_HREF') return apiError(res, 409, 'DUPLICATE_NAVIGATION_HREF', error.message, error.details); if (error.status === 400 || error.code === 'VALIDATION_ERROR') return apiError(res, 400, 'INVALID_PAGE', error.message); throw error; }
         return json(res, 200, { ok: true, publish: await publishAfterSave(user, `Oldal mentés: ${id}`) });
       }
       if (url.pathname === '/api/admin/blocks' && req.method === 'POST') {
         let payload;
         try { payload = await body(req); parseJsonItems(payload.items); }
         catch (error) { return apiError(res, 400, error.code || 'INVALID_BLOCK_JSON', error.message || 'Hibás JSON.'); }
+        const currentBlock = payload.id && repo.block ? await repo.block(payload.id) : null;
+        const cls = buildBlockEffectiveMutationPlan(payload.id && currentBlock ? currentBlock : null, payload);
+        if (cls.noOp) return apiError(res, 400, 'INVALID_EMPTY_MUTATION', 'Nincs menthető változás.');
+        if ((cls.needsSave && !hasAction(adminContext.permissions, 'pages', 'save')) || (cls.needsArchive && !hasAction(adminContext.permissions, 'pages', 'archive'))) return apiError(res, 403, 'FORBIDDEN', 'Nincs jogosultság a művelethez.');
         let data;
-        try { data = await repo.upsertBlock(payload); }
+        try { data = await repo.upsertBlock(cls.next || payload); }
         catch (error) { if (error.code === 'HOME_CANONICAL_USE_HOME_EDITOR') return apiError(res, 409, 'HOME_CANONICAL_USE_HOME_EDITOR', error.message); if (error.status === 400 || error.code === 'VALIDATION_ERROR') return apiError(res, 400, 'INVALID_BLOCK', error.message); throw error; }
         return json(res, 200, { ok: true, data, publish: await publishAfterSave(user, `Blokk mentés: ${payload.page_id}`) });
       }
       if (url.pathname.startsWith('/api/admin/blocks/') && req.method === 'DELETE') { try { await repo.deleteBlock(url.pathname.split('/').pop()); return json(res, 200, { ok: true, publish: await publishAfterSave(user, `Blokk inaktiválás`) }); } catch (error) { if (error.code === 'HOME_CANONICAL_USE_HOME_EDITOR') return apiError(res, 409, 'HOME_CANONICAL_USE_HOME_EDITOR', error.message); throw error; } }
-      if (url.pathname === '/api/admin/settings') { if (req.method === 'GET') return json(res, 200, { ok: true, data: await repo.getSiteSettings() }); if (req.method === 'PUT' || req.method === 'POST') { try { const data = await repo.updateSiteSettings(await body(req), env); return json(res, 200, { ok: true, data, publish: await publishAfterSave(user, 'Alapadatok mentés') }); } catch (error) { if (error.status === 400 || error.code === 'VALIDATION_ERROR') return apiError(res, 400, 'INVALID_SETTINGS', error.message); throw error; } } }
-      if (url.pathname === '/api/admin/navigation') { if (req.method === 'GET') return json(res, 200, { ok: true, data: await repo.nav() }); const pages = await repo.pages(); const valid = validateNavPayload(await body(req), pages); if (!valid.ok) return json(res, valid.error?.code === 'NAVIGATION_TARGET_PAGE_NOT_PUBLISHED' ? 409 : 400, valid); let navigationIds; try { navigationIds = await repo.updateNav(valid.data); } catch (error) { if (error.code === 'NAVIGATION_TARGET_PAGE_NOT_PUBLISHED') return apiError(res, 409, 'NAVIGATION_TARGET_PAGE_NOT_PUBLISHED', error.message, error.details); if (error.status === 400 || error.code === 'VALIDATION_ERROR' || error.code === 'ER_DUP_ENTRY') return apiError(res, 400, navValidationCode(error), error.code === 'ER_DUP_ENTRY' || /Duplikált menüpont link/i.test(String(error.message || '')) ? 'Duplikált menüpont link.' : error.message); throw error; } return json(res, 200, { ok: true, data: { navigationIds: Array.from(navigationIds || []), navigationMappings: navigationIds?.navigationMappings || navigationIds?.clientMappings || [] }, publish: await publishAfterSave(user, 'Menü mentés') }); }
+      if (url.pathname === '/api/admin/settings') { if (!['GET','PUT','POST'].includes(req.method)) return apiError(res, 405, 'METHOD_NOT_ALLOWED', 'Nem támogatott HTTP metódus.'); if (req.method === 'GET') return json(res, 200, { ok: true, data: await repo.getSiteSettings() }); if (req.method === 'PUT' || req.method === 'POST') { try { const data = await repo.updateSiteSettings(await body(req), env); return json(res, 200, { ok: true, data, publish: await publishAfterSave(user, 'Alapadatok mentés') }); } catch (error) { if (error.status === 400 || error.code === 'VALIDATION_ERROR') return apiError(res, 400, 'INVALID_SETTINGS', error.message); throw error; } } }
+      if (url.pathname === '/api/admin/navigation') { if (!['GET','POST','PUT'].includes(req.method)) return apiError(res, 405, 'METHOD_NOT_ALLOWED', 'Nem támogatott HTTP metódus.'); if (req.method === 'GET') return json(res, 200, { ok: true, data: await repo.nav() }); const pages = await repo.pages(); const navPayload = await body(req); const currentNav = await repo.nav(); const navCls = buildNavigationEffectiveMutationPlan(currentNav, navPayload.items || []); if (navCls.noOp) return apiError(res, 400, 'INVALID_EMPTY_MUTATION', 'Nincs menthető változás.'); if ((navCls.needsSave && !hasAction(adminContext.permissions, 'menu', 'save')) || (navCls.needsArchive && !hasAction(adminContext.permissions, 'menu', 'archive'))) return apiError(res, 403, 'FORBIDDEN', 'Nincs jogosultság a művelethez.'); const valid = validateNavPayload(navPayload, pages); if (!valid.ok) return json(res, valid.error?.code === 'NAVIGATION_TARGET_PAGE_NOT_PUBLISHED' ? 409 : 400, valid); let navigationIds; try { navigationIds = await repo.updateNav(navCls.nextRows || valid.data); } catch (error) { if (error.code === 'NAVIGATION_TARGET_PAGE_NOT_PUBLISHED') return apiError(res, 409, 'NAVIGATION_TARGET_PAGE_NOT_PUBLISHED', error.message, error.details); if (error.status === 400 || error.code === 'VALIDATION_ERROR' || error.code === 'ER_DUP_ENTRY') return apiError(res, 400, navValidationCode(error), error.code === 'ER_DUP_ENTRY' || /Duplikált menüpont link/i.test(String(error.message || '')) ? 'Duplikált menüpont link.' : error.message); throw error; } return json(res, 200, { ok: true, data: { navigationIds: Array.from(navigationIds || []), navigationMappings: navigationIds?.navigationMappings || navigationIds?.clientMappings || [] }, publish: await publishAfterSave(user, 'Menü mentés') }); }
       if (url.pathname === '/api/admin/media') {
+        if (!['GET','POST'].includes(req.method)) return apiError(res, 405, 'METHOD_NOT_ALLOWED', 'Nem támogatott HTTP metódus.');
         if (req.method === 'GET') return json(res, 200, { ok: true, data: await repo.listMedia() });
         if (req.method === 'POST') {
           let stagedPath = '';
@@ -219,7 +233,7 @@ export function createAdminServer({ repo, env = process.env, publishService } = 
           }
         }
         if (req.method === 'PATCH' || req.method === 'PUT') {
-          try { const data = await repo.updateMedia(id, await body(req)); return data ? json(res, 200, { ok: true, data }) : apiError(res, 404, 'MEDIA_NOT_FOUND', 'A média elem nem található.'); }
+          try { const payload = await body(req); const cls = classifyMediaMutation(media, payload); if (cls.noOp) return apiError(res, 400, 'INVALID_EMPTY_MUTATION', 'Nincs menthető változás.'); if ((cls.needsSave && !hasAction(adminContext.permissions, 'media', 'save')) || (cls.needsArchive && !hasAction(adminContext.permissions, 'media', 'archive'))) return apiError(res, 403, 'FORBIDDEN', 'Nincs jogosultság a művelethez.'); const data = await repo.updateMedia(id, payload); return data ? json(res, 200, { ok: true, data }) : apiError(res, 404, 'MEDIA_NOT_FOUND', 'A média elem nem található.'); }
           catch (error) { if (error.status === 400 || error.code === 'VALIDATION_ERROR') return apiError(res, 400, 'INVALID_MEDIA', error.message); throw error; }
         }
         if (req.method === 'DELETE') { try { const data = await repo.archiveMedia(id); return data ? json(res, 200, { ok: true, data }) : apiError(res, 404, 'MEDIA_NOT_FOUND', 'A média elem nem található.'); } catch (error) { if (error.status === 400 || error.code === 'VALIDATION_ERROR') return apiError(res, 400, 'INVALID_MEDIA', error.message); throw error; } }
@@ -227,12 +241,12 @@ export function createAdminServer({ repo, env = process.env, publishService } = 
       if (url.pathname === '/api/admin/publish' && req.method === 'POST') return json(res, 200, { ok: true, publish: await publishAfterSave(user, 'Kézi újraélesítés') });
       if (url.pathname.startsWith('/api/admin/publish/rollback/') && req.method === 'POST') { const snap = await repo.publishSnapshot(url.pathname.split('/').pop()); if (!snap) return apiError(res, 404, 'SNAPSHOT_NOT_FOUND', 'Snapshot nem található.'); const preflight = validateContentReferences(snap.content_json); if (!preflight.ok) return apiError(res, 409, 'CONTENT_REFERENCE_INVALID', referenceValidationSummary(preflight), preflight); const content = normalizeSnapshotForReferenceValidation(snap.content_json); await repo.importContentSnapshot(content); return json(res, 200, { ok: true, publish: await publishAfterSave(user, `Rollback: ${snap.id}`) }); }
       if (url.pathname === '/admin/dashboard') return redirect(res, '/admin/pages');
-      if (url.pathname === '/admin/publish') return html(res, publishPanel({ snapshots: await repo.publishSnapshots(20) }), 200, '/admin/publish');
-      if (url.pathname === '/admin/pages') return html(res, pagesTable(await repo.pages()), 200, '/admin/pages');
-      if (url.pathname.startsWith('/admin/pages/')) { const page = await repo.page(url.pathname.split('/').pop()); return page ? html(res, pageForm(page), 200, '/admin/pages') : html(res, '<p class="msg err">Az oldal nem található.</p>', 404); }
-      if (url.pathname === '/admin/menu') return html(res, navHtml(await repo.nav(), await repo.pages()), 200, '/admin/menu');
-      if (url.pathname === '/admin/media') return html(res, mediaPanel({ maxBytes: mediaConfig(env).maxBytes, videoMaxBytes: mediaConfig(env).videoMaxBytes, documentMaxBytes: mediaConfig(env).documentMaxBytes }), 200, '/admin/media');
-      if (url.pathname === '/admin/settings') return html(res, settingsPanel(await repo.getSiteSettings()), 200, '/admin/settings');
+      if (url.pathname === '/admin/publish') return html(res, publishPanel({ snapshots: await repo.publishSnapshots(20), permissions: adminContext.permissions }), 200, '/admin/publish', adminContext);
+      if (url.pathname === '/admin/pages') return html(res, pagesTable(await repo.pages(), { permissions: adminContext.permissions }), 200, '/admin/pages', adminContext);
+      if (url.pathname.startsWith('/admin/pages/')) { const page = await repo.page(url.pathname.split('/').pop()); return page ? html(res, pageForm(page, { permissions: adminContext.permissions }), 200, '/admin/pages', adminContext) : html(res, '<p class="msg err">Az oldal nem található.</p>', 404); }
+      if (url.pathname === '/admin/menu') return html(res, navHtml(await repo.nav(), await repo.pages(), { permissions: adminContext.permissions }), 200, '/admin/menu', adminContext);
+      if (url.pathname === '/admin/media') return html(res, mediaPanel({ maxBytes: mediaConfig(env).maxBytes, videoMaxBytes: mediaConfig(env).videoMaxBytes, documentMaxBytes: mediaConfig(env).documentMaxBytes, permissions: adminContext.permissions }), 200, '/admin/media', adminContext);
+      if (url.pathname === '/admin/settings') return html(res, settingsPanel(await repo.getSiteSettings(), { permissions: adminContext.permissions }), 200, '/admin/settings', adminContext);
       return url.pathname.startsWith('/api/') ? apiError(res, 404, 'NOT_FOUND', 'Not found') : html(res, '<p class="msg err">Nem található.</p>', 404);
     } catch (error) {
       const message = env.NODE_ENV === 'production' ? 'Szerverhiba.' : error.message;

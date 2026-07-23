@@ -2,6 +2,7 @@ import { navHtml as baseNavHtml } from './menu.mjs';
 
 export const menuPositionControlsScript = String.raw`(() => {
   const form = document.getElementById('nav-form');
+  const caps = window.menuCaps || { canSave: true, canArchive: true, canDelete: true };
   const rows = document.getElementById('nav-rows');
   const bottomButton = document.getElementById('add-nav');
   if (!form || !rows || !bottomButton || typeof bottomButton.onclick !== 'function') return;
@@ -108,7 +109,7 @@ export const menuPositionControlsScript = String.raw`(() => {
         }
       }
       const actions = row.querySelector(':scope > .admin-field-actions');
-      if (actions && !actions.querySelector('[data-delete-navigation]')) {
+      if (caps.canDelete && actions && !actions.querySelector('[data-delete-navigation]')) {
         const deleteButton = document.createElement('button');
         deleteButton.type = 'button';
         deleteButton.className = 'danger';
@@ -210,6 +211,7 @@ export const menuPositionControlsScript = String.raw`(() => {
 
   rows.addEventListener('click', async (event) => {
     const deleteButton = event.target.closest('[data-delete-navigation]');
+    if (deleteButton && !caps.canDelete) return;
     if (deleteButton) {
       const row = deleteButton.closest('[data-nav-item]');
       if (!row) return;
@@ -224,6 +226,7 @@ export const menuPositionControlsScript = String.raw`(() => {
       return;
     }
     const addButton = event.target.closest('[data-add-child]');
+    if (addButton && !caps.canSave) return;
     if (!addButton || addButton.disabled) return;
     const parentRow = addButton.closest('[data-nav-item]');
     if (!parentRow) return;
@@ -245,6 +248,6 @@ export const menuPositionControlsScript = String.raw`(() => {
   syncRowButtons();
 })();`;
 
-export function navHtml(items, pages = []) {
-  return `${baseNavHtml(items, pages)}<script>${menuPositionControlsScript}</script>`;
+export function navHtml(items, pages = [], options = {}) {
+  return `${baseNavHtml(items, pages, options)}<script>${menuPositionControlsScript}</script>`;
 }
