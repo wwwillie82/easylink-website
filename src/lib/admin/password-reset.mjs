@@ -4,6 +4,7 @@ import { createSmtpMailer } from './mailer.mjs';
 
 export const RESET_EXPIRES_MINUTES = 60;
 export const RESET_THROTTLE_MINUTES = 5;
+export const RESET_PASSWORD_MIN_LENGTH = 8;
 export const GENERIC_RESET_MESSAGE = 'Ha az e-mail-címhez aktív felhasználó tartozik, elküldtük a jelszóbeállító linket.';
 
 export const normalizeResetEmail = (value) => String(value || '').trim().toLowerCase();
@@ -98,7 +99,7 @@ export async function confirmPasswordReset(repo, payload = {}) {
   const token = String(payload.token || '').trim();
   const password = String(payload.password || '');
   const confirmation = String(payload.password_confirm ?? payload.confirmPassword ?? '');
-  if (!token || password.length < 12 || password !== confirmation) {
+  if (!token || password.length < RESET_PASSWORD_MIN_LENGTH || password !== confirmation) {
     throw resetError(400, 'INVALID_RESET_CONFIRM', 'A link vagy az új jelszó hibás.');
   }
   await repo.consumeAdminPasswordResetToken(tokenHash(token), hashPassword(password));
