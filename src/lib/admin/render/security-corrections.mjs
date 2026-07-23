@@ -5,10 +5,18 @@ import { publishPanel as basePublishPanel } from './publish.mjs';
 import { mediaPanel as baseMediaPanel, mediaPickerJs } from './media.mjs';
 import { settingsPanel as baseSettingsPanel } from './settings.mjs';
 
+const unrestrictedCapabilities = Object.freeze({
+  canSave: true,
+  canArchive: true,
+  canDelete: true,
+  canRepublish: true,
+  canRestore: true,
+});
+
 function capabilityOptions(args, scope) {
   const options = args.findLast?.((value) => value && typeof value === 'object' && value.permissions)
-    || [...args].reverse().find((value) => value && typeof value === 'object' && value.permissions)
-    || {};
+    || [...args].reverse().find((value) => value && typeof value === 'object' && value.permissions);
+  if (!options) return unrestrictedCapabilities;
   return options.permissions?.[scope] || {};
 }
 
