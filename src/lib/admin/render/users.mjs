@@ -53,7 +53,12 @@ function clientJs({ canSave, canArchive }) {
     const rows=document.getElementById('usersRows');
     const editor=document.getElementById('editor');
     const escapeHtml=(value)=>String(value??'').replace(/[&<>\"]/g,(char)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[char]));
-    const notify=(text,type='ok')=>{msg.textContent=text;msg.className='msg '+type;};
+    const notify=(text,type='ok')=>{
+      msg.textContent=text;
+      msg.className='msg admin-users-toast '+type;
+      msg.setAttribute('role',type==='err'?'alert':'status');
+      msg.setAttribute('aria-live',type==='err'?'assertive':'polite');
+    };
     const api=async(url,options={})=>{
       const headers={...(options.body?{'content-type':'application/json'}:{}),...(options.headers||{})};
       const response=await fetch(url,{...options,headers});
@@ -161,7 +166,7 @@ function clientJs({ canSave, canArchive }) {
 export function usersHtml({ permissions = {} } = {}) {
   const canSave = permissions.users?.canSave === true;
   const canArchive = permissions.users?.canArchive === true;
-  return `<section class="admin-page-header"><h2>Felhasználók</h2><p class="admin-section-description">Admin felhasználók és jogosultságok kezelése.</p></section><p id="msg" class="msg"></p>${canSave ? '<button id="newUser">Új felhasználó</button>' : ''}<section class="admin-section"><div class="admin-table-scroll"><table><thead><tr><th>Név</th><th>E-mail</th><th>Státusz</th><th>Utolsó belépés</th><th>Műveletek</th></tr></thead><tbody id="usersRows"></tbody></table></div></section><section id="editor" class="admin-section" hidden></section><script>${clientJs({ canSave, canArchive })}</script>`;
+  return `<style>#msg.admin-users-toast{position:fixed;right:24px;bottom:24px;top:auto;z-index:1000;max-width:min(520px,calc(100vw - 48px));margin:0;box-shadow:0 12px 30px #0f115940}#msg.admin-users-toast:empty{display:none}@media(max-width:680px){#msg.admin-users-toast{left:16px;right:16px;bottom:16px;max-width:none}}</style><section class="admin-page-header"><h2>Felhasználók</h2><p class="admin-section-description">Admin felhasználók és jogosultságok kezelése.</p></section><p id="msg" class="msg admin-users-toast" role="status" aria-live="polite" aria-atomic="true"></p>${canSave ? '<button id="newUser">Új felhasználó</button>' : ''}<section class="admin-section"><div class="admin-table-scroll"><table><thead><tr><th>Név</th><th>E-mail</th><th>Státusz</th><th>Utolsó belépés</th><th>Műveletek</th></tr></thead><tbody id="usersRows"></tbody></table></div></section><section id="editor" class="admin-section" hidden></section><script>${clientJs({ canSave, canArchive })}</script>`;
 }
 
 export function forgotPasswordHtml() {
