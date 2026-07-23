@@ -17,7 +17,7 @@ export const adminNavItems = Object.freeze([
   { scope: 'settings', href: '/admin/settings', label: 'Alapadatok', u1: true },
   { scope: 'publish', href: '/admin/publish', label: 'Korábbi élesítések', u1: true },
   { scope: 'users', href: '/admin/users', label: 'Felhasználók', u1: true },
-  { scope: 'audit', href: '/admin/audit', label: 'Napló', u1: false },
+  { scope: 'audit', href: '/admin/audit', label: 'Napló', u1: true },
 ]);
 
 const empty = () => ({ canSave: false, canArchive: false, canDelete: false, canRepublish: false, canRestore: false });
@@ -125,6 +125,8 @@ export const adminRouteRules = Object.freeze([
   rule(/^\/api\/admin\/settings$/, ['GET'], 'settings'),
   rule(/^\/api\/admin\/settings$/, ['POST', 'PUT'], 'settings', 'save'),
   rule(/^\/admin\/publish$/, ['GET'], 'publish'),
+  rule(/^\/admin\/audit$/, ['GET'], 'audit'),
+  rule(/^\/api\/admin\/audit$/, ['GET'], 'audit'),
   rule(/^\/admin\/users$/, ['GET'], 'users'),
   rule(/^\/api\/admin\/users$/, ['GET'], 'users'),
   rule(/^\/api\/admin\/users$/, ['POST'], 'users', 'save'),

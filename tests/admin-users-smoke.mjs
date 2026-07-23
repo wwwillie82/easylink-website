@@ -31,7 +31,7 @@ import { loginHtml } from '../src/lib/admin/render.mjs';
 import { createAdminServer } from '../src/lib/admin/server-users-hardening.mjs';
 
 assert.equal(adminNavItems.find((item) => item.scope === 'users')?.u1, true);
-assert.equal(adminNavItems.find((item) => item.scope === 'audit')?.u1, false);
+assert.equal(adminNavItems.find((item) => item.scope === 'audit')?.u1, true);
 assert(adminRouteRules.some((rule) => rule.pattern.test('/admin/users') && rule.scope === 'users'));
 assert(adminRouteRules.some((rule) => rule.pattern.test('/api/admin/password-reset/request') && rule.public));
 
