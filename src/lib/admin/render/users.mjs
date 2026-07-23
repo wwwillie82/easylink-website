@@ -1,9 +1,172 @@
 import { esc } from './utils.mjs';
 import { adminScopes, scopeActions } from '../permissions.mjs';
-const labels={pages:'Oldalak',menu:'Menü',media:'Média',settings:'Alapadatok',publish:'Korábbi élesítések',users:'Felhasználók',audit:'Napló'};
-const actionLabels={save:'Mentés',archive:'Archiválás',delete:'Törlés',republish:'Újraélesítés',restore:'Visszaállítás'};
-export function usersHtml({ permissions={} }={}) { const canSave=permissions.users?.canSave; const canArchive=permissions.users?.canArchive; return `<section class="admin-page-header"><h2>Felhasználók</h2><p class="admin-section-description">Admin felhasználók és jogosultságok kezelése.</p></section><p id="msg" class="msg"></p>${canSave?'<button id="newUser">Új felhasználó</button>':''}<section class="admin-section"><div class="admin-table-scroll"><table><thead><tr><th>Név</th><th>E-mail</th><th>Státusz</th><th>Utolsó belépés</th><th>Műveletek</th></tr></thead><tbody id="usersRows"></tbody></table></div></section><section id="editor" class="admin-section" hidden></section><script>${clientJs({canSave,canArchive})}</script>`; }
-function matrixHtml(u, editable){return `<table><thead><tr><th>Terület</th><th>Hozzáférés</th><th>Műveletek</th></tr></thead><tbody>${adminScopes.map(s=>`<tr><td>${labels[s]}</td><td><label><input type="checkbox" data-scope="${s}" ${u.permissions?.[s]?'checked':''} ${editable?'':'disabled'}> Olvasás</label></td><td>${scopeActions[s].filter(a=>!(s==='media'&&a==='delete')).map(a=>`<label><input type="checkbox" data-action="${s}.${a}" ${u.permissions?.[s]?.[{save:'canSave',archive:'canArchive',delete:'canDelete',republish:'canRepublish',restore:'canRestore'}[a]]?'checked':''} ${editable?'':'disabled'}> ${s==='users'&&a==='archive'?'Letiltás / session-visszavonás':actionLabels[a]}</label>`).join('')}</td></tr>`).join('')}</tbody></table>`}
-function clientJs(opts){const scopes=adminScopes.map(s=>({scope:s,label:labels[s],actions:scopeActions[s].filter(a=>!(s==='media'&&a==='delete')).map(a=>({action:a,label:s==='users'&&a==='archive'?'Letiltás / session-visszavonás':actionLabels[a],key:{save:'canSave',archive:'canArchive',delete:'canDelete',republish:'canRepublish',restore:'canRestore'}[a]}))}));return `(()=>{const canSave=${!!opts.canSave},canArchive=${!!opts.canArchive},scopes=${JSON.stringify(scopes)},msg=document.getElementById('msg'),rows=document.getElementById('usersRows'),ed=document.getElementById('editor');const esc=s=>String(s??'').replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));const say=(t,e=false)=>{msg.textContent=t;msg.className='msg '+(e?'err':'ok')};const api=async(u,o={})=>{const r=await fetch(u,{headers:{'content-type':'application/json'},...o});const j=await r.json().catch(()=>({ok:false,error:{message:'Hibás válasz'}}));if(!r.ok||j.ok===false)throw new Error(j.error?.message||'Hiba');return j};function matrix(u){return '<table><thead><tr><th>Terület</th><th>Hozzáférés</th><th>Műveletek</th></tr></thead><tbody>'+scopes.map(s=>'<tr><td>'+s.label+'</td><td><label><input type="checkbox" data-scope="'+s.scope+'" '+(u.permissions&&u.permissions[s.scope]?'checked':'')+' '+(canSave?'':'disabled')+'> Olvasás</label></td><td>'+s.actions.map(a=>'<label><input type="checkbox" data-action="'+s.scope+'.'+a.action+'" '+(u.permissions&&u.permissions[s.scope]&&u.permissions[s.scope][a.key]?'checked':'')+' '+(canSave?'':'disabled')+'> '+a.label+'</label>').join('')+'</td></tr>').join('')+'</tbody></table>'}async function load(){const j=await api('/api/admin/users');rows.innerHTML=j.data.map(u=>'<tr><td>'+esc(u.display_name)+'</td><td>'+esc(u.email)+'</td><td>'+(u.status==='active'?'Aktív':'Letiltott')+'</td><td>'+(u.last_login_at||'-')+'</td><td><button data-edit="'+u.id+'">Szerkesztés</button> '+(canArchive?'<button class="danger" data-revoke="'+u.id+'">Összes munkamenet visszavonása</button>':'')+' '+(canSave?'<button data-reset="'+u.id+'">Jelszóbeállító link újraküldése</button>':'')+'</td></tr>').join('')}function collect(){const p={};ed.querySelectorAll('[data-scope]').forEach(i=>{if(i.checked)p[i.dataset.scope]={canSave:false,canArchive:false,canDelete:false,canRepublish:false,canRestore:false}});ed.querySelectorAll('[data-action]').forEach(i=>{const [s,a]=i.dataset.action.split('.');const k={save:'canSave',archive:'canArchive',delete:'canDelete',republish:'canRepublish',restore:'canRestore'}[a];if(p[s]&&i.checked)p[s][k]=true});return{display_name:ed.querySelector('[name=display_name]').value,email:ed.querySelector('[name=email]').value,status:ed.querySelector('[name=status]').value,permissions:p}}async function edit(id){const u=id?(await api('/api/admin/users/'+id)).data:{id:'',display_name:'',email:'',status:'active',permissions:{}};ed.hidden=false;ed.innerHTML='<h3>'+(id?'Felhasználó szerkesztése':'Új felhasználó')+'</h3><label>Megjelenített név<input name="display_name" value="'+esc(u.display_name||'')+'" '+(canSave?'':'disabled')+'></label><label>E-mail<input name="email" type="email" value="'+esc(u.email||'')+'" '+(canSave?'':'disabled')+'></label><label>Státusz<select name="status" '+(canSave||canArchive?'':'disabled')+'><option value="active">Aktív</option><option value="disabled">Letiltott</option></select></label>'+matrix(u)+'<p class="toolbar">'+(canSave?'<button id="saveUser">Mentés</button>':'')+'</p>';ed.querySelector('[name=status]').value=u.status||'active';ed.querySelectorAll('[data-scope]').forEach(cb=>cb.addEventListener('change',()=>{if(!cb.checked)ed.querySelectorAll('[data-action^="'+cb.dataset.scope+'."]').forEach(a=>a.checked=false)}));ed.querySelector('#saveUser')?.addEventListener('click',async()=>{try{await api(id?'/api/admin/users/'+id:'/api/admin/users',{method:id?'PATCH':'POST',body:JSON.stringify(collect())});say('Mentve.');await load()}catch(e){say(e.message,true)}})}document.getElementById('newUser')?.addEventListener('click',()=>edit(''));rows.addEventListener('click',async e=>{const b=e.target.closest('button');if(!b)return;try{if(b.dataset.edit)await edit(b.dataset.edit);if(b.dataset.revoke){const j=await api('/api/admin/users/'+b.dataset.revoke+'/revoke-sessions',{method:'POST'});if(j.data?.selfRevoked)location.href='/admin/login';else say('Munkamenetek visszavonva.')}if(b.dataset.reset){await api('/api/admin/users/'+b.dataset.reset+'/send-reset-link',{method:'POST'});say('Jelszóbeállító link elküldve.')}}catch(e){say(e.message,true)}});load().catch(e=>say(e.message,true));})();`}
-export function forgotPasswordHtml(){return `<div class="card"><h2>Elfelejtett jelszó</h2><p id="msg" class="msg"></p><form id="forgot"><label>E-mail<input name="email" type="email" required></label><button>Jelszóbeállító link kérése</button></form></div><script>forgot.addEventListener('submit',async e=>{e.preventDefault();const r=await fetch('/api/admin/password-reset/request',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:forgot.email.value})});const j=await r.json();msg.textContent=j.message||j.data?.message||'Ha az e-mail-címhez aktív felhasználó tartozik, elküldtük a jelszóbeállító linket.';msg.className='msg ok'});</script>`}
-export function resetPasswordHtml(token=''){return `<div class="card"><h2>Új jelszó beállítása</h2><p id="msg" class="msg"></p><form id="reset"><input name="token" type="hidden" value="${esc(token)}"><label>Új jelszó<input name="password" type="password" minlength="12" required></label><label>Új jelszó megerősítése<input name="password_confirm" type="password" minlength="12" required></label><button>Jelszó módosítása</button></form></div><script>reset.addEventListener('submit',async e=>{e.preventDefault();const r=await fetch('/api/admin/password-reset/confirm',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({token:reset.token.value,password:reset.password.value,password_confirm:reset.password_confirm.value})});const j=await r.json();msg.textContent=j.data?.message||j.error?.message||'Hiba';msg.className='msg '+(r.ok?'ok':'err');if(r.ok)setTimeout(()=>location.href='/admin/login',1200)});</script>`}
+import { defaultNewUserPermissions } from '../users.mjs';
+
+const scopeLabels = {
+  pages: 'Oldalak',
+  menu: 'Menü',
+  media: 'Média',
+  settings: 'Alapadatok',
+  publish: 'Korábbi élesítések',
+  users: 'Felhasználók',
+  audit: 'Napló',
+};
+
+const actionLabels = {
+  save: 'Mentés',
+  archive: 'Archiválás',
+  delete: 'Törlés',
+  republish: 'Újraélesítés',
+  restore: 'Visszaállítás',
+};
+
+const actionKeys = {
+  save: 'canSave',
+  archive: 'canArchive',
+  delete: 'canDelete',
+  republish: 'canRepublish',
+  restore: 'canRestore',
+};
+
+function clientJs({ canSave, canArchive }) {
+  const scopes = adminScopes.map((scope) => ({
+    scope,
+    label: scopeLabels[scope],
+    actions: scopeActions[scope]
+      .filter((action) => !(scope === 'media' && action === 'delete'))
+      .map((action) => ({
+        action,
+        key: actionKeys[action],
+        label: scope === 'users' && action === 'archive'
+          ? 'Letiltás / session-visszavonás'
+          : actionLabels[action],
+      })),
+  }));
+
+  return `(()=>{
+    const canSave=${Boolean(canSave)};
+    const canArchive=${Boolean(canArchive)};
+    const scopes=${JSON.stringify(scopes)};
+    const defaultPermissions=${JSON.stringify(defaultNewUserPermissions)};
+    const msg=document.getElementById('msg');
+    const rows=document.getElementById('usersRows');
+    const editor=document.getElementById('editor');
+    const escapeHtml=(value)=>String(value??'').replace(/[&<>\"]/g,(char)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[char]));
+    const notify=(text,type='ok')=>{msg.textContent=text;msg.className='msg '+type;};
+    const api=async(url,options={})=>{
+      const headers={...(options.body?{'content-type':'application/json'}:{}),...(options.headers||{})};
+      const response=await fetch(url,{...options,headers});
+      const payload=await response.json().catch(()=>({ok:false,error:{message:'Hibás szerverválasz.'}}));
+      if(!response.ok||payload.ok===false)throw new Error(payload.error?.message||'A művelet sikertelen.');
+      return payload;
+    };
+    const permissionTable=(user)=>'<table><thead><tr><th>Terület</th><th>Hozzáférés</th><th>Műveletek</th></tr></thead><tbody>'
+      +scopes.map((scope)=>'<tr><td>'+scope.label+'</td><td><label><input type="checkbox" data-scope="'+scope.scope+'" '
+        +(user.permissions?.[scope.scope]?'checked ':'')+(canSave?'':'disabled ')+'> Olvasás</label></td><td>'
+        +scope.actions.map((action)=>'<label><input type="checkbox" data-action="'+scope.scope+'.'+action.action+'" '
+          +(user.permissions?.[scope.scope]?.[action.key]?'checked ':'')+(canSave?'':'disabled ')+'> '+action.label+'</label>').join('')
+        +'</td></tr>').join('')+'</tbody></table>';
+    const collectPermissions=()=>{
+      const permissions={};
+      editor.querySelectorAll('[data-scope]').forEach((input)=>{
+        if(input.checked)permissions[input.dataset.scope]={canSave:false,canArchive:false,canDelete:false,canRepublish:false,canRestore:false};
+      });
+      editor.querySelectorAll('[data-action]').forEach((input)=>{
+        const [scope,action]=input.dataset.action.split('.');
+        const key={save:'canSave',archive:'canArchive',delete:'canDelete',republish:'canRepublish',restore:'canRestore'}[action];
+        if(permissions[scope]&&input.checked)permissions[scope][key]=true;
+      });
+      return permissions;
+    };
+    const load=async()=>{
+      const result=await api('/api/admin/users');
+      rows.innerHTML=result.data.map((user)=>'<tr><td>'+escapeHtml(user.display_name)+'</td><td>'+escapeHtml(user.email)+'</td><td>'
+        +(user.status==='active'?'Aktív':'Letiltott')+'</td><td>'+escapeHtml(user.last_login_at||'-')+'</td><td><button data-edit="'+user.id+'">Szerkesztés</button> '
+        +(canArchive?'<button class="danger" data-revoke="'+user.id+'">Összes munkamenet visszavonása</button> ':'')
+        +(canSave?'<button data-reset="'+user.id+'">Jelszóbeállító link újraküldése</button>':'')+'</td></tr>').join('');
+    };
+    const edit=async(id)=>{
+      const isNew=!id;
+      const user=isNew
+        ?{id:null,display_name:'',email:'',status:'active',permissions:defaultPermissions,is_self:false}
+        :(await api('/api/admin/users/'+id)).data;
+      const canReactivate=canSave;
+      const canDisable=canArchive&&!user.is_self;
+      const statusDisabled=isNew||(!canSave&&!canArchive);
+      const activeDisabled=!isNew&&user.status==='disabled'&&!canReactivate;
+      const disabledDisabled=!isNew&&user.status==='active'&&!canDisable;
+      editor.hidden=false;
+      editor.innerHTML='<h3>'+(isNew?'Új felhasználó':'Felhasználó szerkesztése')+'</h3>'
+        +'<label>Megjelenített név<input name="display_name" value="'+escapeHtml(user.display_name||'')+'" '+(canSave?'':'disabled')+'></label>'
+        +'<label>E-mail<input name="email" type="email" value="'+escapeHtml(user.email||'')+'" '+(canSave?'':'disabled')+'></label>'
+        +'<label>Státusz<select name="status" '+(statusDisabled?'disabled':'')+'><option value="active" '+(activeDisabled?'disabled':'')+'>Aktív</option><option value="disabled" '+(disabledDisabled?'disabled':'')+'>Letiltott</option></select></label>'
+        +permissionTable(user)
+        +'<p class="toolbar">'+((isNew?canSave:(canSave||canArchive))?'<button id="saveUser">Mentés</button>':'')+'</p>';
+      const statusInput=editor.querySelector('[name=status]');
+      statusInput.value=user.status||'active';
+      editor.querySelectorAll('[data-scope]').forEach((checkbox)=>checkbox.addEventListener('change',()=>{
+        const actions=editor.querySelectorAll('[data-action^="'+checkbox.dataset.scope+'."]');
+        actions.forEach((action)=>{action.disabled=!canSave||!checkbox.checked;if(!checkbox.checked)action.checked=false;});
+      }));
+      editor.querySelectorAll('[data-scope]').forEach((checkbox)=>checkbox.dispatchEvent(new Event('change')));
+      editor.querySelector('#saveUser')?.addEventListener('click',async()=>{
+        try{
+          const payload={};
+          if(canSave){
+            payload.display_name=editor.querySelector('[name=display_name]').value;
+            payload.email=editor.querySelector('[name=email]').value;
+            payload.permissions=collectPermissions();
+          }
+          if(isNew){
+            payload.status='active';
+          }else if(statusInput.value!==user.status){
+            if(user.status==='active'&&statusInput.value==='disabled'&&!canDisable)throw new Error('Nincs jogosultság a felhasználó letiltásához.');
+            if(user.status==='disabled'&&statusInput.value==='active'&&!canReactivate)throw new Error('Nincs jogosultság a felhasználó aktiválásához.');
+            payload.status=statusInput.value;
+          }
+          if(!Object.keys(payload).length)throw new Error('Nincs menthető változás.');
+          const result=await api(isNew?'/api/admin/users':'/api/admin/users/'+id,{method:isNew?'POST':'PATCH',body:JSON.stringify(payload)});
+          if(isNew&&result.reset?.ok===false){
+            notify('A felhasználó létrejött, de a jelszóbeállító link nem ment ki: '+(result.reset.message||'küldd újra később.'),'warn');
+          }else{
+            notify('Mentve.');
+          }
+          await load();
+          if(!isNew)await edit(id);
+        }catch(error){notify(error.message,'err');}
+      });
+    };
+    document.getElementById('newUser')?.addEventListener('click',()=>edit(null));
+    rows.addEventListener('click',async(event)=>{
+      const button=event.target.closest('button');
+      if(!button)return;
+      try{
+        if(button.dataset.edit)await edit(button.dataset.edit);
+        if(button.dataset.revoke){
+          const result=await api('/api/admin/users/'+button.dataset.revoke+'/revoke-sessions',{method:'POST'});
+          if(result.data?.selfRevoked)location.href='/admin/login';
+          else notify('Munkamenetek visszavonva.');
+        }
+        if(button.dataset.reset){
+          await api('/api/admin/users/'+button.dataset.reset+'/send-reset-link',{method:'POST'});
+          notify('Jelszóbeállító link elküldve.');
+        }
+      }catch(error){notify(error.message,'err');}
+    });
+    load().catch((error)=>notify(error.message,'err'));
+  })();`;
+}
+
+export function usersHtml({ permissions = {} } = {}) {
+  const canSave = permissions.users?.canSave === true;
+  const canArchive = permissions.users?.canArchive === true;
+  return `<section class="admin-page-header"><h2>Felhasználók</h2><p class="admin-section-description">Admin felhasználók és jogosultságok kezelése.</p></section><p id="msg" class="msg"></p>${canSave ? '<button id="newUser">Új felhasználó</button>' : ''}<section class="admin-section"><div class="admin-table-scroll"><table><thead><tr><th>Név</th><th>E-mail</th><th>Státusz</th><th>Utolsó belépés</th><th>Műveletek</th></tr></thead><tbody id="usersRows"></tbody></table></div></section><section id="editor" class="admin-section" hidden></section><script>${clientJs({ canSave, canArchive })}</script>`;
+}
+
+export function forgotPasswordHtml() {
+  return `<div class="card"><h2>Elfelejtett jelszó</h2><p id="msg" class="msg"></p><form id="forgot"><label>E-mail<input name="email" type="email" required></label><button>Jelszóbeállító link kérése</button></form><p><a href="/admin/login">Vissza a belépéshez</a></p></div><script>forgot.addEventListener('submit',async(event)=>{event.preventDefault();try{const response=await fetch('/api/admin/password-reset/request',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:forgot.email.value})});const payload=await response.json();msg.textContent=payload.message||payload.data?.message||'Ha az e-mail-címhez aktív felhasználó tartozik, elküldtük a jelszóbeállító linket.';msg.className='msg ok';}catch{msg.textContent='Ha az e-mail-címhez aktív felhasználó tartozik, elküldtük a jelszóbeállító linket.';msg.className='msg ok';}});</script>`;
+}
+
+export function resetPasswordHtml(token = '') {
+  return `<div class="card"><h2>Új jelszó beállítása</h2><p id="msg" class="msg"></p><form id="reset"><input name="token" type="hidden" value="${esc(token)}"><label>Új jelszó<input name="password" type="password" minlength="12" required></label><label>Új jelszó megerősítése<input name="password_confirm" type="password" minlength="12" required></label><button>Jelszó módosítása</button></form><p><a href="/admin/login">Vissza a belépéshez</a></p></div><script>reset.addEventListener('submit',async(event)=>{event.preventDefault();const response=await fetch('/api/admin/password-reset/confirm',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({token:reset.token.value,password:reset.password.value,password_confirm:reset.password_confirm.value})});const payload=await response.json();msg.textContent=payload.data?.message||payload.error?.message||'Hiba';msg.className='msg '+(response.ok?'ok':'err');if(response.ok)setTimeout(()=>location.href='/admin/login',1200);});</script>`;
+}
