@@ -56,7 +56,7 @@ export const pageDeleteClientScript = String.raw`(() => {
     if (!button || button.disabled) return;
     const id = String(button.dataset.pageDelete || '');
     const title = String(button.dataset.pageTitle || '');
-    if (!/^\\d+$/.test(id)) return;
+    if (!/^\d+$/.test(id)) return;
     const confirmed = window.confirm(
       'Biztosan véglegesen törlöd a(z) „' + title + '” oldalt? ' +
       'Az oldal és minden hozzá tartozó tartalmi blokk törlődik az aktuális adatbázisból. ' +
