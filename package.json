@@ -17,7 +17,7 @@
     "smoke:publish": "node tests/publish-smoke.mjs",
     "smoke:header": "node tests/header-navigation-smoke.mjs",
     "smoke:live": "node scripts/smoke-live-site.mjs",
-    "smoke:composition": "node tests/public-composition-smoke.mjs && node tests/cards-block-renderer-smoke.mjs && node tests/integrations-renderer-regression-smoke.mjs && node tests/contact-renderer-admin-parity-smoke.mjs && node tests/cta-render-regression-smoke.mjs && node tests/cta-four-buttons-header-toggle-smoke.mjs",
+    "smoke:composition": "node tests/public-composition-smoke.mjs && node tests/cards-block-renderer-smoke.mjs && node tests/integrations-renderer-regression-smoke.mjs && node tests/contact-renderer-admin-parity-smoke.mjs && node tests/cta-render-regression-smoke.mjs && node tests/cta-four-buttons-header-toggle-smoke.mjs && node tests/navigation-hierarchy-smoke.mjs",
     "smoke:media-storage": "node tests/media-storage-smoke.mjs",
     "smoke:content-adopt": "node tests/content-adopt-golden-smoke.mjs",
     "admin:media-worker": "node scripts/media-worker.mjs",
