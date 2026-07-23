@@ -10,6 +10,7 @@ import { datedMediaTarget, finalizeStagedMediaFile, isVideoType, maxRequestBytes
 import { parseMediaMultipart } from './multipart-upload.mjs';
 import { isValidHttpExternalUrl, normalizeNavigationTargetType, positiveNavigationPageId } from '../content/internal-links.mjs';
 import { normalizeSnapshotForReferenceValidation, referenceValidationSummary, validateContentReferences } from '../content/reference-validation.mjs';
+import { validateNavigationHierarchy } from '../content/navigation-hierarchy.mjs';
 
 const apiError = (res, status, code, message, details) => json(res, status, { ok: false, error: { code, message, ...(details ? { details } : {}) } });
 const json = (res, status, body, headers = {}) => { res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', ...headers }); res.end(JSON.stringify(body)); };
@@ -50,7 +51,7 @@ function positiveSortOrder(value) {
 export function validateNavPayload(payload, pages = []) {
   const pageMap = new Map((pages || []).map((page) => [Number(page.id), page]));
   if (!Array.isArray(payload?.items) || payload.items.length === 0) return { ok: false, error: { code: 'INVALID_NAVIGATION_ITEMS', message: 'Legalább egy menüpont szükséges.' } };
-  const required = ['title', 'href', 'status'];
+  const required = ['title', 'status'];
   const effectiveHrefs = new Map();
   for (const [index, item] of payload.items.entries()) {
     if (!item || typeof item !== 'object') return { ok: false, error: { code: 'INVALID_NAVIGATION_ITEM', message: `Hibás menüpont: ${index + 1}.` } };
@@ -66,6 +67,10 @@ export function validateNavPayload(payload, pages = []) {
     if (!hasTargetType && (hasTargetPageId || hasTitleOverride)) return { ok: false, error: { code: 'INVALID_NAVIGATION_TARGET', message: 'A cél típusát is meg kell adni a target mezők mellé.' } };
     if (hasTargetType && normalizeNavigationTargetType(item.target_type) !== String(item.target_type).trim().toLowerCase()) return { ok: false, error: { code: 'INVALID_NAVIGATION_TARGET', message: 'Hibás menüpont cél típusa.' } };
     const targetType = hasTargetType ? normalizeNavigationTargetType(item.target_type) : 'legacy';
+    const isGroup = targetType === 'group';
+    if (isGroup) {
+      if (String(item.href || '').trim() || hasTargetPageId || hasTitleOverride) return { ok: false, error: { code: 'INVALID_NAVIGATION_TARGET', message: 'Csoportosító menüpontnak nem lehet célja.' } };
+    }
     if (hasTargetType && targetType === 'page') {
       const pageId = positiveNavigationPageId(item.target_page_id);
       if (!pageId) return { ok: false, error: { code: 'INVALID_NAVIGATION_TARGET', message: 'Belső oldal célhoz oldalazonosító szükséges.' } };
@@ -77,12 +82,15 @@ export function validateNavPayload(payload, pages = []) {
       if (page && !hasTitleOverride && String(item.title || '') !== String(page.title || '')) return { ok: false, error: { code: 'INVALID_NAVIGATION_TARGET', message: 'Örökölt feliratnál a title az oldal címe legyen.' } };
     }
     if (hasTargetType && targetType === 'external' && !isValidHttpExternalUrl(item.href)) return { ok: false, error: { code: 'INVALID_NAVIGATION_TARGET', message: 'A külső URL csak http:// vagy https:// lehet.' } };
-    if (hasTargetType && targetType !== 'page' && (hasTargetPageId || hasTitleOverride)) return { ok: false, error: { code: 'INVALID_NAVIGATION_TARGET', message: 'Legacy és külső link célhoz nem tartozhat oldalazonosító vagy menüfelirat override.' } };
-    const effectiveHref = String(item.href || '').trim();
+    if (hasTargetType && targetType !== 'page' && targetType !== 'group' && (hasTargetPageId || hasTitleOverride)) return { ok: false, error: { code: 'INVALID_NAVIGATION_TARGET', message: 'Legacy és külső link célhoz nem tartozhat oldalazonosító vagy menüfelirat override.' } };
+    if (!isGroup && String(item.href || '').trim() === '') return { ok: false, error: { code: 'INVALID_NAVIGATION_ITEM', message: 'A végpont menüpont linkje kötelező.' } };
+    const effectiveHref = isGroup ? '' : String(item.href || '').trim();
     const previousHrefIndex = effectiveHrefs.get(effectiveHref);
-    if (previousHrefIndex !== undefined) return { ok: false, error: { code: 'DUPLICATE_NAVIGATION_HREF', message: `Duplikált menüpont link (${previousHrefIndex + 1}. és ${index + 1}. sor).` } };
-    effectiveHrefs.set(effectiveHref, index);
+    if (effectiveHref && previousHrefIndex !== undefined) return { ok: false, error: { code: 'DUPLICATE_NAVIGATION_HREF', message: `Duplikált menüpont link (${previousHrefIndex + 1}. és ${index + 1}. sor).` } };
+    if (effectiveHref) effectiveHrefs.set(effectiveHref, index);
   }
+  const hierarchy = validateNavigationHierarchy(payload.items, { pagesById: pageMap });
+  if (!hierarchy.ok) return { ok: false, error: { code: hierarchy.errors[0]?.code || 'INVALID_NAVIGATION_HIERARCHY', message: 'Hibás menühierarchia.' } };
   return { ok: true, data: payload.items };
 }
 
@@ -155,7 +163,7 @@ export function createAdminServer({ repo, env = process.env, publishService } = 
       }
       if (url.pathname.startsWith('/api/admin/blocks/') && req.method === 'DELETE') { try { await repo.deleteBlock(url.pathname.split('/').pop()); return json(res, 200, { ok: true, publish: await publishAfterSave(user, `Blokk inaktiválás`) }); } catch (error) { if (error.code === 'HOME_CANONICAL_USE_HOME_EDITOR') return apiError(res, 409, 'HOME_CANONICAL_USE_HOME_EDITOR', error.message); throw error; } }
       if (url.pathname === '/api/admin/settings') { if (req.method === 'GET') return json(res, 200, { ok: true, data: await repo.getSiteSettings() }); if (req.method === 'PUT' || req.method === 'POST') { try { const data = await repo.updateSiteSettings(await body(req), env); return json(res, 200, { ok: true, data, publish: await publishAfterSave(user, 'Alapadatok mentés') }); } catch (error) { if (error.status === 400 || error.code === 'VALIDATION_ERROR') return apiError(res, 400, 'INVALID_SETTINGS', error.message); throw error; } } }
-      if (url.pathname === '/api/admin/navigation') { if (req.method === 'GET') return json(res, 200, { ok: true, data: await repo.nav() }); const pages = await repo.pages(); const valid = validateNavPayload(await body(req), pages); if (!valid.ok) return json(res, valid.error?.code === 'NAVIGATION_TARGET_PAGE_NOT_PUBLISHED' ? 409 : 400, valid); let navigationIds; try { navigationIds = await repo.updateNav(valid.data); } catch (error) { if (error.code === 'NAVIGATION_TARGET_PAGE_NOT_PUBLISHED') return apiError(res, 409, 'NAVIGATION_TARGET_PAGE_NOT_PUBLISHED', error.message, error.details); if (error.status === 400 || error.code === 'VALIDATION_ERROR' || error.code === 'ER_DUP_ENTRY') return apiError(res, 400, navValidationCode(error), error.code === 'ER_DUP_ENTRY' || /Duplikált menüpont link/i.test(String(error.message || '')) ? 'Duplikált menüpont link.' : error.message); throw error; } return json(res, 200, { ok: true, data: { navigationIds }, publish: await publishAfterSave(user, 'Menü mentés') }); }
+      if (url.pathname === '/api/admin/navigation') { if (req.method === 'GET') return json(res, 200, { ok: true, data: await repo.nav() }); const pages = await repo.pages(); const valid = validateNavPayload(await body(req), pages); if (!valid.ok) return json(res, valid.error?.code === 'NAVIGATION_TARGET_PAGE_NOT_PUBLISHED' ? 409 : 400, valid); let navigationIds; try { navigationIds = await repo.updateNav(valid.data); } catch (error) { if (error.code === 'NAVIGATION_TARGET_PAGE_NOT_PUBLISHED') return apiError(res, 409, 'NAVIGATION_TARGET_PAGE_NOT_PUBLISHED', error.message, error.details); if (error.status === 400 || error.code === 'VALIDATION_ERROR' || error.code === 'ER_DUP_ENTRY') return apiError(res, 400, navValidationCode(error), error.code === 'ER_DUP_ENTRY' || /Duplikált menüpont link/i.test(String(error.message || '')) ? 'Duplikált menüpont link.' : error.message); throw error; } return json(res, 200, { ok: true, data: { navigationIds: Array.from(navigationIds || []), navigationMappings: navigationIds?.navigationMappings || navigationIds?.clientMappings || [] }, publish: await publishAfterSave(user, 'Menü mentés') }); }
       if (url.pathname === '/api/admin/media') {
         if (req.method === 'GET') return json(res, 200, { ok: true, data: await repo.listMedia() });
         if (req.method === 'POST') {

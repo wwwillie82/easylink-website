@@ -2,6 +2,7 @@ import type { ContentBlock } from '@/content/types';
 import type { SitePage } from '@/lib/content/static';
 import { safeParseVideoConfig } from '@/lib/content/video.mjs';
 import { resolveNavigationItem } from '@/lib/content/internal-links.mjs';
+import { buildPublicNavigationTree } from '@/lib/content/navigation-hierarchy.mjs';
 
 type Pool = { query(sql: string, params?: unknown[]): Promise<[any[], unknown]>; execute(sql: string, params?: unknown[]): Promise<[any, unknown]>; end?: () => Promise<void> };
 
@@ -78,8 +79,8 @@ export function createContentRepository(pool: Pool) {
       return pages.filter((page) => page.type === 'content_page');
     },
     async listNavigation() {
-      const [rows] = await pool.query(`SELECT n.title, n.href, n.target_type, n.target_page_id, n.title_override, n.sort_order AS sortOrder, n.status, p.route AS target_route, p.title AS target_title FROM site_navigation_items n LEFT JOIN site_pages p ON p.id = n.target_page_id WHERE n.status = ? ORDER BY n.sort_order ASC, n.id ASC`, ['published']);
-      return rows.map((row) => resolveNavigationItem(row, (row.target_page_id && row.target_route ? { id: row.target_page_id, route: row.target_route, title: row.target_title } : null) as any));
+      const [rows] = await pool.query(`SELECT n.id, n.parent_id, n.title, n.href, n.target_type, n.target_page_id, n.title_override, n.sort_order, n.sort_order AS sortOrder, n.status, p.route AS target_route, p.title AS target_title FROM site_navigation_items n LEFT JOIN site_pages p ON p.id = n.target_page_id WHERE n.status = ? ORDER BY n.parent_id ASC, n.sort_order ASC, n.id ASC`, ['published']);
+      return buildPublicNavigationTree(rows.map((row) => ({ ...row, ...resolveNavigationItem(row, (row.target_page_id && row.target_route ? { id: row.target_page_id, route: row.target_route, title: row.target_title } : null) as any) }))) as any;
     },
   };
 }

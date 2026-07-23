@@ -12,6 +12,12 @@ export async function columnExists(pool, table, columnName) {
   return Boolean(rows[0]);
 }
 
+export async function columnIsNullable(pool, table, columnName) {
+  const [rows] = await pool.query('SELECT IS_NULLABLE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ? LIMIT 1', [table, columnName]);
+  if (!rows[0]) return true;
+  return String(rows[0]?.IS_NULLABLE || '').toUpperCase() === 'YES';
+}
+
 export async function foreignKeyExists(pool, table, constraintName) {
   const [rows] = await pool.query('SELECT CONSTRAINT_NAME FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND CONSTRAINT_TYPE = ? AND CONSTRAINT_NAME = ? LIMIT 1', [table, 'FOREIGN KEY', constraintName]);
   return Boolean(rows[0]);
@@ -21,11 +27,16 @@ export async function ensureNavigationTargetSchema(pool) {
   if (!(await columnExists(pool, 'site_navigation_items', 'target_type'))) await pool.query("ALTER TABLE site_navigation_items ADD COLUMN target_type VARCHAR(32) NOT NULL DEFAULT 'legacy'");
   if (!(await columnExists(pool, 'site_navigation_items', 'target_page_id'))) await pool.query('ALTER TABLE site_navigation_items ADD COLUMN target_page_id BIGINT UNSIGNED NULL');
   if (!(await columnExists(pool, 'site_navigation_items', 'title_override'))) await pool.query('ALTER TABLE site_navigation_items ADD COLUMN title_override VARCHAR(255) NULL');
-  await pool.query("UPDATE site_navigation_items SET target_type='legacy', target_page_id=NULL, title_override=NULL WHERE target_type IS NULL OR target_type NOT IN ('legacy','page','external')");
+  await pool.query("UPDATE site_navigation_items SET target_type='legacy', target_page_id=NULL, title_override=NULL WHERE target_type IS NULL OR target_type NOT IN ('legacy','page','external','group')");
   await pool.query("UPDATE site_navigation_items SET target_type='legacy', target_page_id=NULL, title_override=NULL WHERE target_type='page' AND (target_page_id IS NULL OR target_page_id <= 0 OR NOT EXISTS (SELECT 1 FROM site_pages WHERE site_pages.id = site_navigation_items.target_page_id))");
+  await pool.query("UPDATE site_navigation_items SET href=NULL, target_page_id=NULL, title_override=NULL WHERE target_type='group'");
   await pool.query("UPDATE site_navigation_items SET target_page_id=NULL, title_override=NULL WHERE target_type IN ('legacy','external')");
+  if (!(await columnExists(pool, 'site_navigation_items', 'parent_id'))) await pool.query('ALTER TABLE site_navigation_items ADD COLUMN parent_id BIGINT UNSIGNED NULL');
+  if (!(await columnIsNullable(pool, 'site_navigation_items', 'href'))) await pool.query('ALTER TABLE site_navigation_items MODIFY href VARCHAR(512) NULL');
+  if (!(await indexExists(pool, 'site_navigation_items', 'idx_site_navigation_items_parent_status_order'))) await pool.query('CREATE INDEX idx_site_navigation_items_parent_status_order ON site_navigation_items (parent_id, status, sort_order, id)');
   if (!(await indexExists(pool, 'site_navigation_items', 'idx_site_navigation_items_target_page'))) await pool.query('CREATE INDEX idx_site_navigation_items_target_page ON site_navigation_items (target_page_id)');
   if (!(await foreignKeyExists(pool, 'site_navigation_items', 'fk_site_navigation_items_target_page'))) await pool.query('ALTER TABLE site_navigation_items ADD CONSTRAINT fk_site_navigation_items_target_page FOREIGN KEY (target_page_id) REFERENCES site_pages(id) ON DELETE RESTRICT');
+  if (!(await foreignKeyExists(pool, 'site_navigation_items', 'fk_site_navigation_items_parent'))) await pool.query('ALTER TABLE site_navigation_items ADD CONSTRAINT fk_site_navigation_items_parent FOREIGN KEY (parent_id) REFERENCES site_navigation_items(id) ON DELETE RESTRICT');
 }
 
 export async function ensureMediaIndexes(pool) {

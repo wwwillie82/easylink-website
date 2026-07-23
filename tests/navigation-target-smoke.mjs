@@ -129,7 +129,10 @@ assert.match(publicRepositorySource, /LEFT JOIN site_pages p ON p\.id = n\.targe
 assert.match(publicRepositorySource, /resolveNavigationItem\(row/);
 
 const headerSource = await readFile('src/components/Header.astro', 'utf8');
-assert.match(headerSource, /siteNavigation\.map\(\(item\) => \(\s*<a href=\{item\.href\}>\s*\{item\.title\}\s*<\/a>/s);
+assert.match(headerSource, /siteNavigation\.map\(\(item: any\) => hasChildren\(item\)/);
+assert.match(headerSource, /<details class="nav-group">/);
+assert.match(headerSource, /<a href=\{item\.href\}>\{item\.title\}<\/a>/);
+assert.doesNotMatch(headerSource, /href="#"/);
 
 const adminState = { nav: [{ id: 1, title: 'Áraink', href: '/arak/', sort_order: 1, status: 'published', target_type: 'page', target_page_id: 1, title_override: 'Áraink' }], pages: [{ id: 1, route: '/arak/', title: 'Árak' }], blocks: [] };
 const adminPool = {
@@ -138,7 +141,7 @@ const adminPool = {
     if (text.startsWith('SELECT * FROM site_navigation_items WHERE id=')) return [[adminState.nav.find((n) => String(n.id) === String(params[0]))].filter(Boolean), null];
     if (text.startsWith('SELECT n.*, p.route AS target_route')) return [adminState.nav.map((n) => ({ ...n, target_route: adminState.pages.find((p) => p.id === n.target_page_id)?.route || null, target_title: adminState.pages.find((p) => p.id === n.target_page_id)?.title || null })), null];
     if (text.startsWith('SELECT * FROM site_navigation_items ORDER')) return [adminState.nav.map((n) => ({ ...n })), null];
-    if (text.startsWith('SELECT id, route, title FROM site_pages WHERE id=')) return [[adminState.pages.find((p) => String(p.id) === String(params[0]))].filter(Boolean), null];
+    if (text.startsWith('SELECT id, route, title FROM site_pages WHERE id=') || text.startsWith('SELECT id, route, title, status FROM site_pages WHERE id=')) return [[adminState.pages.find((p) => String(p.id) === String(params[0]))].filter(Boolean), null];
     if (text.startsWith('SELECT id FROM site_pages WHERE id=')) return [[adminState.pages.find((p) => String(p.id) === String(params[0]))].filter(Boolean), null];
     if (text.startsWith('SELECT * FROM site_pages WHERE id=')) return [[adminState.pages.find((p) => String(p.id) === String(params[0]))].filter(Boolean), null];
     if (text.startsWith('SELECT * FROM site_content_blocks')) return [adminState.blocks, null];
@@ -147,8 +150,9 @@ const adminPool = {
   async execute(sql, params = []) {
     const text = String(sql);
     if (text.startsWith('UPDATE site_navigation_items SET title=?, href=?, sort_order=?, status=?, target_type=')) {
-      const row = adminState.nav.find((n) => String(n.id) === String(params[7]));
-      Object.assign(row, { title: params[0], href: params[1], sort_order: params[2], status: params[3], target_type: params[4], target_page_id: params[5], title_override: params[6] });
+      const hasParent = text.includes('parent_id=?');
+      const row = adminState.nav.find((n) => String(n.id) === String(params[hasParent ? 8 : 7]));
+      Object.assign(row, { title: params[0], href: params[1], sort_order: params[2], status: params[3], target_type: params[4], target_page_id: params[5], title_override: params[6], ...(hasParent ? { parent_id: params[7] } : {}) });
       return [{ affectedRows: 1 }, null];
     }
     if (text.startsWith('UPDATE site_navigation_items SET title=?, href=?, sort_order=?, status=? WHERE id=?')) {
@@ -157,7 +161,7 @@ const adminPool = {
       return [{ affectedRows: 1 }, null];
     }
     if (text.startsWith('INSERT INTO site_navigation_items')) {
-      adminState.nav.push({ id: 2, title: params[0], href: params[1], target_type: params[2], target_page_id: params[3], title_override: params[4], sort_order: params[5], status: params[6] });
+      adminState.nav.push({ id: 2, title: params[0], href: params[1], target_type: params[2], target_page_id: params[3], title_override: params[4], parent_id: params.length > 7 ? params[5] : null, sort_order: params.length > 7 ? params[6] : params[5], status: params.length > 7 ? params[7] : params[6] });
       return [{ insertId: 2, affectedRows: 1 }, null];
     }
     return [{ affectedRows: 1 }, null];
@@ -239,19 +243,23 @@ await importRepo.importContentSnapshot({ pages: [{ id: 10, route: '/arak/', titl
 assert.equal(imported.pages[0].id, imported.nav[0].target_page_id);
 
 function createSchemaPool() {
-  const state = { columns: new Set(), indexes: new Set(), fks: new Set(), ddl: [] };
+  const state = { columns: new Set(), nullable: new Set(), indexes: new Set(), fks: new Set(), ddl: [] };
   return { state,
     async query(sql, params = []) {
       const text = String(sql);
-      if (text.includes('INFORMATION_SCHEMA.COLUMNS')) return [[...state.columns].includes(`${params[0]}.${params[1]}`) ? [{ COLUMN_NAME: params[1] }] : [], null];
+      if (text.includes('INFORMATION_SCHEMA.COLUMNS')) { const key=`${params[0]}.${params[1]}`; if (![...state.columns].includes(key)) return [[], null]; return [[{ COLUMN_NAME: params[1], IS_NULLABLE: state.nullable.has(key) ? 'YES' : 'NO' }], null]; }
       if (text.includes('INFORMATION_SCHEMA.STATISTICS')) return [[...state.indexes].includes(`${params[0]}.${params[1]}`) ? [{ INDEX_NAME: params[1] }] : [], null];
       if (text.includes('INFORMATION_SCHEMA.TABLE_CONSTRAINTS')) return [[...state.fks].includes(`${params[0]}.${params[2]}`) ? [{ CONSTRAINT_NAME: params[2] }] : [], null];
       state.ddl.push(text);
       if (text.startsWith('ALTER TABLE site_navigation_items ADD COLUMN target_type')) state.columns.add('site_navigation_items.target_type');
       if (text.startsWith('ALTER TABLE site_navigation_items ADD COLUMN target_page_id')) state.columns.add('site_navigation_items.target_page_id');
       if (text.startsWith('ALTER TABLE site_navigation_items ADD COLUMN title_override')) state.columns.add('site_navigation_items.title_override');
+      if (text.startsWith('ALTER TABLE site_navigation_items ADD COLUMN parent_id')) state.columns.add('site_navigation_items.parent_id');
+      if (text.startsWith('ALTER TABLE site_navigation_items MODIFY href')) { state.columns.add('site_navigation_items.href'); state.nullable.add('site_navigation_items.href'); }
+      if (text.startsWith('CREATE INDEX idx_site_navigation_items_parent_status_order')) state.indexes.add('site_navigation_items.idx_site_navigation_items_parent_status_order');
       if (text.startsWith('CREATE INDEX idx_site_navigation_items_target_page')) state.indexes.add('site_navigation_items.idx_site_navigation_items_target_page');
       if (text.startsWith('ALTER TABLE site_navigation_items ADD CONSTRAINT fk_site_navigation_items_target_page')) state.fks.add('site_navigation_items.fk_site_navigation_items_target_page');
+      if (text.startsWith('ALTER TABLE site_navigation_items ADD CONSTRAINT fk_site_navigation_items_parent')) state.fks.add('site_navigation_items.fk_site_navigation_items_parent');
       return [[], null];
     },
   };
@@ -261,6 +269,9 @@ await ensureNavigationTargetSchema(schemaPool);
 assert.equal(schemaPool.state.columns.has('site_navigation_items.target_type'), true);
 assert.equal(schemaPool.state.indexes.has('site_navigation_items.idx_site_navigation_items_target_page'), true);
 assert.equal(schemaPool.state.fks.has('site_navigation_items.fk_site_navigation_items_target_page'), true);
+assert.equal(schemaPool.state.columns.has('site_navigation_items.parent_id'), true);
+assert.equal(schemaPool.state.indexes.has('site_navigation_items.idx_site_navigation_items_parent_status_order'), true);
+assert.equal(schemaPool.state.fks.has('site_navigation_items.fk_site_navigation_items_parent'), true);
 schemaPool.state.ddl = [];
 await ensureNavigationTargetSchema(schemaPool);
 assert.equal(schemaPool.state.ddl.some((stmt) => /^(ALTER|CREATE) /i.test(stmt)), false);
@@ -270,8 +281,13 @@ function createMigratePool() {
   schemaPool.state.columns.add('site_navigation_items.target_type');
   schemaPool.state.columns.add('site_navigation_items.target_page_id');
   schemaPool.state.columns.add('site_navigation_items.title_override');
+  schemaPool.state.columns.add('site_navigation_items.parent_id');
+  schemaPool.state.columns.add('site_navigation_items.href');
+  schemaPool.state.nullable.add('site_navigation_items.href');
   schemaPool.state.indexes.add('site_navigation_items.idx_site_navigation_items_target_page');
+  schemaPool.state.indexes.add('site_navigation_items.idx_site_navigation_items_parent_status_order');
   schemaPool.state.fks.add('site_navigation_items.fk_site_navigation_items_target_page');
+  schemaPool.state.fks.add('site_navigation_items.fk_site_navigation_items_parent');
   return schemaPool;
 }
 const migratePool = createMigratePool();
@@ -284,7 +300,9 @@ assert.match(drySql, /target_type VARCHAR\(32\) NOT NULL DEFAULT 'legacy'/);
 assert.match(drySql, /fk_site_navigation_items_target_page/);
 
 const schemaSource = await readFile('src/lib/db/schema.sql', 'utf8');
-assert.match(schemaSource, /href VARCHAR\(512\) NOT NULL UNIQUE/);
+assert.match(schemaSource, /href VARCHAR\(512\) NULL UNIQUE/);
+assert.match(schemaSource, /parent_id BIGINT UNSIGNED NULL/);
+assert.match(schemaSource, /fk_site_navigation_items_parent/);
 assert.doesNotMatch(schemaSource, /ALTER TABLE site_navigation_items ADD COLUMN IF NOT EXISTS target_type/);
 assert.doesNotMatch(schemaSource, /card_description|card_asset|link_target|site_navigation_targets/);
 console.log('Navigation target smoke passed: resolver, backfill, provider, admin compatibility, snapshot rollback ordering and migration helpers.');

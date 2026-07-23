@@ -12,6 +12,7 @@ const brand = publicSettings.brand;
 const headerCta = resolvePageHeaderCta(pageCtaBlock, publicSettings.defaultCta) as { shouldRender: boolean; buttons: CtaButton[] };
 const validIntent = (value: unknown) => ['demo','trial','email'].includes(String(value || '')) ? String(value) : '';
 const safeId = (value: unknown, fallback: string) => String(value || fallback).trim().replace(/[^a-zA-Z0-9_.:-]/g, '-').slice(0, 80);
+const hasChildren = (item: any) => Array.isArray(item.children) && item.children.length > 0;
 ---
 <header class="site-header">
   <div class="container nav-wrap">
@@ -21,8 +22,20 @@ const safeId = (value: unknown, fallback: string) => String(value || fallback).t
       </span>
     </a>
 
-    <nav aria-label="Fő navigáció">
-      {siteNavigation.map((item) => <a href={item.href}>{item.title}</a>)}
+    <nav aria-label="Fő navigáció" class="site-nav">
+      {siteNavigation.map((item: any) => hasChildren(item) ? (
+        <details class="nav-group">
+          <summary>{item.title}</summary>
+          <div class="nav-dropdown">
+            {item.children.map((child: any) => hasChildren(child) ? (
+              <details class="nav-group nav-group--nested">
+                <summary>{child.title}</summary>
+                <div class="nav-dropdown nav-dropdown--nested">{child.children.map((leaf: any) => <a href={leaf.href}>{leaf.title}</a>)}</div>
+              </details>
+            ) : <a href={child.href}>{child.title}</a>)}
+          </div>
+        </details>
+      ) : <a href={item.href}>{item.title}</a>)}
     </nav>
 
     {headerCta.shouldRender && (
@@ -46,155 +59,33 @@ const safeId = (value: unknown, fallback: string) => String(value || fallback).t
     )}
   </div>
 </header>
+<script>
+  document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape') return;
+    document.querySelectorAll('.site-nav details[open]').forEach((details) => details.removeAttribute('open'));
+  });
+</script>
 <style>
-  .site-header {
-    position: sticky;
-    top: 0;
-    z-index: 20;
-    background: rgba(255, 255, 255, 0.94);
-    backdrop-filter: blur(18px);
-    border-bottom: 1px solid rgba(15, 17, 89, 0.08);
-    box-shadow: 0 18px 50px rgba(15, 17, 89, 0.06);
-  }
-
-  .nav-wrap {
-    width: min(calc(100% - 32px), 1480px);
-    min-height: var(--header-height);
-    display: grid;
-    grid-template-columns: minmax(168px, 190px) minmax(max-content, 1fr) minmax(0, auto);
-    align-items: center;
-    gap: clamp(12px, 1.35vw, 22px);
-  }
-
-  .brand,
-  .brand-logo-frame {
-    display: inline-flex;
-    align-items: center;
-    justify-content: flex-start;
-    overflow: visible;
-  }
-
-  .brand-logo-frame {
-    width: min(33vw, var(--logo-max-width));
-    min-width: 150px;
-    height: var(--logo-max-height);
-  }
-
-  .brand img {
-    display: block;
-    width: auto;
-    max-width: 100%;
-    height: auto;
-    max-height: var(--logo-max-height);
-    object-fit: contain;
-    object-position: left center;
-  }
-
-  nav {
-    display: flex;
-    gap: clamp(4px, 0.55vw, 10px);
-    align-items: center;
-    justify-content: center;
-    flex-wrap: nowrap;
-    min-width: 0;
-    font-size: 0.86rem;
-    color: var(--color-navy);
-    font-weight: 700;
-  }
-
-  nav a {
-    padding: 8px 9px;
-    border-radius: var(--radius-pill);
-    opacity: 0.78;
-    white-space: nowrap;
-  }
-
-  nav a:hover,
-  nav a:focus-visible {
-    opacity: 1;
-    background: #f1f5f0;
-    outline: none;
-  }
-
-  .nav-ctas {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 8px;
-    flex-wrap: nowrap;
-    min-width: 0;
-    max-width: none;
-  }
-
-  .nav-cta {
-    padding: 10px 13px;
-    white-space: nowrap;
-    font-size: 0.82rem;
-    line-height: 1.1;
-  }
-
-  .nav-cta.button-secondary {
-    color: var(--color-navy);
-    border-color: rgba(15, 17, 89, 0.18);
-    background: #f4f7f3;
-    box-shadow: 0 8px 22px rgba(15, 17, 89, 0.08);
-  }
-
-  .nav-cta.button-secondary:hover,
-  .nav-cta.button-secondary:focus-visible {
-    color: var(--color-navy);
-    border-color: rgba(15, 17, 89, 0.28);
-    background: #eaf2e6;
-  }
-
-  @media (max-width: 1380px) {
-    .nav-wrap {
-      grid-template-columns: minmax(150px, auto) minmax(0, 1fr);
-      padding-top: 8px;
-    }
-
-    .nav-ctas {
-      grid-column: 1 / -1;
-      max-width: none;
-      justify-content: flex-end;
-      flex-wrap: wrap;
-      padding-bottom: 10px;
-    }
-  }
-
-  @media (max-width: 980px) {
-    .nav-wrap {
-      min-height: var(--header-height-mobile);
-      padding-top: 9px;
-      padding-bottom: 9px;
-      grid-template-columns: minmax(0, 1fr) auto;
-    }
-
-    .brand-logo-frame {
-      width: var(--logo-max-width-mobile);
-      min-width: 138px;
-      height: var(--logo-max-height-mobile);
-    }
-
-    .brand img { max-height: var(--logo-max-height-mobile); }
-
-    nav {
-      grid-column: 1 / -1;
-      justify-content: flex-start;
-      overflow-x: auto;
-      flex-wrap: nowrap;
-      padding-bottom: 2px;
-      scrollbar-width: none;
-    }
-
-    nav::-webkit-scrollbar { display: none; }
-    .nav-ctas { justify-content: flex-start; }
-  }
-
-  @media (max-width: 560px) {
-    .nav-wrap { grid-template-columns: 1fr; }
-    .nav-ctas { display: grid; grid-template-columns: 1fr; width: 100%; }
-    .nav-cta { width: 100%; }
-    nav { font-size: 0.82rem; }
-  }
+  .site-header { position: sticky; top: 0; z-index: 20; background: rgba(255,255,255,.94); backdrop-filter: blur(18px); border-bottom: 1px solid rgba(15,17,89,.08); box-shadow: 0 18px 50px rgba(15,17,89,.06); }
+  .nav-wrap { width: min(calc(100% - 32px), 1480px); min-height: var(--header-height); display: grid; grid-template-columns: minmax(168px, 190px) minmax(max-content, 1fr) minmax(0, auto); align-items: center; gap: clamp(12px, 1.35vw, 22px); }
+  .brand, .brand-logo-frame { display: inline-flex; align-items: center; justify-content: flex-start; overflow: visible; }
+  .brand-logo-frame { width: min(33vw, var(--logo-max-width)); min-width: 150px; height: var(--logo-max-height); }
+  .brand img { display: block; width: auto; max-width: 100%; height: auto; max-height: var(--logo-max-height); object-fit: contain; object-position: left center; }
+  .site-nav { display: flex; gap: clamp(4px, .55vw, 10px); align-items: center; justify-content: center; flex-wrap: nowrap; min-width: 0; font-size: .86rem; color: var(--color-navy); font-weight: 700; }
+  .site-nav a, .site-nav summary { padding: 8px 9px; border-radius: var(--radius-pill); opacity: .78; white-space: nowrap; }
+  .site-nav a:hover, .site-nav a:focus-visible, .site-nav summary:hover, .site-nav summary:focus-visible { opacity: 1; background: #f1f5f0; outline: 3px solid rgba(46,229,255,.65); outline-offset: 2px; }
+  .nav-group { position: relative; }
+  .nav-group summary { list-style: none; cursor: pointer; user-select: none; }
+  .nav-group summary::-webkit-details-marker { display: none; }
+  .nav-group summary::after { content: "▾"; margin-left: .35rem; font-size: .72em; }
+  .nav-dropdown { display: grid; gap: 4px; min-width: 210px; position: absolute; top: calc(100% + 8px); left: 0; padding: 10px; border-radius: 18px; background: #fff; box-shadow: 0 18px 48px rgba(15,17,89,.16); border: 1px solid rgba(15,17,89,.08); z-index: 30; }
+  .nav-dropdown--nested { left: 100%; top: 0; }
+  .nav-group:not([open]) > .nav-dropdown { display: none; }
+  .nav-ctas { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: nowrap; min-width: 0; max-width: none; }
+  .nav-cta { padding: 10px 13px; white-space: nowrap; font-size: .82rem; line-height: 1.1; }
+  .nav-cta.button-secondary { color: var(--color-navy); border-color: rgba(15,17,89,.18); background: #f4f7f3; box-shadow: 0 8px 22px rgba(15,17,89,.08); }
+  .nav-cta.button-secondary:hover, .nav-cta.button-secondary:focus-visible { color: var(--color-navy); border-color: rgba(15,17,89,.28); background: #eaf2e6; }
+  @media (max-width: 1380px) { .nav-wrap { grid-template-columns: minmax(150px, auto) minmax(0, 1fr); padding-top: 8px; } .nav-ctas { grid-column: 1 / -1; max-width: none; justify-content: flex-end; flex-wrap: wrap; padding-bottom: 10px; } }
+  @media (max-width: 980px) { .nav-wrap { min-height: var(--header-height-mobile); padding-top: 9px; padding-bottom: 9px; grid-template-columns: minmax(0, 1fr) auto; } .brand-logo-frame { width: var(--logo-max-width-mobile); min-width: 138px; height: var(--logo-max-height-mobile); } .brand img { max-height: var(--logo-max-height-mobile); } .site-nav { grid-column: 1 / -1; justify-content: flex-start; align-items: stretch; flex-direction: column; overflow: visible; flex-wrap: nowrap; padding-bottom: 2px; scrollbar-width: none; } .site-nav::-webkit-scrollbar { display: none; } .nav-dropdown, .nav-dropdown--nested { position: static; box-shadow: none; border: 0; padding: 4px 0 4px 14px; background: transparent; } .nav-ctas { justify-content: flex-start; } }
+  @media (max-width: 560px) { .nav-wrap { grid-template-columns: 1fr; } .nav-ctas { display: grid; grid-template-columns: 1fr; width: 100%; } .nav-cta { width: 100%; } .site-nav { font-size: .82rem; } }
 </style>
