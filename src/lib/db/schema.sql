@@ -163,3 +163,16 @@ ALTER TABLE site_pages ADD COLUMN IF NOT EXISTS hero_video JSON NULL;
 
 ALTER TABLE site_pages ADD COLUMN IF NOT EXISTS presentation LONGTEXT NULL CHECK (presentation IS NULL OR JSON_VALID(presentation));
 ALTER TABLE site_content_blocks ADD COLUMN IF NOT EXISTS presentation LONGTEXT NULL CHECK (presentation IS NULL OR JSON_VALID(presentation));
+
+CREATE TABLE IF NOT EXISTS site_admin_password_reset_tokens (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  admin_user_id BIGINT UNSIGNED NOT NULL,
+  token_hash CHAR(64) NOT NULL UNIQUE,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  expires_at TIMESTAMP NOT NULL,
+  used_at TIMESTAMP NULL,
+  requested_ip VARCHAR(64) NULL,
+  INDEX idx_site_admin_password_reset_user_active (admin_user_id, used_at, expires_at),
+  INDEX idx_site_admin_password_reset_expiry (expires_at, used_at),
+  CONSTRAINT fk_site_admin_password_reset_tokens_user FOREIGN KEY (admin_user_id) REFERENCES site_admin_users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

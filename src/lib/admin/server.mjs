@@ -5,6 +5,8 @@ import { open, readFile, stat } from 'node:fs/promises';
 import { authenticate, createLoginSession, clearAuthCookies, sameOriginOk } from './auth.mjs';
 import { parseJsonItems, validateLoginPayload } from './validation.mjs';
 import { layout, loginHtml, mediaPanel, navHtml, pageForm, pagesTable, publishPanel, settingsPanel } from './render.mjs';
+import { usersHtml, forgotPasswordHtml, resetPasswordHtml } from './render/users.mjs';
+import { requestPasswordReset, confirmPasswordReset, issuePasswordReset } from './password-reset.mjs';
 import { authorizeAdminRequest, apiError as policyApiError } from './policy.mjs';
 import { buildPageEffectiveMutationPlan, buildBlockEffectiveMutationPlan, buildHomeAggregateEffectiveMutationPlan, buildNavigationEffectiveMutationPlan, classifyMediaMutation, hasAction } from './permissions.mjs';
 import { parsedBody } from './request-body.mjs';
@@ -105,6 +107,13 @@ export function createAdminServer({ repo, env = process.env, publishService } = 
   return http.createServer(async (req, res) => {
     try {
       const url = new URL(req.url, 'http://localhost');
+      if ((url.pathname === '/admin/forgot-password' || url.pathname === '/admin/reset-password') && req.method !== 'GET') return policyApiError(res, 405, 'METHOD_NOT_ALLOWED', 'Nem támogatott HTTP metódus.', undefined, { allow: 'GET' });
+      if (url.pathname === '/api/admin/password-reset/request' && req.method !== 'POST') return policyApiError(res, 405, 'METHOD_NOT_ALLOWED', 'Nem támogatott HTTP metódus.', undefined, { allow: 'POST' });
+      if (url.pathname === '/api/admin/password-reset/confirm' && req.method !== 'POST') return policyApiError(res, 405, 'METHOD_NOT_ALLOWED', 'Nem támogatott HTTP metódus.', undefined, { allow: 'POST' });
+      if (url.pathname === '/admin/forgot-password' && req.method === 'GET') { res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); return res.end(layout(forgotPasswordHtml(), { nav: false })); }
+      if (url.pathname === '/admin/reset-password' && req.method === 'GET') { res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); return res.end(layout(resetPasswordHtml(url.searchParams.get('token') || ''), { nav: false })); }
+      if (url.pathname === '/api/admin/password-reset/request' && req.method === 'POST') { if (!sameOriginOk(req)) return apiError(res, 403, 'FORBIDDEN', 'Érvénytelen kérés.'); const result = await requestPasswordReset(repo, (await body(req)).email, { env, requestedIp: req.socket?.remoteAddress || null }); return json(res, 200, { ok: true, message: result.message }); }
+      if (url.pathname === '/api/admin/password-reset/confirm' && req.method === 'POST') { if (!sameOriginOk(req)) return apiError(res, 403, 'FORBIDDEN', 'Érvénytelen kérés.'); try { const result = await confirmPasswordReset(repo, await body(req)); return json(res, 200, { ok: true, data: result }); } catch (error) { return apiError(res, error.status || 400, error.code || 'INVALID_RESET_TOKEN', error.message || 'A jelszóbeállító link érvénytelen vagy lejárt.'); } }
       if ((url.pathname === '/admin' || url.pathname === '/admin/login') && req.method !== 'GET') return policyApiError(res, 405, 'METHOD_NOT_ALLOWED', 'Nem támogatott HTTP metódus.', undefined, { allow: 'GET' });
       if (url.pathname === '/api/admin/login' && req.method !== 'POST') return policyApiError(res, 405, 'METHOD_NOT_ALLOWED', 'Nem támogatott HTTP metódus.', undefined, { allow: 'POST' });
       if ((url.pathname === '/admin' || url.pathname === '/admin/login') && req.method === 'GET') { res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); return res.end(loginHtml()); }
@@ -126,6 +135,22 @@ export function createAdminServer({ repo, env = process.env, publishService } = 
       if (url.pathname === '/api/admin/logout' && req.method === 'POST') { await repo.revokeAdminSession?.(adminContext.session.id); return redirect(res, '/admin/login', { 'set-cookie': clearAuthCookies(env) }); }
       if (url.pathname === '/api/admin/session' && req.method === 'GET') return json(res, 200, { ok: true, data: { user, permissions: adminContext.permissions, expiresAt: adminContext.session.expiresAt } });
       if (url.pathname === '/api/admin/pages') { if (!['GET','POST'].includes(req.method)) return apiError(res, 405, 'METHOD_NOT_ALLOWED', 'Nem támogatott HTTP metódus.'); if (req.method === 'POST') { const payload = await body(req); if (!payload.title || !payload.route) return apiError(res, 400, 'INVALID_PAGE', 'Oldalnév és URL szükséges.'); let data; try { data = await repo.createPage(payload); } catch (error) { if (error.code === 'HOME_USE_HOME_EDITOR') return apiError(res, 409, 'HOME_USE_HOME_EDITOR', error.message); if (error.status === 400 || error.code === 'VALIDATION_ERROR') return apiError(res, 400, 'INVALID_PAGE', error.message); throw error; } return json(res, 200, { ok: true, data, publish: await publishAfterSave(user, `Oldal létrehozás: ${data.id}`) }); } return json(res, 200, { ok: true, data: await repo.pages() }); }
+
+
+      if (url.pathname === '/api/admin/users') {
+        if (!['GET','POST'].includes(req.method)) return apiError(res, 405, 'METHOD_NOT_ALLOWED', 'Nem támogatott HTTP metódus.');
+        if (req.method === 'GET') return json(res, 200, { ok: true, data: await repo.listAdminUsers() });
+        try { const data = await repo.createAdminUserWithPermissions(await body(req)); let reset = { ok: true }; try { await issuePasswordReset(repo, data, { env, requestedIp: req.socket?.remoteAddress || null }); } catch (error) { reset = { ok: false, code: error.code || 'SEND_FAILED', message: error.message || 'A link küldése sikertelen, küldd újra később.' }; } return json(res, 200, { ok: true, data, reset }); } catch (error) { return apiError(res, error.status || 400, error.code || 'INVALID_USER', error.message); }
+      }
+      if (/^\/api\/admin\/users\/\d+(?:\/(?:revoke-sessions|send-reset-link))?$/.test(url.pathname)) {
+        const parts = url.pathname.split('/').filter(Boolean); const id = Number(parts[3]);
+        if (url.pathname.endsWith('/revoke-sessions')) { if (req.method !== 'POST') return apiError(res, 405, 'METHOD_NOT_ALLOWED', 'Nem támogatott HTTP metódus.'); await repo.revokeAdminUserSessions(id); return json(res, 200, { ok: true, data: { selfRevoked: Number(id) === Number(user.id) } }); }
+        if (url.pathname.endsWith('/send-reset-link')) { if (req.method !== 'POST') return apiError(res, 405, 'METHOD_NOT_ALLOWED', 'Nem támogatott HTTP metódus.'); const target = await repo.getAdminUserWithPermissions(id); if (!target || target.status !== 'active') return apiError(res, 404, 'USER_NOT_FOUND', 'Aktív felhasználó nem található.'); try { await issuePasswordReset(repo, target, { env, requestedIp: req.socket?.remoteAddress || null }); return json(res, 200, { ok: true }); } catch (error) { return apiError(res, error.status || 503, error.code || 'SEND_FAILED', error.message || 'A küldés sikertelen.'); } }
+        if (!['GET','PUT','PATCH'].includes(req.method)) return apiError(res, 405, 'METHOD_NOT_ALLOWED', 'Nem támogatott HTTP metódus.');
+        if (req.method === 'GET') { const data = await repo.getAdminUserWithPermissions(id); return data ? json(res, 200, { ok: true, data }) : apiError(res, 404, 'USER_NOT_FOUND', 'A felhasználó nem található.'); }
+        const current = await repo.getAdminUserWithPermissions(id); if (!current) return apiError(res, 404, 'USER_NOT_FOUND', 'A felhasználó nem található.'); const payload = await body(req); const disable = current.status === 'active' && payload.status === 'disabled'; const normal = payload.display_name !== undefined || payload.displayName !== undefined || payload.email !== undefined || payload.permissions !== undefined || (current.status === 'disabled' && payload.status === 'active'); if ((normal && !hasAction(adminContext.permissions,'users','save')) || (disable && !hasAction(adminContext.permissions,'users','archive'))) return apiError(res, 403, 'FORBIDDEN', 'Nincs jogosultság a művelethez.');
+        try { return json(res, 200, { ok: true, data: await repo.updateAdminUserWithPermissions(id, payload, user.id) }); } catch (error) { return apiError(res, error.status || 400, error.code || 'INVALID_USER', error.message); }
+      }
 
       if (/\/admin\/pages\/\d+\/home\/preview\/.*(?:%2e|%2f|\.\.)/i.test(req.url || '') || /^\/admin\/pages\/\d+\/home(?!\/preview|$)/.test(url.pathname)) return apiError(res, 400, 'INVALID_PREVIEW_PATH', 'Hibás előnézeti útvonal.');
       const previewMatch = /^\/admin\/pages\/(\d+)\/home\/preview(?:\/(.*))?$/.exec(url.pathname);
@@ -241,6 +266,7 @@ export function createAdminServer({ repo, env = process.env, publishService } = 
       if (url.pathname === '/api/admin/publish' && req.method === 'POST') return json(res, 200, { ok: true, publish: await publishAfterSave(user, 'Kézi újraélesítés') });
       if (url.pathname.startsWith('/api/admin/publish/rollback/') && req.method === 'POST') { const snap = await repo.publishSnapshot(url.pathname.split('/').pop()); if (!snap) return apiError(res, 404, 'SNAPSHOT_NOT_FOUND', 'Snapshot nem található.'); const preflight = validateContentReferences(snap.content_json); if (!preflight.ok) return apiError(res, 409, 'CONTENT_REFERENCE_INVALID', referenceValidationSummary(preflight), preflight); const content = normalizeSnapshotForReferenceValidation(snap.content_json); await repo.importContentSnapshot(content); return json(res, 200, { ok: true, publish: await publishAfterSave(user, `Rollback: ${snap.id}`) }); }
       if (url.pathname === '/admin/dashboard') return redirect(res, '/admin/pages');
+      if (url.pathname === '/admin/users') return html(res, usersHtml({ permissions: adminContext.permissions }), 200, '/admin/users', adminContext);
       if (url.pathname === '/admin/publish') return html(res, publishPanel({ snapshots: await repo.publishSnapshots(20), permissions: adminContext.permissions }), 200, '/admin/publish', adminContext);
       if (url.pathname === '/admin/pages') return html(res, pagesTable(await repo.pages(), { permissions: adminContext.permissions }), 200, '/admin/pages', adminContext);
       if (url.pathname.startsWith('/admin/pages/')) { const page = await repo.page(url.pathname.split('/').pop()); return page ? html(res, pageForm(page, { permissions: adminContext.permissions }), 200, '/admin/pages', adminContext) : html(res, '<p class="msg err">Az oldal nem található.</p>', 404); }

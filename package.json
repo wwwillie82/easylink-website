@@ -46,13 +46,15 @@
     "smoke:navigation-hierarchy": "node tests/navigation-hierarchy-smoke.mjs",
     "smoke:menu-position-controls": "node tests/menu-add-position-controls-smoke.mjs",
     "smoke:navigation-delete": "node tests/navigation-delete-smoke.mjs",
-    "smoke:page-delete": "node tests/page-delete-smoke.mjs"
+    "smoke:page-delete": "node tests/page-delete-smoke.mjs",
+    "smoke:admin-users": "node tests/admin-users-smoke.mjs"
   },
   "dependencies": {
     "astro": "7.0.5",
     "typescript": "6.0.3",
     "mysql2": "3.11.5",
-    "busboy": "1.6.0"
+    "busboy": "1.6.0",
+    "nodemailer": "6.9.16"
   },
   "devDependencies": {}
 }

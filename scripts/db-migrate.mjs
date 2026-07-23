@@ -69,6 +69,8 @@ export async function migrate({ pool, dryRun = false } = {}) {
   for (const stmt of sql.split(/;\s*\n/).map((s) => s.trim()).filter(Boolean)) await pool.query(stmt);
   await ensureNavigationTargetSchema(pool);
   await ensureMediaIndexes(pool);
+  if (!(await indexExists(pool, 'site_admin_password_reset_tokens', 'idx_site_admin_password_reset_user_active'))) await pool.query('CREATE INDEX idx_site_admin_password_reset_user_active ON site_admin_password_reset_tokens (admin_user_id, used_at, expires_at)');
+  if (!(await indexExists(pool, 'site_admin_password_reset_tokens', 'idx_site_admin_password_reset_expiry'))) await pool.query('CREATE INDEX idx_site_admin_password_reset_expiry ON site_admin_password_reset_tokens (expires_at, used_at)');
   await ensureAdminAuthFoundation(pool);
   return 'MariaDB schema migration completed.';
 }

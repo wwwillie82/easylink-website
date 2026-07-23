@@ -16,7 +16,7 @@ export const adminNavItems = Object.freeze([
   { scope: 'media', href: '/admin/media', label: 'Média', u1: true },
   { scope: 'settings', href: '/admin/settings', label: 'Alapadatok', u1: true },
   { scope: 'publish', href: '/admin/publish', label: 'Korábbi élesítések', u1: true },
-  { scope: 'users', href: '/admin/users', label: 'Felhasználók', u1: false },
+  { scope: 'users', href: '/admin/users', label: 'Felhasználók', u1: true },
   { scope: 'audit', href: '/admin/audit', label: 'Napló', u1: false },
 ]);
 
@@ -93,6 +93,10 @@ export const adminRouteRules = Object.freeze([
   rule(/^\/admin$/, ['GET'], null, null, { public: true }),
   rule(/^\/admin\/login$/, ['GET'], null, null, { public: true }),
   rule(/^\/api\/admin\/login$/, ['POST'], null, null, { public: true }),
+  rule(/^\/admin\/forgot-password$/, ['GET'], null, null, { public: true }),
+  rule(/^\/admin\/reset-password$/, ['GET'], null, null, { public: true }),
+  rule(/^\/api\/admin\/password-reset\/request$/, ['POST'], null, null, { public: true }),
+  rule(/^\/api\/admin\/password-reset\/confirm$/, ['POST'], null, null, { public: true }),
   rule(/^\/admin\/dashboard$/, ['GET'], 'pages'),
   rule(/^\/api\/admin\/session$/, ['GET'], null, null, { authOnly: true }),
   rule(/^\/api\/admin\/logout$/, ['POST'], null, null, { authOnly: true, csrf: true }),
@@ -121,6 +125,13 @@ export const adminRouteRules = Object.freeze([
   rule(/^\/api\/admin\/settings$/, ['GET'], 'settings'),
   rule(/^\/api\/admin\/settings$/, ['POST', 'PUT'], 'settings', 'save'),
   rule(/^\/admin\/publish$/, ['GET'], 'publish'),
+  rule(/^\/admin\/users$/, ['GET'], 'users'),
+  rule(/^\/api\/admin\/users$/, ['GET'], 'users'),
+  rule(/^\/api\/admin\/users$/, ['POST'], 'users', 'save'),
+  rule(/^\/api\/admin\/users\/\d+$/, ['GET'], 'users'),
+  rule(/^\/api\/admin\/users\/\d+$/, ['PUT', 'PATCH'], 'users'),
+  rule(/^\/api\/admin\/users\/\d+\/revoke-sessions$/, ['POST'], 'users', 'archive'),
+  rule(/^\/api\/admin\/users\/\d+\/send-reset-link$/, ['POST'], 'users', 'save'),
   rule(/^\/api\/admin\/publish$/, ['POST'], 'publish', 'republish'),
   rule(/^\/api\/admin\/publish\/rollback\/\d+$/, ['POST'], 'publish', 'restore'),
 ]);
