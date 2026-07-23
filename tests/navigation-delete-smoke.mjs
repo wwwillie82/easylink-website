@@ -62,7 +62,10 @@ function deletePool(nav = [
   ]);
   await assert.rejects(
     () => createAdminRepository(pool).deleteNavigationItem(11),
-    (error) => error.code === 'NAVIGATION_DELETE_INVALID_HIERARCHY' && error.details?.hierarchyCode === 'NAVIGATION_PUBLISHED_EMPTY_GROUP',
+    (error) => error.code === 'NAVIGATION_DELETE_INVALID_HIERARCHY'
+      && error.details?.hierarchyCode === 'NAVIGATION_PUBLISHED_EMPTY_GROUP'
+      && /szülőcsoport egyetlen látható gyermeke/.test(error.message)
+      && /archiváld ezt a menüpontot és a szülőcsoportot/.test(error.message),
   );
   assert.equal(state.nav.some((item) => item.id === 11), true, 'sole published child is preserved until the branch is archived or rearranged');
   assert.equal(state.rollbacks, 1);
@@ -86,6 +89,7 @@ const deleteRepositorySource = await readFile('src/lib/admin/repository-navigati
 assert.match(deleteRepositorySource, /validateNavigationHierarchy/);
 assert.match(deleteRepositorySource, /NAVIGATION_ITEM_HAS_CHILDREN/);
 assert.match(deleteRepositorySource, /NAVIGATION_DELETE_INVALID_HIERARCHY/);
+assert.match(deleteRepositorySource, /szülőcsoport egyetlen látható gyermeke/);
 assert.match(deleteRepositorySource, /DELETE FROM site_navigation_items WHERE id=\?/);
 
 const baseRepositorySource = await readFile('src/lib/admin/repository.mjs', 'utf8');
@@ -93,4 +97,4 @@ assert.match(baseRepositorySource, /SELECT \* FROM site_navigation_items ORDER B
 assert.match(baseRepositorySource, /INSERT INTO site_navigation_items SET \?/);
 assert.match(baseRepositorySource, /UPDATE site_navigation_items SET parent_id=NULL/);
 
-console.log('Navigation delete smoke passed: physical delete, hierarchy protection, admin removal and snapshot restore contracts are present.');
+console.log('Navigation delete smoke passed: physical delete, actionable hierarchy guidance, admin removal and snapshot restore contracts are present.');
