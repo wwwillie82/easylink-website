@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
-import { navHtml, menuVisibleDefaultScript } from '../src/lib/admin/render/menu-visible-default.mjs';
-import { menuPositionControlsScript } from '../src/lib/admin/render/menu-position-controls.mjs';
+import { navHtml, menuPositionControlsScript } from '../src/lib/admin/render/menu-position-controls.mjs';
 
 const html = navHtml([
   { id: 1, title: 'Root group', href: null, target_type: 'group', parent_id: null, sort_order: 1, status: 'published' },
@@ -12,6 +11,8 @@ assert.match(html, /Új root menüpont legfelül/);
 assert.match(html, /Új root menüpont legalul/);
 assert.match(html, /Gyermek menüpont hozzáadása/);
 assert.match(menuPositionControlsScript, /position === 'start' \? \[newRow, \.\.\.existingSiblings\] : \[\.\.\.existingSiblings, newRow\]/);
+assert.match(menuPositionControlsScript, /statusSelect\.value = 'published'/);
+assert.match(menuPositionControlsScript, /statusSelect\.dispatchEvent\(new Event\('change', \{ bubbles: true \}\)\)/);
 assert.match(menuPositionControlsScript, /parentSelect\.value = parentRef/);
 assert.match(menuPositionControlsScript, /newRow\.dataset\.suppressParentMoveFeedback = '1'/);
 assert.match(menuPositionControlsScript, /parentSelect\?\.dispatchEvent\(new Event\('change', \{ bubbles: true \}\)\)/);
@@ -26,8 +27,5 @@ assert.match(menuPositionControlsScript, /row\.scrollIntoView\(\{ block: 'center
 assert.match(menuPositionControlsScript, /row\.animate\?\./);
 assert.match(menuPositionControlsScript, /event\.target\.matches\('\[data-role="parent-select"\]'\)/);
 assert.match(menuPositionControlsScript, /else showParentMoveFeedback\(row\)/);
-assert.match(menuVisibleDefaultScript, /#add-nav-bottom, \[data-menu-add-position="top"\] button, \[data-add-child\]/);
-assert.match(menuVisibleDefaultScript, /status\.value = 'published'/);
-assert.match(menuVisibleDefaultScript, /status\.dispatchEvent\(new Event\('change', \{ bubbles: true \}\)\)/);
 
 console.log('Menu add position controls smoke passed: deterministic insertion, visible default and parent-move feedback contracts are present.');

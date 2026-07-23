@@ -154,6 +154,11 @@ export const menuPositionControlsScript = String.raw`(() => {
     const newRow = [...rows.querySelectorAll('[data-nav-item]')].find((row) => !before.has(row));
     if (!newRow) return;
 
+    const statusSelect = newRow.querySelector('[data-field="status"]');
+    if (statusSelect) {
+      statusSelect.value = 'published';
+      statusSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    }
     const parentSelect = newRow.querySelector('[data-role="parent-select"]');
     if (parentSelect) parentSelect.value = parentRef;
     const ordered = position === 'start' ? [newRow, ...existingSiblings] : [...existingSiblings, newRow];
