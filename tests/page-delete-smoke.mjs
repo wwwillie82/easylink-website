@@ -162,6 +162,8 @@ assert.match(formHtml, /legfeljebb egy nem archivált saját tartalmi blokk/);
 assert.match(pageDeleteClientScript, /fetch\('\/api\/admin\/pages\/' \+ encodeURIComponent\(id\), \{ method: 'DELETE' \}\)/);
 assert.match(pageDeleteClientScript, /Korábbi élesítés visszaállításával az oldal és blokkjai/);
 assert.match(pageDeleteClientScript, /window\.confirm/);
+assert.equal(pageDeleteClientScript.includes("if (!/^\\d+$/.test(id)) return;"), true, 'numeric page IDs pass the runtime click guard');
+assert.equal(pageDeleteClientScript.includes("if (!/^\\\\d+$/.test(id)) return;"), false, 'runtime guard must not search for a literal \\d token');
 
 const serverSource = await readFile('src/lib/admin/server-page-delete.mjs', 'utf8');
 assert.match(serverSource, /api\\\/admin\\\/pages/);
@@ -174,4 +176,4 @@ assert.match(baseRepositorySource, /importContentSnapshot/);
 assert.match(baseRepositorySource, /INSERT INTO site_pages/);
 assert.match(baseRepositorySource, /INSERT INTO site_content_blocks/);
 
-console.log('Page delete smoke passed: navigation, active content, active block-count, home protection, cascade delete, UI warning and snapshot restore contracts are present.');
+console.log('Page delete smoke passed: navigation, active content, active block-count, home protection, cascade delete, UI warning, click runtime and snapshot restore contracts are present.');
