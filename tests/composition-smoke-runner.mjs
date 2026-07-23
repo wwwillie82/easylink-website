@@ -11,6 +11,13 @@ const tests = [
   'tests/menu-add-position-controls-smoke.mjs',
   'tests/navigation-delete-smoke.mjs',
   'tests/page-delete-smoke.mjs',
+  'tests/admin-auth-permissions-smoke.mjs',
+  'tests/admin-effective-plans-smoke.mjs',
+  'tests/admin-permission-migration-smoke.mjs',
+  'tests/admin-permission-ui-smoke.mjs',
+  'tests/admin-security-corrections-smoke.mjs',
+  'tests/admin-home-api-smoke.mjs',
+  'tests/menu-a2b-smoke.mjs',
 ];
 
 for (const file of tests) {
@@ -28,4 +35,4 @@ for (const file of tests) {
   console.log(`COMPOSITION_PASS: ${file}`);
 }
 
-console.log('Composition smoke suite passed.');
+console.log('Composition and U1 admin security smoke suite passed.');
