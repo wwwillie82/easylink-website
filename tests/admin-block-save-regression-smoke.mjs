@@ -220,6 +220,8 @@ assert.match(localStatus.querySelector('[data-dirty-message]').className, /err/)
 dirty.markSaving();
 assert.equal(localStatus.textContent, 'Mentés folyamatban…');
 dirty.markSaved();
+assert.equal(localStatus.textContent, 'Mentés sikeres.');
+assert.match(localStatus.querySelector('p').className, /ok/);
 sandbox.runMsg('Tartalom mentve, élesítés sikeres.', true);
 assert.equal(localStatus.textContent, 'Tartalom mentve, élesítés sikeres.');
 assert.match(localStatus.querySelector('p').className, /ok/);
