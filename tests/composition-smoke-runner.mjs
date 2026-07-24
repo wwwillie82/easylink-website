@@ -23,6 +23,7 @@ const tests = [
   'tests/admin-audit-smoke.mjs',
   'tests/admin-audit-user-ux-smoke.mjs',
   'tests/admin-block-save-regression-smoke.mjs',
+  'tests/admin-block-save-status-fixed-smoke.mjs',
   'tests/admin-home-api-smoke.mjs',
   'tests/menu-a2b-smoke.mjs',
   'tests/live-smoke-metadata-contract-smoke.mjs',
