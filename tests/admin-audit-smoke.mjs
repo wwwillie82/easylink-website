@@ -160,7 +160,9 @@ assert.ok(codes.includes('admin_authorization_denied:denied'));
 assert.ok(codes.includes('admin_publish_failed:failure'));
 
 const runtimeEntry = await readFile(new URL('../scripts/admin-server.mjs', import.meta.url), 'utf8');
-assert.match(runtimeEntry, /server-audit-hardening\.mjs/);
+assert.match(runtimeEntry, /server-block-save-audit-hardening\.mjs/);
+const blockAuditRuntime = await readFile(new URL('../src/lib/admin/server-block-save-audit-hardening.mjs', import.meta.url), 'utf8');
+assert.match(blockAuditRuntime, /server-audit-hardening\.mjs/);
 
 const failureEvents = auditEventsForCompletedRequest({
   method: 'POST',
