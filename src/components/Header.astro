@@ -16,11 +16,14 @@ const hasChildren = (item: any) => Array.isArray(item.children) && item.children
 ---
 <header class="site-header">
   <div class="container nav-wrap">
-    <a class="brand" href="/" aria-label="Easylink főoldal">
-      <span class="brand-logo-frame">
-        <img src={brand.headerLogoPath} alt={brand.headerLogoAlt} />
-      </span>
-    </a>
+    <div class="brand-zone">
+      <a class="brand" href="/" aria-label="Easylink főoldal">
+        <span class="brand-logo-frame">
+          <img src={brand.headerLogoPath} alt={brand.headerLogoAlt} />
+        </span>
+      </a>
+      <a class="admin-session-link" data-admin-session-link href="/admin/pages" hidden>Admin</a>
+    </div>
 
     <nav aria-label="Fő navigáció" class="site-nav">
       {siteNavigation.map((item: any) => hasChildren(item) ? (
@@ -60,6 +63,38 @@ const hasChildren = (item: any) => Array.isArray(item.children) && item.children
   </div>
 </header>
 <script>
+  const adminLink = document.querySelector('[data-admin-session-link]');
+  const adminRoutes = [
+    ['pages', '/admin/pages'],
+    ['menu', '/admin/menu'],
+    ['media', '/admin/media'],
+    ['settings', '/admin/settings'],
+    ['publish', '/admin/publish'],
+    ['users', '/admin/users'],
+    ['audit', '/admin/audit'],
+  ];
+
+  if (adminLink instanceof HTMLAnchorElement) {
+    fetch('/api/admin/session', {
+      method: 'GET',
+      credentials: 'same-origin',
+      cache: 'no-store',
+      headers: { accept: 'application/json' },
+    })
+      .then(async (response) => response.ok ? response.json().catch(() => null) : null)
+      .then((payload) => {
+        if (!payload?.ok || !payload?.data?.user) return;
+        const permissions = payload.data.permissions || {};
+        const route = adminRoutes.find(([scope]) => Boolean(permissions[scope]))?.[1];
+        if (!route) return;
+        adminLink.href = route;
+        adminLink.hidden = false;
+        const userLabel = payload.data.user.displayName || payload.data.user.email || '';
+        adminLink.setAttribute('aria-label', userLabel ? `Admin felület megnyitása (${userLabel})` : 'Admin felület megnyitása');
+      })
+      .catch(() => {});
+  }
+
   document.addEventListener('keydown', (event) => {
     if (event.key !== 'Escape') return;
     document.querySelectorAll('.site-nav details[open]').forEach((details) => details.removeAttribute('open'));
@@ -68,9 +103,13 @@ const hasChildren = (item: any) => Array.isArray(item.children) && item.children
 <style>
   .site-header { position: sticky; top: 0; z-index: 20; background: rgba(255,255,255,.94); backdrop-filter: blur(18px); border-bottom: 1px solid rgba(15,17,89,.08); box-shadow: 0 18px 50px rgba(15,17,89,.06); }
   .nav-wrap { width: min(calc(100% - 32px), 1480px); min-height: var(--header-height); display: grid; grid-template-columns: minmax(168px, 190px) minmax(max-content, 1fr) minmax(0, auto); align-items: center; gap: clamp(12px, 1.35vw, 22px); }
+  .brand-zone { display: grid; justify-items: start; align-content: center; gap: 3px; min-width: 0; }
   .brand, .brand-logo-frame { display: inline-flex; align-items: center; justify-content: flex-start; overflow: visible; }
   .brand-logo-frame { width: min(33vw, var(--logo-max-width)); min-width: 150px; height: var(--logo-max-height); }
   .brand img { display: block; width: auto; max-width: 100%; height: auto; max-height: var(--logo-max-height); object-fit: contain; object-position: left center; }
+  .admin-session-link { display: inline-flex; align-items: center; justify-content: center; min-height: 24px; padding: 3px 9px; border-radius: var(--radius-pill); background: var(--color-navy); color: #fff; font-size: .72rem; line-height: 1; font-weight: 800; text-decoration: none; box-shadow: 0 5px 14px rgba(15,17,89,.18); }
+  .admin-session-link:hover, .admin-session-link:focus-visible { background: #262875; color: #fff; outline: 3px solid rgba(46,229,255,.65); outline-offset: 2px; }
+  .admin-session-link[hidden] { display: none; }
   .site-nav { display: flex; gap: clamp(4px, .55vw, 10px); align-items: center; justify-content: center; flex-wrap: nowrap; min-width: 0; font-size: .86rem; color: var(--color-navy); font-weight: 700; }
   .site-nav a, .site-nav summary { padding: 8px 9px; border-radius: var(--radius-pill); opacity: .78; white-space: nowrap; }
   .site-nav a:hover, .site-nav a:focus-visible, .site-nav summary:hover, .site-nav summary:focus-visible { opacity: 1; background: #f1f5f0; outline: 3px solid rgba(46,229,255,.65); outline-offset: 2px; }
