@@ -22,7 +22,7 @@ function addPublicSiteLink(html) {
 
 export function layout(body, options = {}) {
   const html = baseLayout(body, options);
-  return options.nav === false ? html : addPublicSiteLink(html);
+  return options.nav === false || !options.adminContext?.user ? html : addPublicSiteLink(html);
 }
 
 export function loginHtml(error = '') {
