@@ -2,6 +2,7 @@ import { esc } from './utils.mjs';
 import { adminScopes, scopeActions } from '../permissions.mjs';
 import { RESET_PASSWORD_MIN_LENGTH } from '../password-reset.mjs';
 import { defaultNewUserPermissions } from '../users.mjs';
+import { adminDateTimeClientSource } from '../date-time.mjs';
 
 const scopeLabels = {
   pages: 'Oldalak',
@@ -43,8 +44,10 @@ function clientJs({ canSave, canArchive }) {
           : actionLabels[action],
       })),
   }));
+  const dateTimeSource = adminDateTimeClientSource();
 
   return `(()=>{
+    ${dateTimeSource}
     const canSave=${Boolean(canSave)};
     const canArchive=${Boolean(canArchive)};
     const scopes=${JSON.stringify(scopes)};
@@ -87,7 +90,7 @@ function clientJs({ canSave, canArchive }) {
     const load=async()=>{
       const result=await api('/api/admin/users');
       rows.innerHTML=result.data.map((user)=>'<tr><td>'+escapeHtml(user.display_name)+'</td><td>'+escapeHtml(user.email)+'</td><td>'
-        +(user.status==='active'?'Aktív':'Letiltott')+'</td><td>'+escapeHtml(user.last_login_at||'-')+'</td><td><button data-edit="'+user.id+'">Szerkesztés</button> '
+        +(user.status==='active'?'Aktív':'Letiltott')+'</td><td>'+escapeHtml(formatAdminDateTime(user.last_login_at,'-'))+'</td><td><button data-edit="'+user.id+'">Szerkesztés</button> '
         +(canArchive?'<button class="danger" data-revoke="'+user.id+'">Összes munkamenet visszavonása</button> ':'')
         +(canSave?'<button data-reset="'+user.id+'">Jelszóbeállító link újraküldése</button>':'')+'</td></tr>').join('');
     };
