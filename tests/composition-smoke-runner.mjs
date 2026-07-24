@@ -12,6 +12,7 @@ const tests = [
   'tests/navigation-delete-smoke.mjs',
   'tests/page-delete-smoke.mjs',
   'tests/admin-auth-permissions-smoke.mjs',
+  'tests/admin-public-navigation-links-smoke.mjs',
   'tests/admin-effective-plans-smoke.mjs',
   'tests/admin-permission-migration-smoke.mjs',
   'tests/admin-permission-ui-smoke.mjs',
