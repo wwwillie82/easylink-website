@@ -19,10 +19,19 @@ function metadataValue(value) {
   try { return JSON.parse(value); } catch { return null; }
 }
 
+export function blockPayloadForBaseRepository(payload = {}) {
+  if (!Array.isArray(payload?.items)) return payload;
+  return { ...payload, items: JSON.stringify(payload.items) };
+}
+
 export function createAdminRepository(pool) {
   const repo = createBaseAdminRepository(pool);
   return {
     ...repo,
+
+    async upsertBlock(payload) {
+      return repo.upsertBlock(blockPayloadForBaseRepository(payload));
+    },
 
     async listAuditEvents(filters = {}) {
       const page = Math.max(1, Number(filters.page || 1));
