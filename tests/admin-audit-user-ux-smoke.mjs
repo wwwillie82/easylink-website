@@ -24,10 +24,15 @@ const auditHtml = auditPanel();
 assert.match(auditHtml, /<select name="target_type">/);
 assert.match(auditHtml, /Admin felhasználó/);
 assert.match(auditHtml, /Menüpont/);
-assert.match(auditHtml, /A Cél ID és a Request ID mezőben az azonosító egy részlete is elegendő/);
-assert.match(auditHtml, /<th>Cél típusa<\/th><th>Cél ID<\/th><th>Cél neve<\/th>/);
+assert.match(auditHtml, /Tartalmi blokknál a Cél ID a blokk azonosítója/);
+assert.match(auditHtml, /a külön Oldal oszlop mutatja a szülőoldalt/);
+assert.match(auditHtml, /<th>Cél típusa<\/th><th>Cél ID<\/th><th>Cél neve<\/th><th>Oldal<\/th>/);
+assert.match(auditHtml, /pageContextHtml\(a\)/);
+assert.match(auditHtml, /m\.pageId/);
+assert.match(auditHtml, /m\.pageTitle/);
+assert.match(auditHtml, /m\.pageRoute/);
 assert.match(auditHtml, /<td><code>'\+escHtml\(a\.target_id\|\|'—'\)/);
-assert.match(auditHtml, /colspan="11"/);
+assert.match(auditHtml, /colspan="12"/);
 
 const users = usersHtml({ permissions: { users: { canSave: true, canArchive: true } } });
 assert.match(users, /Felhasználó szerkesztése \('/);
